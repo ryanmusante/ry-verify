@@ -1,8 +1,8 @@
 # ry-verify
 
-**Version 7.190.0** · [Changelog](CHANGELOG.md)
+**Version 7.191.0** · [Changelog](CHANGELOG.md)
 
-Verification and idempotency probe for the CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys on the Beelink GTR9 Pro (Ryzen AI Max+ 395 / gfx1151 / Strix Halo). One fish script — `ry-verify.fish`, `--verify` plus `--check` — comparing 17 [Managed Files](#managed-files) byte for byte, then the live kernel-cmdline, module, sysctl, unit, fstab, and session state.
+Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory and compares the installed bytes against its own embedded baseline, then reads the live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
 ## Quick Start
 
@@ -60,11 +60,11 @@ Skipping the hardware check is the risky override — a wrong-CPU run compares a
 
 ## Managed Files
 
-In deploy order; system files are checked against `0644` where the filesystem records modes, user files against `0600`.
+Listed in deploy order, audited byte for byte against the regenerated baseline; system files are checked against `0644` where the filesystem records modes, user files against `0600`.
 
 ### Boot
 
-| File | Purpose |
+| File | Expected content |
 |---|---|
 | `/boot/loader/loader.conf` | systemd-boot: `default @saved`, `timeout 0`, `console-mode keep`, `editor no` |
 | `/etc/kernel/cmdline` | `rw root=UUID=<detected>` plus the 14 kernel tokens |
@@ -73,7 +73,7 @@ In deploy order; system files are checked against `0644` where the filesystem re
 
 ### System
 
-| File | Purpose |
+| File | Expected content |
 |---|---|
 | `/etc/systemd/resolved.conf.d/99-cachyos-resolved.conf` | mDNS and LLMNR off |
 | `/etc/systemd/logind.conf.d/99-cachyos-logind.conf` | 8 power, suspend, hibernate, and reboot keys ignored, long-press included |
@@ -89,7 +89,7 @@ In deploy order; system files are checked against `0644` where the filesystem re
 
 ### User
 
-| File | Purpose |
+| File | Expected content |
 |---|---|
 | `~/.config/environment.d/10-environment.conf` | session env — DXVK, GTK, MangoHud, Proton, VKD3D, Wine, PowerDevil |
 | `~/.config/MangoHud/MangoHud.conf` | readout-only HUD — horizontal, top-left, toggle `Shift_R+F12` |
@@ -125,11 +125,11 @@ In deploy order; system files are checked against `0644` where the filesystem re
 > [!CAUTION]
 > `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship at the same version. Clone both repos at the same tag. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
 
-All tunables are `set -g` globals — there is no external config file, and only `EXPECTED_SCALING_DRIVER` is verify-side alone. Every other key below is carried verbatim by [ry-install](https://github.com/ryanmusante/ry-install) at the same version; edit both repos in lockstep.
+The expected state: every static and runtime check reads against the keys below. All tunables are `set -g` globals — there is no external config file, and only `EXPECTED_SCALING_DRIVER` is verify-side alone. Every other key is carried verbatim by [ry-install](https://github.com/ryanmusante/ry-install) at the same version; edit both repos in lockstep.
 
 ### Bootloader Keys
 
-| Key | Value | Emitted as | File |
+| Key | Value | Checked as | File |
 |---|---|---|---|
 | `LOADER_DEFAULT` | `@saved` | `default` | `loader.conf` |
 | `LOADER_TIMEOUT` | `0` | `timeout` | `loader.conf` |
@@ -163,7 +163,7 @@ All tunables are `set -g` globals — there is no external config file, and only
 
 `HOOKS` order is an invariant, enforced when the profile is deployed: `base` first, `fsck` last, no duplicates, and `systemd` before `autodetect`, `keyboard`, and `sd-vconsole`; `autodetect` before `microcode` and `modconf`; `keyboard` before `sd-vconsole`; `modconf` before `kms`; `block` before `filesystems`.
 
-| Key | Value | Emitted as |
+| Key | Value | Checked as |
 |---|---|---|
 | `MKINITCPIO_MODULES` | `amdgpu` | `MODULES=()` |
 | `MKINITCPIO_HOOKS` | `base`, `systemd`, `autodetect`, `microcode`, `modconf`, `kms`, `keyboard`, `sd-vconsole`, `block`, `filesystems`, `fsck` | `HOOKS=()` |
@@ -176,7 +176,7 @@ All tunables are `set -g` globals — there is no external config file, and only
 
 `NM_WIFI_POWERSAVE` is `2` because the MT7925 handles powersave in software and spikes latency otherwise. `BLACKLIST_AMDXDNA` is `false` because the IOMMU is on; [Tuning Notes](#tuning-notes) has the reverse switch.
 
-| Key | Value | Emitted as |
+| Key | Value | Checked as |
 |---|---|---|
 | `RESOLVED_MDNS` | `no` | `MulticastDNS=` |
 | `RESOLVED_LLMNR` | `no` | `LLMNR=` |
@@ -227,17 +227,19 @@ Ships at priority `95`, after the vendor `70-cachyos-settings.conf`.
 
 ## Packages
 
-**Install** (`PKGS_ADD`, 17) — `nvme-cli`, `cachyos-gaming-meta`, `cachyos-gaming-applications`, `cachyos-benchmarker`, `lib32-mesa`, `mkinitcpio-firmware`, `fd`, `sd`, `dust`, `procs`, `bottom`, `htop`, `lm_sensors`, `rtkit`, `realtime-privileges`, `nftables`, `pacman-contrib`.
+**Expected present** (`PKGS_ADD`, 17) — `nvme-cli`, `cachyos-gaming-meta`, `cachyos-gaming-applications`, `cachyos-benchmarker`, `lib32-mesa`, `mkinitcpio-firmware`, `fd`, `sd`, `dust`, `procs`, `bottom`, `htop`, `lm_sensors`, `rtkit`, `realtime-privileges`, `nftables`, `pacman-contrib`.
 
-**Remove** (`PKGS_DEL`, 9) — `plymouth`, `cachyos-plymouth-bootanimation`, `cachyos-plymouth-theme`, `breeze-plymouth`, `plymouth-kcm`, `micro`, `cachyos-micro-settings`, `cachy-update`, `kdeconnect`.
+**Expected absent** (`PKGS_DEL`, 9) — `plymouth`, `cachyos-plymouth-bootanimation`, `cachyos-plymouth-theme`, `breeze-plymouth`, `plymouth-kcm`, `micro`, `cachyos-micro-settings`, `cachy-update`, `kdeconnect`.
 
 ## Units
 
-**Masked** (`MASK`, 11) — `ananicy-cpp.service`, `power-profiles-daemon.service`, `NetworkManager-wait-online.service`, `avahi-daemon.service`, `avahi-daemon.socket`, `ufw.service`, `sleep.target`, `suspend.target`, `hibernate.target`, `hybrid-sleep.target`, `suspend-then-hibernate.target`.
+**Expected masked** (`MASK`, 11) — `ananicy-cpp.service`, `power-profiles-daemon.service`, `NetworkManager-wait-online.service`, `avahi-daemon.service`, `avahi-daemon.socket`, `ufw.service`, `sleep.target`, `suspend.target`, `hibernate.target`, `hybrid-sleep.target`, `suspend-then-hibernate.target`.
 
-**Enabled** (`EXPECTED_SERVICES`, 5) — `fstrim.timer`, `NetworkManager.service`, `cpupower.service`, `nftables.service`, `bluetooth.service`.
+**Expected enabled** (`EXPECTED_SERVICES`, 5) — `fstrim.timer`, `NetworkManager.service`, `cpupower.service`, `nftables.service`, `bluetooth.service`.
 
 ## Tuning Notes
+
+How the checked values behave at runtime, and the remedy when a check flags one.
 
 ### Gaming Stack
 
@@ -256,7 +258,7 @@ Ships at priority `95`, after the vendor `70-cachyos-settings.conf`.
 
 ## BIOS
 
-Multi-thread gains flatten past ~85 W. Set a flat `SPL = fPPT = sPPT = 85 W` ceiling (stock boosts to 140 W) with `STAPM Boost = 0` and `TjMax = 90 °C`, under `Advanced → SMU Common Options`; full per-setting walkthrough: [gtr9pro-bios-reference](https://github.com/ryanmusante/gtr9pro-bios-reference).
+Firmware is not checked — set the flat `SPL = fPPT = sPPT = 85 W` ceiling (stock boosts to 140 W), `STAPM Boost = 0`, and `TjMax = 90 °C` once, under `Advanced → SMU Common Options`; multi-thread gains flatten past ~85 W. Full per-setting walkthrough: [gtr9pro-bios-reference](https://github.com/ryanmusante/gtr9pro-bios-reference).
 
 ## Troubleshooting
 

@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.191.0
+-------
+
+  - readme: audit-voice rewrite; Purpose -> Expected content, Emitted as ->
+    Checked as, Install/Remove/Masked/Enabled leads -> Expected forms
+
+
 7.190.0
 -------
 
