@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.193.0
+-------
+
+  - readme: fold Managed Files tables, Packages, Units, Tuning Notes, and
+    the BIOS values into the ry-install pointer; add Verify-only Keys
+
+
 7.192.0
 -------
 
