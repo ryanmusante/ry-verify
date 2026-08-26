@@ -7,7 +7,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 -------
 
   - readme: fold Managed Files tables, Packages, Units, Tuning Notes, and
-    the BIOS values into the ry-install pointer; add Verify-only Keys
+    BIOS values into the ry-install pointer; Service Keys -> Verify-only Keys
 
 
 7.192.0
