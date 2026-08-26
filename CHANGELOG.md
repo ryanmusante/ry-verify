@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.192.0
+-------
+
+  - readme: drop the seven restated value tables for a same-tag pointer at
+    ry-install; Service Keys stays as the one verify-side table
+
+
 7.191.0
 -------
 

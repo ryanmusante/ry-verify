@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.191.0** · [Changelog](CHANGELOG.md)
+**Version 7.192.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory and compares the installed bytes against its own embedded baseline, then reads the live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -125,56 +125,9 @@ Listed in deploy order, audited byte for byte against the regenerated baseline; 
 > [!CAUTION]
 > `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship at the same version. Clone both repos at the same tag. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
 
-The expected state: every static and runtime check reads against the keys below. All tunables are `set -g` globals — there is no external config file, and only `EXPECTED_SCALING_DRIVER` is verify-side alone. Every other key is carried verbatim by [ry-install](https://github.com/ryanmusante/ry-install) at the same version; edit both repos in lockstep.
-
-### Bootloader Keys
-
-| Key | Value | Checked as | File |
-|---|---|---|---|
-| `LOADER_DEFAULT` | `@saved` | `default` | `loader.conf` |
-| `LOADER_TIMEOUT` | `0` | `timeout` | `loader.conf` |
-| `LOADER_CONSOLE_MODE` | `keep` | `console-mode` | `loader.conf` |
-| `LOADER_EDITOR` | `no` | `editor` | `loader.conf` |
-| `SDBOOT_DEFAULT_ENTRY` | `manual` | `DEFAULT_ENTRY=` | `sdboot-manage.conf` |
-| `SDBOOT_OVERWRITE` | `yes` | `OVERWRITE_EXISTING=` | `sdboot-manage.conf` |
-| `SDBOOT_REMOVE_EXISTING` | `yes` | `REMOVE_EXISTING=` | `sdboot-manage.conf` |
-| `SDBOOT_REMOVE_OBSOLETE` | `yes` | `REMOVE_OBSOLETE=` | `sdboot-manage.conf` |
-
-### Kernel Parameters
-
-| Token | Effect |
-|---|---|
-| `amd_pstate=active` | CPPC autonomous mode — the `amd-pstate-epp` scaling driver |
-| `btusb.enable_autosuspend=n` | keep the BT controller powered — no reconnect stalls |
-| `fsck.mode=auto` | fsck only when the filesystem asks for it |
-| `fsck.repair=yes` | auto-repair whatever fsck finds |
-| `iommu=pt` | passthrough default domain — low DMA overhead |
-| `ipv6.disable=1` | disable the IPv6 stack |
-| `mt7925e.disable_aspm=1` | MT7925 endpoint ASPM off — driver-level coredump mitigation |
-| `nvme_core.default_ps_max_latency_us=0` | NVMe APST off — no power-state exit latency |
-| `pcie_aspm.policy=performance` | bias every PCIe link away from ASPM |
-| `processor.max_cstate=1` | cap ACPI C-states at C1 — idle-exit latency floor |
-| `quiet` | suppress boot console noise |
-| `split_lock_detect=off` | no split-lock throttling penalty in games |
-| `usbcore.autosuspend=-1` | USB autosuspend off globally |
-| `zswap.enabled=0` | zswap off — zram is the swap path |
-
-### Initramfs
-
-`HOOKS` order is an invariant, enforced when the profile is deployed: `base` first, `fsck` last, no duplicates, and `systemd` before `autodetect`, `keyboard`, and `sd-vconsole`; `autodetect` before `microcode` and `modconf`; `keyboard` before `sd-vconsole`; `modconf` before `kms`; `block` before `filesystems`.
-
-| Key | Value | Checked as |
-|---|---|---|
-| `MKINITCPIO_MODULES` | `amdgpu` | `MODULES=()` |
-| `MKINITCPIO_HOOKS` | `base`, `systemd`, `autodetect`, `microcode`, `modconf`, `kms`, `keyboard`, `sd-vconsole`, `block`, `filesystems`, `fsck` | `HOOKS=()` |
-| `MKINITCPIO_COMPRESSION` | `zstd` | `COMPRESSION=` |
-| `MKINITCPIO_COMPRESSION_OPTIONS` | `-3` | `COMPRESSION_OPTIONS=()` |
+The expected state: every check reads against the keys `ry-verify.fish` embeds. The full value tables live in [ry-install](https://github.com/ryanmusante/ry-install)'s Embedded Values at the same tag; only `EXPECTED_SCALING_DRIVER` below is verify-side alone. Edit both repos in lockstep.
 
 ### Service Keys
-
-`DNSOverTLS=` and `DNSSEC=` are left unset by design — the router does DoT upstream and validates DNSSEC. The router serves DoT WAN-side only, so a host `DNSOverTLS=yes` would fail closed.
-
-`NM_WIFI_POWERSAVE` is `2` because the MT7925 handles powersave in software and spikes latency otherwise. `BLACKLIST_AMDXDNA` is `false` because the IOMMU is on; [Tuning Notes](#tuning-notes) has the reverse switch.
 
 | Key | Value | Checked as |
 |---|---|---|
@@ -194,36 +147,6 @@ The expected state: every static and runtime check reads against the keys below.
 | `EPP_PREFERENCE` | `performance` | udev `ATTR{cpufreq/energy_performance_preference}` |
 | `EXPECTED_SCALING_DRIVER` | `amd-pstate-epp` | nothing — checked at runtime, never written |
 | `BLACKLIST_AMDXDNA` | `false` | nothing — `true` emits `blacklist amdxdna` |
-
-### Session Environment
-
-| Variable | Effect |
-|---|---|
-| `DXVK_LOG_LEVEL=none` | DXVK logging off |
-| `GSK_RENDERER=ngl` | GTK4 GL renderer; the Vulkan renderer aborts on gfx1151 |
-| `MANGOHUD=1` | HUD on for Vulkan titles |
-| `MESA_SHADER_CACHE_MAX_SIZE=16G` | roomy Mesa shader cache |
-| `POWERDEVIL_NO_DDCUTIL=1` | PowerDevil DDC/CI off — silences `org_kde_powerdevil` i2c errors |
-| `PROTON_FSR4_INDICATOR=1` | on-screen FSR4-active watermark (Proton-CachyOS) |
-| `PROTON_LOCAL_SHADER_CACHE=1` | per-prefix shader cache |
-| `VKD3D_DEBUG=none` | vkd3d logging off |
-| `VKD3D_SHADER_DEBUG=none` | vkd3d shader logging off |
-| `WINEDEBUG=-all` | Wine debug channels off |
-
-### Sysctl Overrides
-
-Ships at priority `95`, after the vendor `70-cachyos-settings.conf`.
-
-| Key | Value | Effect |
-|---|---|---|
-| `kernel.nmi_watchdog` | `0` | NMI watchdog off |
-| `net.core.default_qdisc` | `fq` | pairs with BBR |
-| `net.ipv4.tcp_congestion_control` | `bbr` | BBR congestion control |
-| `net.ipv4.tcp_notsent_lowat` | `16384` | cap unsent buffer at 16 KiB |
-| `net.ipv4.tcp_slow_start_after_idle` | `0` | keep the congestion window across idle |
-| `vm.compaction_proactiveness` | `0` | proactive compaction off |
-| `vm.max_map_count` | `2147483642` | Steam's esync requirement |
-| `vm.watermark_boost_factor` | `0` | watermark boosting off |
 
 ## Packages
 
