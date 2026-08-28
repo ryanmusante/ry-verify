@@ -3,35 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.193.0
+7.194.0
 -------
 
-  - readme: fold Managed Files tables, Packages, Units, Tuning Notes, and
-    BIOS values into the ry-install pointer; Service Keys -> Verify-only Keys
+  - changelog: fold the 7.190.0 through 7.193.0 blocks into the range
 
 
-7.192.0
--------
-
-  - readme: drop the seven restated value tables for a same-tag pointer at
-    ry-install; Service Keys stays as the one verify-side table
-
-
-7.191.0
--------
-
-  - readme: audit-voice rewrite; Purpose -> Expected content, Emitted as ->
-    Checked as, Install/Remove/Masked/Enabled leads -> Expected forms
-
-
-7.190.0
--------
-
-  - split: ry-verify.fish moves here from the ry-install repository; README
-    and CHANGELOG rescoped to ry-verify.fish
-
-
-7.139.0 - 7.189.0
+7.139.0 - 7.193.0
 -----------------
 
   - boot: COMPRESSION_OPTIONS -1 -> -3, drop -T0; fsck.mode=force -> auto
@@ -58,6 +36,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - help: backups path beside the log path; each names its counterpart
   - split: 7.177.0 moves verify and check to ry-verify.fish, shared fns
     verbatim; 7.177.1 - 7.180.0 shed every counterpart arm
+  - split: 7.190.0 moves ry-verify.fish here from the ry-install
+    repository; README and CHANGELOG rescoped to ry-verify.fish
   - counts: 2 scripts, sync sites 4 -> 6, zip entries 5 -> 6; KERNEL_PARAMS
     15 -> 14, ENV_VARS 9 -> 10, SYSCTL_VALUES 9 -> 8, PKGS_ADD 16 -> 17
 
