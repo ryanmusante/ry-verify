@@ -3,13 +3,19 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.194.0
+7.195.0
 -------
 
-  - changelog: fold the 7.190.0 through 7.193.0 blocks into the range
+  - env: drop PROTON_FSR4_INDICATOR=1; GSK_RENDERER ngl -> gl, matching
+    the installer
+  - sysctl: expect vm.watermark_scale_factor=125
+  - kernel: expect fsck.mode=force
+  - configuration: MangoHud baseline ships cpu_stats enabled
+  - counts: ENV_VARS 10 -> 9, SYSCTL_VALUES 8 -> 9
+  - changelog: fold the 7.194.0 block into the range
 
 
-7.139.0 - 7.193.0
+7.139.0 - 7.194.0
 -----------------
 
   - boot: COMPRESSION_OPTIONS -1 -> -3, drop -T0; fsck.mode=force -> auto
