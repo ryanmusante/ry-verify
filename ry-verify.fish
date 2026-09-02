@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.195.0 — CachyOS config manager for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.195.1 — CachyOS config manager for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.195.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.195.1"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -136,40 +136,40 @@ set -g _RY_NO_COLOR false
 test "$TERM" = dumb; and set -g _RY_NO_COLOR true
 set -q NO_COLOR; and test -n "$NO_COLOR"; and set -g _RY_NO_COLOR true # no-color.org: non-empty value disables color
 set -l fish_ver $FISH_VERSION; set -l parts (string split '.' -- "$fish_ver"); set -l _fish_minor (string replace -r '[^0-9].*' '' -- "$parts[2]"); test -z "$_fish_minor"; and set _fish_minor 0
-if not string match -qr '^\d+$' -- "$parts[1]"; or not string match -qr '^\d+$' -- "$_fish_minor"; echo "[ERR] fish version unparseable: '$fish_ver'" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not string match -qr '^\d+$' -- "$parts[1]"; or not string match -qr '^\d+$' -- "$_fish_minor"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish version unparseable: '$fish_ver'" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set -l _fish_ok 0
 test "$parts[1]" -gt 3; and set _fish_ok 1
 test "$parts[1]" -eq 3; and test "$_fish_minor" -ge 6; and set _fish_ok 1
-if test "$_fish_ok" -eq 0; echo "[ERR] fish 3.6+ required (found: $fish_ver)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if test "$_fish_ok" -eq 0; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish 3.6+ required (found: $fish_ver)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set --erase fish_ver parts _fish_minor _fish_ok
 
 # ── TMP ROOT (PINNED /tmp) + COREUTILS PROBES ──
 set -q TMPDIR; and set --erase TMPDIR # pin tmp to /tmp; children must not honor inherited TMPDIR
-if not test -w /tmp; echo "[ERR] tmp dir not writable: /tmp" >&2; _ry_exit $EXIT_PREFLIGHT; end
-if not command -q find; echo "[ERR] GNU findutils find(1) required (tmpfile sweeps + boot-entry enumeration)" >&2; _ry_exit $EXIT_PREFLIGHT; end
-if not command find /dev/null -maxdepth 0 -printf '' 2>/dev/null; echo "[ERR] find(1) lacks -maxdepth/-printf (need GNU findutils; busybox/uutils not supported)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not test -w /tmp; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] tmp dir not writable: /tmp" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not command -q find; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] GNU findutils find(1) required (tmpfile sweeps + boot-entry enumeration)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not command find /dev/null -maxdepth 0 -printf '' 2>/dev/null; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] find(1) lacks -maxdepth/-printf (need GNU findutils; busybox/uutils not supported)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set -l _ry_mv_a (command mktemp 2>/dev/null); set -l _ry_mv_b (command mktemp 2>/dev/null)
-if test -z "$_ry_mv_a"; or test -z "$_ry_mv_b"; command rm -f -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; echo "[ERR] mktemp(1) failed — cannot allocate probe files for the mv -T capability check (tmp dir probed writable above; check inode/space limits)" >&2; _ry_exit $EXIT_PREFLIGHT; end
-if not command mv -T -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; command rm -f -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; echo "[ERR] mv(1) lacks -T no-target-directory (need GNU coreutils ≥ 8.x; busybox not supported)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if test -z "$_ry_mv_a"; or test -z "$_ry_mv_b"; command rm -f -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] mktemp(1) failed — cannot allocate probe files for the mv -T capability check (tmp dir probed writable above; check inode/space limits)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not command mv -T -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; command rm -f -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] mv(1) lacks -T no-target-directory (need GNU coreutils ≥ 8.x; busybox not supported)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 command rm -f -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; set --erase _ry_mv_a _ry_mv_b
-if not command -q stat; echo "[ERR] GNU coreutils stat(1) required (used for mode/owner verification)" >&2; _ry_exit $EXIT_PREFLIGHT; end
-if not command -q date; echo "[ERR] GNU coreutils date(1) required (used for timestamps in DATE_LABEL, TIMESTAMP, JSONL ts fields)" >&2; _ry_exit $EXIT_PREFLIGHT; end
-if not string match -qr '^[+-]\d{4}$' -- (command date '+%z' 2>/dev/null); echo "[ERR] date(1) lacks %z timezone offset support (need GNU coreutils ≥ 8.x; rejects empty or literal-%z output)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not command -q stat; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] GNU coreutils stat(1) required (used for mode/owner verification)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not command -q date; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] GNU coreutils date(1) required (used for timestamps in DATE_LABEL, TIMESTAMP, JSONL ts fields)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not string match -qr '^[+-]\d{4}$' -- (command date '+%z' 2>/dev/null); test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] date(1) lacks %z timezone offset support (need GNU coreutils ≥ 8.x; rejects empty or literal-%z output)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 
 # ── TIMESTAMPS + HOME + LOG_DIR ──
 set -l _ry_now (command date '+%Y-%m-%d|%Y%m%d-%H%M%S%z'); set -l _ry_dt (string split -m1 '|' -- "$_ry_now"); set -g DATE_LABEL $_ry_dt[1]; set -g TIMESTAMP (string join '-' $_ry_dt[2] $fish_pid); set --erase _ry_now _ry_dt
 if test -z "$HOME"; or not test -d "$HOME"
     set -gx HOME (command getent passwd $_MY_UID 2>/dev/null | command head -n 1 | command awk -F: '{print $6}')
-    if test -z "$HOME"; or not test -d "$HOME"; echo "[ERR] Cannot determine HOME directory" >&2; _ry_exit $EXIT_PREFLIGHT; end
+    if test -z "$HOME"; or not test -d "$HOME"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Cannot determine HOME directory" >&2; _ry_exit $EXIT_PREFLIGHT; end
 end
 set -gx HOME (string trim -r -c / -- (string trim -- "$HOME"))
-if test -z "$HOME"; or not test -d "$HOME"; echo "[ERR] HOME resolves to empty/non-dir after normalization: '$HOME'" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if test -z "$HOME"; or not test -d "$HOME"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] HOME resolves to empty/non-dir after normalization: '$HOME'" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set -g _RY_HOME_DIR "$HOME/ry-install"; set -g LOG_DIR "$_RY_HOME_DIR/logs/$DATE_LABEL"; set -g _RY_BACKUP_DIR "$_RY_HOME_DIR/backups"
 set -l _prev_mkdir_umask 022; set -q umask; and set _prev_mkdir_umask $umask # umask var directly; autoloaded umask(1) leaks to stderr
 set -g umask 0077
 command mkdir -p -- "$LOG_DIR" "$_RY_BACKUP_DIR" 2>/dev/null; or begin
     set -g umask $_prev_mkdir_umask
-    echo "[ERR] Cannot create log/backup directory: $LOG_DIR $_RY_BACKUP_DIR" >&2
+    test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Cannot create log/backup directory: $LOG_DIR $_RY_BACKUP_DIR" >&2
     _ry_exit $EXIT_PREFLIGHT
 end
 set -g umask $_prev_mkdir_umask
@@ -178,7 +178,7 @@ for _ld_path in "$_RY_HOME_DIR" "$_RY_HOME_DIR/logs" "$LOG_DIR" "$_RY_BACKUP_DIR
     command chmod -- 700 "$_ld_path" 2>/dev/null
     set -l _post (command stat -c '%a' -- "$_ld_path" 2>/dev/null)
     if test -n "$_pre"; and test "$_pre" != "$_post"; set -ga _RY_PERM_FIX_NOTICES "LOG_DIR_PERM_FIX: $_ld_path $_pre→$_post"; end
-    if test "$_post" != 700; echo "[ERR] Log dir mode is $_post (expected 700): $_ld_path" >&2; _ry_exit $EXIT_PREFLIGHT; end
+    if test "$_post" != 700; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Log dir mode is $_post (expected 700): $_ld_path" >&2; _ry_exit $EXIT_PREFLIGHT; end
 end
 set --erase _ld_path _prev_mkdir_umask
 set -g LOG_FILE "$LOG_DIR/preflight-$TIMESTAMP.jsonl"
@@ -292,7 +292,7 @@ end
 
 # ── CLEANUP: MASTER ORCHESTRATOR (_do_cleanup) ──
 function _do_cleanup --description "Master cleanup: reap children → tmpfiles → filesystem sweep → globals"
-    _dc_kill_children # quiesce children first: revert must not race live pacman
+    _dc_kill_children # quiesce children first: sweeps must not race live children
     _dc_sweep_tmpfiles
     _dc_sweep_filesystem
     _dc_erase_globals
@@ -1870,6 +1870,17 @@ function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor
 end
 
 # ── VERIFY-RUNTIME: MODULE-STATE SUBS (_vrkm_*; feed _vrk_module_state) ──
+function _vrkm_kp_value --argument-names key --description "_vrkm_module_params sub: Value of the KERNEL_PARAMS token named key; nothing when absent"
+    set -l _kre (string escape --style=regex -- "$key"); set -l _v (string match -rg -- "^$_kre=(.*)\$" $KERNEL_PARAMS)
+    test -n "$_v"; and printf '%s\n' "$_v[1]"
+end
+function _vrkm_module_params --description "_vrk_module_state sub: Module.param tokens vs /sys/module; expectations read from KERNEL_PARAMS"
+    for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled # sysfs-readable module_params among the managed tokens
+        set -l _want (_vrkm_kp_value "$_mp"); test -n "$_want"; or continue # token absent: nothing to assert
+        set -l _path /sys/module/(string replace -a -- '-' '_' (string replace -r '\.[^.]*$' '' -- "$_mp"))/parameters/(string replace -r '^[^.]*\.' '' -- "$_mp")
+        if contains -- "$_want" 0 n N; _chk_sysfs_match "$_path" '^[N0]$' "$_mp"; else if contains -- "$_want" 1 y Y; _chk_sysfs_match "$_path" '^[Y1]$' "$_mp"; else; _chk_sysfs_eq "$_path" "$_want" "$_mp"; end # bool module_param reads Y/N
+    end
+end
 function _vrkm_amdgpu --description "_vrk_module_state sub: amdgpu parameters (hex-aware compare; expected from KERNEL_PARAMS)"
     test -d /sys/module/amdgpu/parameters; or return 0
     set -l _pairs
@@ -1930,12 +1941,8 @@ end
 function _vrk_module_state --description "_verify_runtime_kparams sub: Module parameters + blacklist"
     _echo "MODULE STATE"; _echo
     _echo "── Module parameters ──"
-    _chk_sysfs_eq /sys/module/usbcore/parameters/autosuspend -1 "usbcore.autosuspend"
-    _chk_sysfs_eq /sys/module/nvme_core/parameters/default_ps_max_latency_us 0 "nvme_core.default_ps_max_latency_us"
+    _vrkm_module_params
     _vrkm_amdgpu
-    _echo "── Additional module parameters ──"
-    _chk_sysfs_match /sys/module/zswap/parameters/enabled '^[N0]$' zswap.enabled
-    _chk_sysfs_eq /proc/sys/kernel/nmi_watchdog 0 nmi_watchdog
     _echo; _echo "── I/O scheduler (NVMe) ──"
     set -l _nvme_bdevs (command find /sys/block -mindepth 1 -maxdepth 1 -name 'nvme*n*' 2>/dev/null)
     if test (count $_nvme_bdevs) -eq 0; _info "  No NVMe block device present"; end
@@ -2547,8 +2554,8 @@ if not test -f "$LOG_FILE"
     set -l _prev_umask 022; set -q umask; and set _prev_umask $umask
     set -g umask 0177
     if not command install -m 0600 -- /dev/null "$LOG_FILE" 2>/dev/null
-        if not command touch -- "$LOG_FILE" 2>/dev/null; set -g umask $_prev_umask; echo "[ERR] Failed to create log file: $LOG_FILE" >&2; _ry_exit $EXIT_PREFLIGHT; end
-        if not command chmod -- 600 "$LOG_FILE" 2>/dev/null; set -g umask $_prev_umask; command rm -f -- "$LOG_FILE" 2>/dev/null; echo "[ERR] Failed to set 0600 on log file: $LOG_FILE" >&2; _ry_exit $EXIT_PREFLIGHT; end
+        if not command touch -- "$LOG_FILE" 2>/dev/null; set -g umask $_prev_umask; test "$MODE" != check; and echo "[ERR] Failed to create log file: $LOG_FILE" >&2; _ry_exit $EXIT_PREFLIGHT; end
+        if not command chmod -- 600 "$LOG_FILE" 2>/dev/null; set -g umask $_prev_umask; command rm -f -- "$LOG_FILE" 2>/dev/null; test "$MODE" != check; and echo "[ERR] Failed to set 0600 on log file: $LOG_FILE" >&2; _ry_exit $EXIT_PREFLIGHT; end
     end
     set -g umask $_prev_umask
 else

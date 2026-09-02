@@ -3,6 +3,15 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.195.1
+-------
+
+  - check: stderr stays silent on the log-file create gates and every
+    bootstrap gate, matching the root guard and _err_loud (rc 3)
+  - verify: module-parameter expectations derive from KERNEL_PARAMS
+    (usbcore, nvme_core, zswap); the nmi_watchdog duplicate is dropped
+
+
 7.195.0
 -------
 
@@ -12,7 +21,6 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - kernel: expect fsck.mode=force
   - configuration: MangoHud baseline ships cpu_stats enabled
   - counts: ENV_VARS 10 -> 9, SYSCTL_VALUES 8 -> 9
-  - changelog: fold the 7.194.0 block into the range
 
 
 7.139.0 - 7.194.0

@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.195.0** · [Changelog](CHANGELOG.md)
+**Version 7.195.1** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory and compares the installed bytes against its own embedded baseline, then reads the live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -46,7 +46,7 @@ Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYY
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
 | `1` | a `--verify` mismatch |
 | `2` | bad arguments, root misuse |
-| `3` | missing dependency, uncached sudo, gate mismatch; root `--check` is silent |
+| `3` | missing dependency, uncached sudo, gate mismatch; `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
 ## Environment Overrides
