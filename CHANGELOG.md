@@ -3,11 +3,18 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.195.2
+-------
+
+  - check: the managed-file count tripwire stays silent like every other
+    gate past the argv peek
+
+
 7.195.1
 -------
 
   - check: stderr stays silent on the log-file create gates and every
-    bootstrap gate, matching the root guard and _err_loud (rc 3)
+    bootstrap gate past the argv peek, as the root guard and _err_loud (rc 3)
   - verify: module-parameter expectations derive from KERNEL_PARAMS
     (usbcore, nvme_core, zswap); the nmi_watchdog duplicate is dropped
 
