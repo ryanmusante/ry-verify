@@ -3,6 +3,16 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.196.0
+-------
+
+  - verify: module-parameter compare is exact for integer params; only
+    zswap.enabled tolerates the bool Y/N spelling
+  - logging: JSONL header keeps an empty argv element
+  - readme: Quick Start runs chmod +x first (git tracks the script 0644);
+    lockstep wording says version, not tag
+
+
 7.195.2
 -------
 

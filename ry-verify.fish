@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.195.2 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.196.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.195.2"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.196.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -157,7 +157,7 @@ if not command -q date; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] GNU
 if not string match -qr '^[+-]\d{4}$' -- (command date '+%z' 2>/dev/null); test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] date(1) lacks %z timezone offset support (need GNU coreutils ≥ 8.x; rejects empty or literal-%z output)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 
 # ── TIMESTAMPS + HOME + LOG_DIR ──
-set -l _ry_now (command date '+%Y-%m-%d|%Y%m%d-%H%M%S%z'); set -l _ry_dt (string split -m1 '|' -- "$_ry_now"); set -g DATE_LABEL $_ry_dt[1]; set -g TIMESTAMP (string join '-' $_ry_dt[2] $fish_pid); set --erase _ry_now _ry_dt
+set -l _ry_now (command date '+%Y-%m-%d|%Y%m%d-%H%M%S%z'); set -l _ry_dt (string split -m1 '|' -- "$_ry_now"); set -g DATE_LABEL $_ry_dt[1]; set -g TIMESTAMP (string join -- '-' $_ry_dt[2] $fish_pid); set --erase _ry_now _ry_dt
 if test -z "$HOME"; or not test -d "$HOME"
     set -gx HOME (command getent passwd $_MY_UID 2>/dev/null | command head -n 1 | command awk -F: '{print $6}')
     if test -z "$HOME"; or not test -d "$HOME"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Cannot determine HOME directory" >&2; _ry_exit $EXIT_PREFLIGHT; end
@@ -1869,15 +1869,13 @@ function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor
 end
 
 # ── VERIFY-RUNTIME: MODULE-STATE SUBS (_vrkm_*; feed _vrk_module_state) ──
-function _vrkm_kp_value --argument-names key --description "_vrkm_module_params sub: Value of the KERNEL_PARAMS token named key; nothing when absent"
-    set -l _kre (string escape --style=regex -- "$key"); set -l _v (string match -rg -- "^$_kre=(.*)\$" $KERNEL_PARAMS)
-    test -n "$_v"; and printf '%s\n' "$_v[1]"
-end
+function _vrkm_kp_value --argument-names key --description "_vrkm_module_params sub: Value of the KERNEL_PARAMS token named key; nothing when absent"; set -l _kre (string escape --style=regex -- "$key"); set -l _v (string match -rg -- "^$_kre=(.*)\$" $KERNEL_PARAMS); test -n "$_v"; and printf '%s\n' "$_v[1]"; end
 function _vrkm_module_params --description "_vrk_module_state sub: Module.param tokens vs /sys/module; expectations read from KERNEL_PARAMS"
+    set -l _bool_params zswap.enabled # bool module_params read Y/N; integers compare exactly
     for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled # sysfs-readable module_params among the managed tokens
         set -l _want (_vrkm_kp_value "$_mp"); test -n "$_want"; or continue # token absent: nothing to assert
         set -l _path /sys/module/(string replace -a -- '-' '_' (string replace -r '\.[^.]*$' '' -- "$_mp"))/parameters/(string replace -r '^[^.]*\.' '' -- "$_mp")
-        if contains -- "$_want" 0 n N; _chk_sysfs_match "$_path" '^[N0]$' "$_mp"; else if contains -- "$_want" 1 y Y; _chk_sysfs_match "$_path" '^[Y1]$' "$_mp"; else; _chk_sysfs_eq "$_path" "$_want" "$_mp"; end # bool module_param reads Y/N
+        if not contains -- "$_mp" $_bool_params; _chk_sysfs_eq "$_path" "$_want" "$_mp"; else if contains -- "$_want" 0 n N; _chk_sysfs_match "$_path" '^[N0]$' "$_mp"; else if contains -- "$_want" 1 y Y; _chk_sysfs_match "$_path" '^[Y1]$' "$_mp"; else; _chk_sysfs_eq "$_path" "$_want" "$_mp"; end
     end
 end
 function _vrkm_amdgpu --description "_vrk_module_state sub: amdgpu parameters (hex-aware compare; expected from KERNEL_PARAMS)"
@@ -2561,7 +2559,7 @@ else
     command chmod -- 600 "$LOG_FILE" 2>/dev/null
 end
 set -l _argv_parts; set -l _argv_in (status filename) $_ORIG_ARGV
-for _r in $_argv_in; set -a _argv_parts '"'(_json_str "$_r")'"'; end
+for _r in $_argv_in; set -a _argv_parts '"'(_json_str "$_r" | string collect --allow-empty)'"'; end
 set --erase _r
 set -l _argv_json '['(string join -- ',' $_argv_parts)']'; set -l _verbose_json false
 test "$QUIET" = false; and set _verbose_json true
