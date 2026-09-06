@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.197.1** · [Changelog](CHANGELOG.md)
+**Version 7.198.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory and compares the installed bytes against its own embedded baseline, then reads the live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 

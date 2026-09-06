@@ -3,13 +3,15 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.197.1
+7.198.0
 -------
 
   - verify: module-parameter readback covers every sysfs-readable managed
     token; pcie_aspm.policy matches its bracketed active entry
   - verify: the MangoHud check asserts every active directive in emission
     order instead of seven literals
+  - counts: PKGS_ADD 19 and EXPECTED_SERVICES 6 - the two boosters expected
+    present, dmemcg-booster-system.service expected enabled and active
 
 
 7.197.0
