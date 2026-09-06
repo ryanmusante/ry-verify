@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.199.0
+-------
+
+  - kernel: ttm.pages_limit=20971520 joins KERNEL_PARAMS and the readback
+    token list; tripwire 14 -> 15
+
+
 7.198.0
 -------
 
