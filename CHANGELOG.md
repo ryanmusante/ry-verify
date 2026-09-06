@@ -3,7 +3,7 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.196.0
+7.197.0
 -------
 
   - verify: module-parameter compare is exact for integer params; only
