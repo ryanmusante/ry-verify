@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.197.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.197.1 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.197.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.197.1"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -1372,11 +1372,7 @@ function _verify_static_user --description "Verify environment.d ENV_VARS + Mang
     end
     _echo "── MangoHud (readout-only HUD) ──"
     if _chk_file "$HOME/.config/MangoHud/MangoHud.conf"
-        for _hud in horizontal legacy_layout=0 position=top-left toggle_hud=Shift_R+F12 # generator literals; lockstep with the generator
-            _chk_grep "$HOME/.config/MangoHud/MangoHud.conf" "$_hud"
-        end
-        _chk_grep "$HOME/.config/MangoHud/MangoHud.conf" "fps" "MangoHud fps readout"
-        for _hud in font_size=20 background_alpha=0.4
+        for _hud in horizontal legacy_layout=0 position=top-left toggle_hud=Shift_R+F12 fps frametime frame_timing gpu_stats gpu_temp gpu_core_clock gpu_power cpu_stats cpu_mhz cpu_power vram ram font_size=20 text_outline background_alpha=0.4 # every generator directive, emission order; lockstep
             _chk_grep "$HOME/.config/MangoHud/MangoHud.conf" "$_hud"
         end
     end
@@ -1870,12 +1866,26 @@ end
 
 # ── VERIFY-RUNTIME: MODULE-STATE SUBS (_vrkm_*; feed _vrk_module_state) ──
 function _vrkm_kp_value --argument-names key --description "_vrkm_module_params sub: Value of the KERNEL_PARAMS token named key; nothing when absent"; set -l _kre (string escape --style=regex -- "$key"); set -l _v (string match -rg -- "^$_kre=(.*)\$" $KERNEL_PARAMS); test -n "$_v"; and printf '%s\n' "$_v[1]"; end
+function _vrkm_param_assert --argument-names mp path want --description "_vrkm_module_params sub: Assert one module_param by kind — bracketed list, bool Y/N, or exact"
+    set -l _bool_params zswap.enabled btusb.enable_autosuspend mt7925e.disable_aspm # bool module_params read Y/N; integers compare exactly
+    set -l _bracket_params pcie_aspm.policy # list readers mark the active entry in brackets
+    if contains -- "$mp" $_bracket_params
+        _chk_sysfs_match "$path" '\['(string escape --style=regex -- "$want")'\]' "$mp"
+    else if not contains -- "$mp" $_bool_params
+        _chk_sysfs_eq "$path" "$want" "$mp"
+    else if contains -- "$want" 0 n N
+        _chk_sysfs_match "$path" '^[N0]$' "$mp"
+    else if contains -- "$want" 1 y Y
+        _chk_sysfs_match "$path" '^[Y1]$' "$mp"
+    else
+        _chk_sysfs_eq "$path" "$want" "$mp"
+    end
+end
 function _vrkm_module_params --description "_vrk_module_state sub: Module.param tokens vs /sys/module; expectations read from KERNEL_PARAMS"
-    set -l _bool_params zswap.enabled # bool module_params read Y/N; integers compare exactly
-    for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled # sysfs-readable module_params among the managed tokens
+    for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled btusb.enable_autosuspend mt7925e.disable_aspm pcie_aspm.policy ipv6.disable ttm.pages_limit # sysfs-readable module_params among the managed tokens
         set -l _want (_vrkm_kp_value "$_mp"); test -n "$_want"; or continue # token absent: nothing to assert
         set -l _path /sys/module/(string replace -a -- '-' '_' (string replace -r '\.[^.]*$' '' -- "$_mp"))/parameters/(string replace -r '^[^.]*\.' '' -- "$_mp")
-        if not contains -- "$_mp" $_bool_params; _chk_sysfs_eq "$_path" "$_want" "$_mp"; else if contains -- "$_want" 0 n N; _chk_sysfs_match "$_path" '^[N0]$' "$_mp"; else if contains -- "$_want" 1 y Y; _chk_sysfs_match "$_path" '^[Y1]$' "$_mp"; else; _chk_sysfs_eq "$_path" "$_want" "$_mp"; end
+        _vrkm_param_assert "$_mp" "$_path" "$_want"
     end
 end
 function _vrkm_amdgpu --description "_vrk_module_state sub: amdgpu parameters (hex-aware compare; expected from KERNEL_PARAMS)"

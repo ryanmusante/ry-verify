@@ -3,14 +3,21 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.197.1
+-------
+
+  - verify: module-parameter readback covers every sysfs-readable managed
+    token; pcie_aspm.policy matches its bracketed active entry
+  - verify: the MangoHud check asserts every active directive in emission
+    order instead of seven literals
+
+
 7.197.0
 -------
 
   - verify: module-parameter compare is exact for integer params; only
     zswap.enabled tolerates the bool Y/N spelling
   - logging: JSONL header keeps an empty argv element
-  - readme: Quick Start runs chmod +x first (git tracks the script 0644);
-    lockstep wording says version, not tag
 
 
 7.195.2
