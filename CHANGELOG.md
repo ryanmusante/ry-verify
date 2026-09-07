@@ -29,53 +29,33 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - logging: JSONL header keeps an empty argv element
 
 
-7.195.2
--------
-
-  - check: the managed-file count tripwire stays silent like every other
-    gate past the argv peek
-
-
-7.195.1
--------
-
-  - check: stderr stays silent on the log-file create gates and every
-    bootstrap gate past the argv peek, as the root guard and _err_loud (rc 3)
-  - verify: module-parameter expectations derive from KERNEL_PARAMS
-    (usbcore, nvme_core, zswap); the nmi_watchdog duplicate is dropped
-
-
-7.195.0
--------
-
-  - env: drop PROTON_FSR4_INDICATOR=1; GSK_RENDERER ngl -> gl, matching
-    the installer
-  - sysctl: expect vm.watermark_scale_factor=125
-  - kernel: expect fsck.mode=force
-  - configuration: MangoHud baseline ships cpu_stats enabled
-  - counts: ENV_VARS 10 -> 9, SYSCTL_VALUES 8 -> 9
-
-
-7.139.0 - 7.194.0
+7.139.0 - 7.195.2
 -----------------
 
   - boot: COMPRESSION_OPTIONS -1 -> -3, drop -T0; fsck.mode=force -> auto
-  - kernel: land on iommu=pt; drop amd_iommu, clearcpuid=umip, amdxdna
+  - kernel: land on iommu=pt; drop amd_iommu, clearcpuid=umip, amdxdna;
+    7.195.0 expects fsck.mode=force
   - dns: drop pinned upstreams, DNSOverTLS= and DNSSEC=; link DNS wins
   - network: autoconnect-retries-default=0, wlan0 quit after four tries
-  - env: PROTON_FSR4_UPGRADE -> FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1;
-    drop PROTON_ENABLE_WAYLAND=1, add GSK_RENDERER=ngl
-  - configuration: assert the nftables ICMPv6 base accept
+  - env: PROTON_FSR4_UPGRADE -> FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1,
+    dropped at 7.195.0; GSK_RENDERER ngl then gl, matching the installer
+  - configuration: assert the nftables ICMPv6 base accept; 7.195.0 expects
+    the MangoHud baseline to ship cpu_stats enabled
   - packages: 7.173.0 adds cachyos-benchmarker
-  - sysctl: drop both net.core.netdev_budget keys and vm.swappiness=150
+  - sysctl: drop both net.core.netdev_budget keys and vm.swappiness=150;
+    7.195.0 expects vm.watermark_scale_factor=125
   - backup: .ry.bak moves to ~/ry-install/backups, slash-encoded; .ry.orig
     strays are INFO
   - verify: every cpufreq policy, non-fallback loader entries, resolved
     unit state, live ext4 opts, MangoHud, .ry.bak, parser complaints
+  - verify: 7.195.1 derives module-parameter expectations from
+    KERNEL_PARAMS (usbcore, nvme_core, zswap); nmi_watchdog duplicate gone
   - cleanup: 7.181.0 - 7.182.2 erase and sweep only what each script sets
   - check: record 60-ry-* drop-ins before the sudo gate; mode drift sets drift
   - check: 7.186.1 then 7.187.0 take every --check abbreviation, -c to
     -check, silent rc 3
+  - check: 7.195.1 - 7.195.2 keep stderr silent on the log-file create
+    gates, every bootstrap gate past the argv peek, and the count tripwire
   - preflight: rc 3 on a stale counts tripwire, a reserved COUNTRY,
     NM_WIFI_POWERSAVE outside 0-3; no ipv6.disable=1 warns
   - logging: millisecond JSONL timestamps, CHECK_GREP key=value; the sudo
@@ -86,7 +66,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - split: 7.190.0 moves ry-verify.fish here from the ry-install
     repository; README and CHANGELOG rescoped to ry-verify.fish
   - counts: 2 scripts, sync sites 4 -> 6, zip entries 5 -> 6; KERNEL_PARAMS
-    15 -> 14, ENV_VARS 9 -> 10, SYSCTL_VALUES 9 -> 8, PKGS_ADD 16 -> 17
+    15 -> 14, PKGS_ADD 16 -> 17; 7.195.0 ENV_VARS 10 -> 9, SYSCTL 8 -> 9
 
 
 7.137.0 - 7.138.0

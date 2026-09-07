@@ -2,7 +2,7 @@
 
 **Version 7.199.0** · [Changelog](CHANGELOG.md)
 
-Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory and compares the installed bytes against its own embedded baseline, then reads the live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
+Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
 ## Quick Start
 
@@ -21,7 +21,7 @@ A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `W
 
 ## Requirements
 
-`ry-verify.fish` runs no dependency phase — it refuses to start without GNU `id`, `find`, `stat`, `date`, `mktemp`, and `mv -T`, and guards the rest at their call sites.
+`ry-verify.fish` runs no dependency phase — it refuses to start without GNU `id`, `find`, `stat`, `date`, `mktemp`, and `mv -T`.
 
 | Requirement | Detail |
 |---|---|
@@ -61,7 +61,7 @@ Skipping the hardware check is the risky override — a wrong-CPU run compares a
 
 ## Managed Files
 
-The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-install)'s Managed Files, in deploy order. Each is regenerated in memory and compared byte for byte; system files are checked against `0644` where the filesystem records modes, user files against `0600`.
+The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-install)'s Managed Files, in deploy order. System files are checked against `0644` where the filesystem records modes, user files against `0600`.
 
 ## Checks
 
@@ -75,7 +75,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Static: packages | `PKGS_ADD` and `EXPECTED_VULKAN_PKGS` present, `PKGS_DEL` absent, `pacman.conf` `IgnorePkg` and `ParallelDownloads` |
 | Static: services | `MASK` unit state, plus masked units the profile no longer declares |
 | Static: syntax | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
-| Static: checksum | SHA256 of installed bytes against generator output per destination, root-UUID fallback compare, `.ry.bak` recovery copies in `~/ry-install/backups/` non-empty |
+| Static: checksum | SHA256 of installed bytes against generator output, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty |
 | Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, NVMe I/O scheduler, blacklists |
 | Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, `MASK` units inactive, user-scope units, Wi-Fi and NM backend |
 | Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain |
@@ -83,7 +83,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Safety and Reliability
 
-**Verification** — `--verify` compares installed bytes to generator output byte for byte, logging both SHA256 digests on a mismatch, then checks live kernel-cmdline, module, sysctl, unit, fstab, and session state.
+**Verification** — `--verify` compares installed bytes to generator output, logging both SHA256 digests on a mismatch, then checks live kernel-cmdline, module, sysctl, unit, fstab, and session state.
 
 **Read-only** — neither mode takes a lock or writes outside its log tree.
 
@@ -94,7 +94,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 > [!CAUTION]
 > `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship at the same version. Clone both repos at the same version. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
 
-The expected state: every check reads against the keys `ry-verify.fish` embeds. Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install) at the same version; the two keys below are verify-side alone. Edit both repos in lockstep.
+Every check reads against the keys `ry-verify.fish` embeds. Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below are verify-side alone. Edit both repos in lockstep.
 
 ### Verify-only Keys
 
