@@ -21,8 +21,6 @@ A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `W
 
 ## Requirements
 
-`ry-verify.fish` runs no dependency phase — it refuses to start without GNU `id`, `find`, `stat`, `date`, `mktemp`, and `mv -T`.
-
 | Requirement | Detail |
 |---|---|
 | OS | CachyOS (Arch-based), systemd-boot with BLS entries |
@@ -34,13 +32,11 @@ A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `W
 
 ## Usage
 
-The bare invocation equals `--verify`; `--check` is the silent idempotency probe (the two are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and is an unknown option here, exit `2`; the unattended install is that repo's bare invocation. Positional arguments exit `2`. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
+The bare invocation equals `--verify`; `--check` is the silent idempotency probe (the two are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and is an unknown option here, exit `2`. Positional arguments exit `2`. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
 
 Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl`. A fresh install's `./ry-verify.fish --check` reports drift until reboot.
 
 ## Exit Codes
-
-`ry-verify.fish` exits `0 1 2 3 10`.
 
 | Code | Meaning |
 |---|---|
@@ -65,7 +61,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Checks
 
-`--verify` runs the static groups first, then the runtime groups. `--check` runs the silent subset and reports drift only; it records unmanaged `60-ry-*` drop-ins before the sudo gate, and orphan masks after it.
+`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset and reports drift only.
 
 | Group | Scope |
 |---|---|
@@ -83,8 +79,6 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Safety and Reliability
 
-**Verification** — `--verify` compares installed bytes to generator output, logging both SHA256 digests on a mismatch, then checks live kernel-cmdline, module, sysctl, unit, fstab, and session state.
-
 **Read-only** — neither mode takes a lock or writes outside its log tree.
 
 **Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, and any `sdboot-manage.conf.d` drop-in.
@@ -94,7 +88,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 > [!CAUTION]
 > `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship at the same version. Clone both repos at the same version. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
 
-Every check reads against the keys `ry-verify.fish` embeds. Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below are verify-side alone. Edit both repos in lockstep.
+Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below are verify-side alone. Edit both repos in lockstep.
 
 ### Verify-only Keys
 
