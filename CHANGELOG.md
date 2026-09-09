@@ -3,6 +3,15 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.200.0
+-------
+
+  - verify: assert connectivity checking is disabled in the NetworkManager
+    drop-in
+  - counts: PKGS_ADD 17 and EXPECTED_SERVICES 5 - the boosters and their unit
+    are no longer expected
+
+
 7.199.0
 -------
 
