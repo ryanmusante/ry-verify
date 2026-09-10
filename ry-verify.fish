@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.200.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.200.1 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.200.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.200.1"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -1607,6 +1607,7 @@ function _ry_verify_static --description "Verify installed configs: boot, system
 end
 
 # ── --CHECK MODE: SILENT IDEMPOTENCY PROBE ──
+function _check_drift --argument-names key detail --description "Set the check-mode drift flag and record the cause"; set -g _RY_CHECK_DRIFT 1; _log "$key: $detail"; end
 function _check_phase_files --description "Check-mode phase: file content hash compare"
     for dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS
         set -l expected (_ry_content_bytes "$dst" | string collect --no-trim-newlines --allow-empty); set -l _gen_rc $pipestatus[1]
@@ -1615,14 +1616,14 @@ function _check_phase_files --description "Check-mode phase: file content hash c
         switch "$_ib_rc"
             case 0
             case 1
-                set -g _RY_CHECK_DRIFT 1
+                _check_drift CHECK_CONTENT_DRIFT "dst=$dst reason=absent-or-unreadable"
                 continue
             case 2
                 _log "CHECK_PREFLIGHT: sudo lapse reading $dst"; return $EXIT_PREFLIGHT
             case '*'
                 _log "CHECK_PREFLIGHT: _installed_bytes returned unexpected rc=$_ib_rc for $dst"; return $EXIT_PREFLIGHT
         end
-        test "$expected" = "$actual"; or set -g _RY_CHECK_DRIFT 1
+        test "$expected" = "$actual"; or _check_drift CHECK_CONTENT_DRIFT "dst=$dst reason=content"
         set -l _mp 0644; set -l _ms true; contains -- "$dst" $USER_DESTINATIONS; and set _mp 0600; and set _ms false
         set -l _mc (_ry_mode_drift "$dst" "$_ms" "$_mp"); test -n "$_mc"; and set -g _RY_CHECK_DRIFT 1; and _log "CHECK_MODE_DRIFT: dst=$dst mode=$_mc expected=$_mp"
         set -g _RY_CHECK_FILES_CHECKED (math $_RY_CHECK_FILES_CHECKED + 1)
@@ -1632,8 +1633,8 @@ end
 function _check_phase_cmdline --description "Check-mode phase: cmdline contains KERNEL_PARAMS + rw"
     set -l _cmdline (command cat -- /proc/cmdline 2>/dev/null)
     if test -z "$_cmdline"; _log "CHECK_PREFLIGHT: /proc/cmdline empty or unreadable"; return $EXIT_PREFLIGHT; end
-    for _p in $KERNEL_PARAMS; set -l _p_re (string escape --style=regex -- "$_p"); string match -qr -- "(^|\s)$_p_re(\s|\$)" "$_cmdline"; or set -g _RY_CHECK_DRIFT 1; end
-    string match -qr -- '(^|\s)rw(\s|$)' "$_cmdline"; or set -g _RY_CHECK_DRIFT 1
+    for _p in $KERNEL_PARAMS; set -l _p_re (string escape --style=regex -- "$_p"); string match -qr -- "(^|\s)$_p_re(\s|\$)" "$_cmdline"; or _check_drift CHECK_CMDLINE_DRIFT "token=$_p"; end
+    string match -qr -- '(^|\s)rw(\s|$)' "$_cmdline"; or _check_drift CHECK_CMDLINE_DRIFT token=rw
     return 0
 end
 function _svc_chk_expected --description "Check EXPECTED_SERVICES units"
@@ -1642,19 +1643,19 @@ function _svc_chk_expected --description "Check EXPECTED_SERVICES units"
         if test "$load" = ERR_NO_DATA
             _log "CHECK_PREFLIGHT: cannot determine state for $unit (systemctl error)"; return $EXIT_PREFLIGHT
         else if test "$load" = not-found
-            set -g _RY_CHECK_DRIFT 1
+            _check_drift CHECK_UNIT_DRIFT "unit=$unit state=not-found"
         else
             if test "$unit" = nftables.service; and test "$active" != active # oneshot reads inactive after clean load
                 if not command -q nft
                     _log "CHECK_NFT_UNPROBEABLE: nft(8) absent — live ruleset unverifiable, treating as drift (fail-closed)"
-                    set -g _RY_CHECK_DRIFT 1
+                    _check_drift CHECK_UNIT_DRIFT "unit=$unit reason=nft-absent"
                 else
-                    _nft_input_drop_live; or set -g _RY_CHECK_DRIFT 1
+                    _nft_input_drop_live; or _check_drift CHECK_UNIT_DRIFT "unit=$unit reason=ruleset-not-live"
                 end
             else
-                test "$active" = active; or set -g _RY_CHECK_DRIFT 1 # RemainAfterExit oneshots read active
+                test "$active" = active; or _check_drift CHECK_UNIT_DRIFT "unit=$unit active=$active" # RemainAfterExit oneshots read active
             end
-            test "$ufs" = enabled; or set -g _RY_CHECK_DRIFT 1
+            test "$ufs" = enabled; or _check_drift CHECK_UNIT_DRIFT "unit=$unit ufs=$ufs"
         end
     end
     return 0
@@ -1710,13 +1711,13 @@ function _check_phase_units --description "Check-mode phase: EXPECTED_SERVICES +
         set -l _v (_unit_state_padded $unit)
         if test "$_v[1]" = ERR_NO_DATA; _log "CHECK_PREFLIGHT: cannot determine state for $unit (systemctl error)"; return $EXIT_PREFLIGHT; end
         test "$_v[1]" = not-found; and continue
-        test "$_v[3]" = masked; or set -g _RY_CHECK_DRIFT 1
+        test "$_v[3]" = masked; or _check_drift CHECK_UNIT_DRIFT "unit=$unit ufs=$_v[3] expected=masked"
     end
     for unit in $_implicit_svcs
         set -l _v (_unit_state_padded $unit)
         if test "$_v[1]" = ERR_NO_DATA; _log "CHECK_PREFLIGHT: cannot determine state for $unit (systemctl error)"; return $EXIT_PREFLIGHT; end
         test "$_v[1]" = not-found; and continue
-        test "$_v[3]" = enabled; or test "$_v[3]" = static; or set -g _RY_CHECK_DRIFT 1 # conf.d units accept enabled|static
+        test "$_v[3]" = enabled; or test "$_v[3]" = static; or _check_drift CHECK_UNIT_DRIFT "unit=$unit ufs=$_v[3] expected=enabled|static" # conf.d units accept enabled|static
     end
     return 0
 end

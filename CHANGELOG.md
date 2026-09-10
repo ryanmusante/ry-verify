@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.200.1
+-------
+
+  - check: content, cmdline-token and unit drift log CHECK_*_DRIFT with the
+    cause; only mode drift did, so an rc 10 log could not name the file
+
+
 7.200.0
 -------
 
