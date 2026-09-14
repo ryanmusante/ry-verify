@@ -3,62 +3,73 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.200.1
+7.201.0
 -------
 
-  - check: content, cmdline-token and unit drift log CHECK_*_DRIFT with the
-    cause; only mode drift did, so an rc 10 log could not name the file
+  - verify: mode drift is no longer reported for a destination that is a
+    symlink, whose own mode is meaningless and whose chmod would follow it
+  - verify: the backup sweep no longer reports nothing-deployed-yet once the
+    checksum phase has matched; it now names the real causes
 
 
-7.200.0
--------
-
-  - verify: assert connectivity checking is disabled in the NetworkManager
-    drop-in
-  - counts: PKGS_ADD 17 and EXPECTED_SERVICES 5 - the boosters and their unit
-    are no longer expected
-
-
-7.139.0 - 7.199.0
+7.190.0 - 7.200.1
 -----------------
 
-  - boot: COMPRESSION_OPTIONS -1 -> -3, drop -T0; fsck.mode=force -> auto
-  - kernel: land on iommu=pt; drop amd_iommu, clearcpuid=umip, amdxdna;
-    7.195.0 expects fsck.mode=force; 7.199.0 adds ttm.pages_limit=20971520
-  - dns: drop pinned upstreams, DNSOverTLS= and DNSSEC=; link DNS wins
-  - network: autoconnect-retries-default=0, wlan0 quit after four tries
-  - env: PROTON_FSR4_UPGRADE -> FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1,
-    dropped at 7.195.0; GSK_RENDERER ngl then gl, matching the installer
-  - configuration: assert the nftables ICMPv6 base accept; 7.195.0 expects
-    the MangoHud baseline to ship cpu_stats enabled
-  - packages: 7.173.0 adds cachyos-benchmarker
-  - sysctl: drop both net.core.netdev_budget keys and vm.swappiness=150;
-    7.195.0 expects vm.watermark_scale_factor=125
-  - backup: .ry.bak moves to ~/ry-install/backups, slash-encoded; .ry.orig
-    strays are INFO
-  - verify: every cpufreq policy, non-fallback loader entries, resolved
-    unit state, live ext4 opts, MangoHud, .ry.bak, parser complaints
+  - kernel: 7.195.0 expects fsck.mode=force; 7.199.0 adds
+    ttm.pages_limit=20971520
+  - env: PROTON_FSR4_INDICATOR=1 dropped at 7.195.0
+  - configuration: 7.195.0 expects the MangoHud baseline to ship cpu_stats
+    enabled
+  - sysctl: 7.195.0 expects vm.watermark_scale_factor=125
   - verify: 7.195.1 derives module-parameter expectations from
     KERNEL_PARAMS (usbcore, nvme_core, zswap); nmi_watchdog duplicate gone
   - verify: 7.197.0 module-parameter compare is exact for integer params; only
     zswap.enabled tolerates the bool Y/N spelling
   - verify: 7.198.0 readback covers every sysfs-readable managed token,
     pcie_aspm.policy by bracket match; MangoHud asserts every active directive
+  - verify: 7.200.0 asserts connectivity checking is disabled in the
+    NetworkManager drop-in
+  - check: 7.195.1 - 7.195.2 silence every bootstrap gate and the count
+    tripwire
+  - check: 7.200.1 logs CHECK_*_DRIFT with the cause for content, cmdline
+    token and unit drift; only mode drift did, so rc 10 could not name it
+  - logging: 7.197.0 keeps an empty argv element
+  - split: 7.190.0 moves ry-verify.fish here
+  - counts: 7.195.0 ENV_VARS 10 -> 9, SYSCTL 8 -> 9
+  - counts: 7.198.0 PKGS_ADD 17 -> 19 and EXPECTED_SERVICES 5 -> 6, the two
+    boosters and their unit expected; 7.199.0 KERNEL_PARAMS 14 -> 15
+  - counts: 7.200.0 PKGS_ADD 19 -> 17 and EXPECTED_SERVICES 6 -> 5, the
+    boosters and their unit no longer expected
+
+
+7.139.0 - 7.189.0
+-----------------
+
+  - boot: COMPRESSION_OPTIONS -1 -> -3, drop -T0; fsck.mode=force -> auto
+  - kernel: land on iommu=pt; drop amd_iommu, clearcpuid=umip, amdxdna
+  - dns: drop pinned upstreams, DNSOverTLS= and DNSSEC=; link DNS wins
+  - network: autoconnect-retries-default=0, wlan0 quit after four tries
+  - env: PROTON_FSR4_UPGRADE -> FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1;
+    GSK_RENDERER ngl then gl, matching the installer
+  - configuration: assert the nftables ICMPv6 base accept
+  - packages: 7.173.0 adds cachyos-benchmarker
+  - sysctl: drop both net.core.netdev_budget keys and vm.swappiness=150
+  - backup: .ry.bak moves to ~/ry-install/backups, slash-encoded; .ry.orig
+    strays are INFO
+  - verify: every cpufreq policy, non-fallback loader entries, resolved
+    unit state, live ext4 opts, MangoHud, .ry.bak, parser complaints
   - cleanup: 7.181.0 - 7.182.2 erase and sweep only what each script sets
   - check: record 60-ry-* drop-ins before the sudo gate; mode drift sets drift
-  - check: 7.186.1 - 7.187.0 take every --check abbreviation, silent rc 3;
-    7.195.1 - 7.195.2 silence every bootstrap gate and the count tripwire
+  - check: 7.186.1 - 7.187.0 take every --check abbreviation, silent rc 3
   - preflight: rc 3 on a stale counts tripwire, a reserved COUNTRY,
     NM_WIFI_POWERSAVE outside 0-3; no ipv6.disable=1 warns
   - logging: millisecond JSONL timestamps, CHECK_GREP key=value; the sudo
-    cache gate logs a START and pairs; 7.197.0 keeps an empty argv element
+    cache gate logs a START and pairs
   - help: backups path beside the log path; each names its counterpart
   - split: 7.177.0 moves verify and check to ry-verify.fish, shared fns
-    verbatim; 7.177.1 - 7.180.0 shed counterpart arms; 7.190.0 moves it here
+    verbatim; 7.177.1 - 7.180.0 shed counterpart arms
   - counts: 2 scripts, sync sites 4 -> 6, zip entries 5 -> 6; KERNEL_PARAMS
-    15 -> 14, PKGS_ADD 16 -> 17; 7.195.0 ENV_VARS 10 -> 9, SYSCTL 8 -> 9
-  - counts: 7.198.0 PKGS_ADD 17 -> 19 and EXPECTED_SERVICES 5 -> 6, the two
-    boosters and their unit expected; 7.199.0 KERNEL_PARAMS 14 -> 15
+    15 -> 14, PKGS_ADD 16 -> 17
 
 
 7.137.0 - 7.138.0

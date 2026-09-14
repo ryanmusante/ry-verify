@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.200.1 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.201.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.200.1"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.201.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -1138,6 +1138,7 @@ function _ry_content_bytes --argument-names dst --description "Raw bytes of embe
 end
 function _ry_mode_drift --argument-names dst use_sudo perms --description "Emit the current mode when it differs from the managed contract, else nothing"
     string match -q '/boot/*' -- "$dst"; and return 1 # vfat synthesizes modes from mount options
+    test -L "$dst"; and return 1 # a symlink's own mode is meaningless; chmod follows it
     set -l _cur (_as $use_sudo stat -c '%a' -- "$dst" 2>/dev/null | string trim --); test -z "$_cur"; and return 1
     test "$_cur" = (string replace -r '^0+(?=.)' '' -- "$perms"); and return 1
     printf '%s' "$_cur"
@@ -1558,7 +1559,7 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
         test -s "$_cand"; or set -a _empty "$_cand"
     end
     if test "$_present" -eq 0
-        _info "  no $_RY_BACKUP_SUFFIX copies (nothing deployed yet, or they were removed by hand)"
+        _info "  no $_RY_BACKUP_SUFFIX copies (no run has rewritten a boot file or fstab, or they were removed by hand)"
     else if test (count $_empty) -gt 0
         _fail "  $_RY_BACKUP_SUFFIX: "(count $_empty)" of $_present empty — unusable for recovery: $_empty"
     else
