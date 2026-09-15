@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.201.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.202.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.201.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.202.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -792,7 +792,15 @@ function _mktemp_or_null --description "Wrapper for mktemp; emits path on stdout
 end
 function _tmp_dir --description "Tmp root (pinned /tmp)"; printf '%s' /tmp; end
 
-# ── FILESYSTEM PROBES (system-dst, byte read) ──
+# ── FILESYSTEM PROBES (symlink, system-dst, byte read) ──
+function _is_symlink --argument-names path use_sudo --description "Sudo-aware test -L (rc 0/1/2 = symlink/not/sudo-lapse)"
+    if test "$use_sudo" = true
+        sudo -n true 2>/dev/null; or return 2
+        sudo -n test -L "$path" 2>/dev/null
+    else
+        test -L "$path"
+    end
+end
 function _is_system_dst --argument-names dst --description "True if dst is a system path (requires sudo to read)"; string match -q '/etc/*' -- "$dst"; or string match -q '/boot/*' -- "$dst"; end
 function _installed_bytes --argument-names dst --description "Raw bytes of installed file" # callers read $pipestatus[1] only
     set -l _bytes
@@ -1499,6 +1507,8 @@ end
 
 # ── VERIFY-STATIC: CHECKSUM + DRIVER (SHA256 match + _ry_verify_static) ──
 function _vsc_check_one --argument-names dst --description "_verify_static_checksum sub: Compare one destination's expected vs installed bytes"
+    set -l _sl false; _is_system_dst "$dst"; and set _sl true
+    if _is_symlink "$dst" $_sl; _fail "  $dst: symlink — a managed destination must be a regular file"; _log "VERIFY_STATIC_SYMLINK: dst=$dst"; return 0; end
     set -l expected (_ry_content_bytes "$dst" | string collect --no-trim-newlines --allow-empty)
     set -l _gen_rc $pipestatus[1]
     if test "$_gen_rc" -ne 0
@@ -1611,6 +1621,8 @@ end
 function _check_drift --argument-names key detail --description "Set the check-mode drift flag and record the cause"; set -g _RY_CHECK_DRIFT 1; _log "$key: $detail"; end
 function _check_phase_files --description "Check-mode phase: file content hash compare"
     for dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS
+        set -l _mp 0644; set -l _ms true; contains -- "$dst" $USER_DESTINATIONS; and set _mp 0600; and set _ms false
+        _is_symlink "$dst" $_ms; and _check_drift CHECK_SYMLINK_DRIFT "dst=$dst"
         set -l expected (_ry_content_bytes "$dst" | string collect --no-trim-newlines --allow-empty); set -l _gen_rc $pipestatus[1]
         if test "$_gen_rc" -ne 0; _log "CHECK_PREFLIGHT: generator failed for $dst (rc=$_gen_rc)"; return $EXIT_PREFLIGHT; end
         set -l actual (_installed_bytes "$dst" | string collect --no-trim-newlines --allow-empty); set -l _ib_rc $pipestatus[1]
@@ -1625,7 +1637,6 @@ function _check_phase_files --description "Check-mode phase: file content hash c
                 _log "CHECK_PREFLIGHT: _installed_bytes returned unexpected rc=$_ib_rc for $dst"; return $EXIT_PREFLIGHT
         end
         test "$expected" = "$actual"; or _check_drift CHECK_CONTENT_DRIFT "dst=$dst reason=content"
-        set -l _mp 0644; set -l _ms true; contains -- "$dst" $USER_DESTINATIONS; and set _mp 0600; and set _ms false
         set -l _mc (_ry_mode_drift "$dst" "$_ms" "$_mp"); test -n "$_mc"; and set -g _RY_CHECK_DRIFT 1; and _log "CHECK_MODE_DRIFT: dst=$dst mode=$_mc expected=$_mp"
         set -g _RY_CHECK_FILES_CHECKED (math $_RY_CHECK_FILES_CHECKED + 1)
     end

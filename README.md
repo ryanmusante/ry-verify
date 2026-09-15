@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.201.0** · [Changelog](CHANGELOG.md)
+**Version 7.202.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -71,7 +71,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Static: packages | `PKGS_ADD` and `EXPECTED_VULKAN_PKGS` present, `PKGS_DEL` absent, `pacman.conf` `IgnorePkg` and `ParallelDownloads` |
 | Static: services | `MASK` unit state, plus masked units the profile no longer declares |
 | Static: syntax | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
-| Static: checksum | SHA256 of installed bytes against generator output, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty |
+| Static: checksum | SHA256 of installed bytes against generator output, a symlinked destination rejected rather than followed, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty |
 | Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, NVMe I/O scheduler, blacklists |
 | Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, `MASK` units inactive, user-scope units, Wi-Fi and NM backend |
 | Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain |

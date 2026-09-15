@@ -3,6 +3,18 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.202.0
+-------
+
+  - verify: the checksum phase now fails a managed destination that is a
+    symlink instead of reading through it and reporting a match
+  - check: a symlinked destination is recorded as CHECK_SYMLINK_DRIFT, so a
+    run that would replace it no longer reports as idempotent
+  - readme: the checks table states that a symlinked destination is rejected
+  - changelog: same-tag bullets merged, mechanism clauses and derived counts
+    dropped; every version still named
+
+
 7.201.0
 -------
 
@@ -18,28 +30,15 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - kernel: 7.195.0 expects fsck.mode=force; 7.199.0 adds
     ttm.pages_limit=20971520
   - env: PROTON_FSR4_INDICATOR=1 dropped at 7.195.0
-  - configuration: 7.195.0 expects the MangoHud baseline to ship cpu_stats
-    enabled
+  - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled
   - sysctl: 7.195.0 expects vm.watermark_scale_factor=125
-  - verify: 7.195.1 derives module-parameter expectations from
-    KERNEL_PARAMS (usbcore, nvme_core, zswap); nmi_watchdog duplicate gone
-  - verify: 7.197.0 module-parameter compare is exact for integer params; only
-    zswap.enabled tolerates the bool Y/N spelling
+  - verify: 7.195.1 derives module-parameter expectations from KERNEL_PARAMS;
+    7.197.0 compare is exact for integer params, zswap.enabled tolerates Y/N
   - verify: 7.198.0 readback covers every sysfs-readable managed token,
-    pcie_aspm.policy by bracket match; MangoHud asserts every active directive
-  - verify: 7.200.0 asserts connectivity checking is disabled in the
-    NetworkManager drop-in
+    pcie_aspm.policy by bracket match; 7.200.0 asserts connectivity disabled
   - check: 7.195.1 - 7.195.2 silence every bootstrap gate and the count
-    tripwire
-  - check: 7.200.1 logs CHECK_*_DRIFT with the cause for content, cmdline
-    token and unit drift; only mode drift did, so rc 10 could not name it
-  - logging: 7.197.0 keeps an empty argv element
+    tripwire; 7.200.1 logs CHECK_*_DRIFT with the cause, so rc 10 names it
   - split: 7.190.0 moves ry-verify.fish here
-  - counts: 7.195.0 ENV_VARS 10 -> 9, SYSCTL 8 -> 9
-  - counts: 7.198.0 PKGS_ADD 17 -> 19 and EXPECTED_SERVICES 5 -> 6, the two
-    boosters and their unit expected; 7.199.0 KERNEL_PARAMS 14 -> 15
-  - counts: 7.200.0 PKGS_ADD 19 -> 17 and EXPECTED_SERVICES 6 -> 5, the
-    boosters and their unit no longer expected
 
 
 7.139.0 - 7.189.0
@@ -56,11 +55,11 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - sysctl: drop both net.core.netdev_budget keys and vm.swappiness=150
   - backup: .ry.bak moves to ~/ry-install/backups, slash-encoded; .ry.orig
     strays are INFO
-  - verify: every cpufreq policy, non-fallback loader entries, resolved
-    unit state, live ext4 opts, MangoHud, .ry.bak, parser complaints
+  - verify: every cpufreq policy, non-fallback loader entries, resolved unit
+    state, live ext4 opts, MangoHud, .ry.bak, parser complaints
   - cleanup: 7.181.0 - 7.182.2 erase and sweep only what each script sets
-  - check: record 60-ry-* drop-ins before the sudo gate; mode drift sets drift
-  - check: 7.186.1 - 7.187.0 take every --check abbreviation, silent rc 3
+  - check: record 60-ry-* drop-ins before the sudo gate, mode drift sets
+    drift; 7.186.1 - 7.187.0 take every --check abbreviation, silent rc 3
   - preflight: rc 3 on a stale counts tripwire, a reserved COUNTRY,
     NM_WIFI_POWERSAVE outside 0-3; no ipv6.disable=1 warns
   - logging: millisecond JSONL timestamps, CHECK_GREP key=value; the sudo
@@ -68,8 +67,6 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - help: backups path beside the log path; each names its counterpart
   - split: 7.177.0 moves verify and check to ry-verify.fish, shared fns
     verbatim; 7.177.1 - 7.180.0 shed counterpart arms
-  - counts: 2 scripts, sync sites 4 -> 6, zip entries 5 -> 6; KERNEL_PARAMS
-    15 -> 14, PKGS_ADD 16 -> 17
 
 
 7.137.0 - 7.138.0
