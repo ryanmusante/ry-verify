@@ -3,28 +3,18 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.202.0
+7.203.0
 -------
 
-  - verify: the checksum phase now fails a managed destination that is a
-    symlink instead of reading through it and reporting a match
-  - check: a symlinked destination is recorded as CHECK_SYMLINK_DRIFT, so a
-    run that would replace it no longer reports as idempotent
-  - readme: the checks table states that a symlinked destination is rejected
-  - changelog: same-tag bullets merged, mechanism clauses and derived counts
-    dropped; every version still named
+  - configuration: expects the ry-install managed-file header on every
+    managed file but /etc/kernel/cmdline; checksums move with ry-install
+  - verify: report labels read Wi-Fi, not WiFi or wifi
+  - readme: EXPECTED_SCALING_DRIVER is described as the runtime check it is
+  - changelog: trimmed to expectation changes, coverage and fixes; both
+    prior single-version blocks folded into the range below
 
 
-7.201.0
--------
-
-  - verify: mode drift is no longer reported for a destination that is a
-    symlink, whose own mode is meaningless and whose chmod would follow it
-  - verify: the backup sweep no longer reports nothing-deployed-yet once the
-    checksum phase has matched; it now names the real causes
-
-
-7.190.0 - 7.200.1
+7.190.0 - 7.202.0
 -----------------
 
   - kernel: 7.195.0 expects fsck.mode=force; 7.199.0 adds
@@ -33,11 +23,13 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled
   - sysctl: 7.195.0 expects vm.watermark_scale_factor=125
   - verify: 7.195.1 derives module-parameter expectations from KERNEL_PARAMS;
-    7.197.0 compare is exact for integer params, zswap.enabled tolerates Y/N
-  - verify: 7.198.0 readback covers every sysfs-readable managed token,
-    pcie_aspm.policy by bracket match; 7.200.0 asserts connectivity disabled
-  - check: 7.195.1 - 7.195.2 silence every bootstrap gate and the count
-    tripwire; 7.200.1 logs CHECK_*_DRIFT with the cause, so rc 10 names it
+    7.197.0 compare is exact for integer params
+  - verify: 7.198.0 readback covers every sysfs-readable managed token;
+    7.200.0 asserts connectivity disabled
+  - verify: 7.201.0 drops mode drift for a symlinked destination; 7.202.0
+    fails it in the checksum phase instead of reading through it
+  - check: 7.195.1 - 7.195.2 silence every bootstrap gate; 7.200.1 logs
+    CHECK_*_DRIFT with the cause; 7.202.0 records CHECK_SYMLINK_DRIFT
   - split: 7.190.0 moves ry-verify.fish here
 
 
@@ -57,16 +49,12 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     strays are INFO
   - verify: every cpufreq policy, non-fallback loader entries, resolved unit
     state, live ext4 opts, MangoHud, .ry.bak, parser complaints
-  - cleanup: 7.181.0 - 7.182.2 erase and sweep only what each script sets
-  - check: record 60-ry-* drop-ins before the sudo gate, mode drift sets
-    drift; 7.186.1 - 7.187.0 take every --check abbreviation, silent rc 3
-  - preflight: rc 3 on a stale counts tripwire, a reserved COUNTRY,
-    NM_WIFI_POWERSAVE outside 0-3; no ipv6.disable=1 warns
-  - logging: millisecond JSONL timestamps, CHECK_GREP key=value; the sudo
-    cache gate logs a START and pairs
-  - help: backups path beside the log path; each names its counterpart
-  - split: 7.177.0 moves verify and check to ry-verify.fish, shared fns
-    verbatim; 7.177.1 - 7.180.0 shed counterpart arms
+  - check: mode drift sets drift; 7.186.1 - 7.187.0 take every --check
+    abbreviation, silent rc 3
+  - preflight: rc 3 on a reserved COUNTRY, NM_WIFI_POWERSAVE outside 0-3; no
+    ipv6.disable=1 warns
+  - logging: millisecond JSONL timestamps
+  - split: 7.177.0 moves verify and check to ry-verify.fish
 
 
 7.137.0 - 7.138.0
@@ -98,7 +86,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 7.118.0 - 7.122.0
 -----------------
 
-  - services: mask ufw instead of removing, MASK 10 -> 11, PKGS_DEL 10 -> 9
+  - services: mask ufw instead of removing
 
 
 7.100.0 - 7.107.3

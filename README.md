@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.202.0** · [Changelog](CHANGELOG.md)
+**Version 7.203.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -94,7 +94,7 @@ Value tables, package and unit sets, and tuning rationale live in [ry-install](h
 
 | Key | Value | Checked as |
 |---|---|---|
-| `EXPECTED_SCALING_DRIVER` | `amd-pstate-epp` | nothing — checked at runtime, never written |
+| `EXPECTED_SCALING_DRIVER` | `amd-pstate-epp` | live scaling driver (Runtime: kernel) |
 | `EXPECTED_VULKAN_PKGS` | `vulkan-radeon`, `lib32-vulkan-radeon` | presence, with `PKGS_ADD` (Static: packages) |
 
 ## BIOS

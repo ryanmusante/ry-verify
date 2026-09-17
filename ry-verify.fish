@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.202.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.203.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.202.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.203.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -423,15 +423,15 @@ function _ir_resolve_root_uuid --description "Cache root UUID into _ROOT_UUID"
             _log "ROOT_UUID_UNAVAILABLE: mode=$MODE reason=$_reason — non-fatal for this mode"
     end
 end
-function _ir_precompute_caches --description "Precompute WiFi-backend and canonical-dst caches" # canon list index-aligned to source
+function _ir_precompute_caches --description "Precompute Wi-Fi-backend and canonical-dst caches" # canon list index-aligned to source
     set -g _RY_PROFILE_USES_WIFI_BACKEND false
     for _d in $SYSTEM_DESTINATIONS
         if string match -q '*nm.conf' -- "$_d"; set -g _RY_PROFILE_USES_WIFI_BACKEND true; break; end
     end
     set -g _RY_CANON_SYSTEM_DSTS
-    for _d in $SYSTEM_DESTINATIONS; set -a _RY_CANON_SYSTEM_DSTS (command realpath -m -- "$_d" 2>/dev/null; or echo "$_d"); end
+    for _d in $SYSTEM_DESTINATIONS; set -ga _RY_CANON_SYSTEM_DSTS (command realpath -m -- "$_d" 2>/dev/null; or echo "$_d"); end
     set -g _RY_CANON_USER_DSTS
-    for _d in $USER_DESTINATIONS; set -a _RY_CANON_USER_DSTS (command realpath -m -- "$_d" 2>/dev/null; or echo "$_d"); end
+    for _d in $USER_DESTINATIONS; set -ga _RY_CANON_USER_DSTS (command realpath -m -- "$_d" 2>/dev/null; or echo "$_d"); end
     set -l _sys_in (count $SYSTEM_DESTINATIONS); set -l _sys_out (count $_RY_CANON_SYSTEM_DSTS)
     if test "$_sys_in" -ne "$_sys_out"; _err_loud "BUG: _RY_CANON_SYSTEM_DSTS count drift: in=$_sys_in out=$_sys_out"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     set -l _usr_in (count $USER_DESTINATIONS); set -l _usr_out (count $_RY_CANON_USER_DSTS)
@@ -551,11 +551,11 @@ function _init_runtime --description "Cache root UUID + validate config + precom
 end
 
 # ── CONTENT GENERATORS: BOOT (loader, cmdline, sdboot-manage, mkinitcpio) ──
-function _content__boot_loader_loader.conf --description "Generate content for /boot/loader/loader.conf"; printf '%s\n' "# systemd-boot loader configuration" "default $LOADER_DEFAULT" "timeout $LOADER_TIMEOUT" "console-mode $LOADER_CONSOLE_MODE" "editor $LOADER_EDITOR"; end
+function _content__boot_loader_loader.conf --description "Generate content for /boot/loader/loader.conf"; printf '%s\n' "# ry-install: systemd-boot loader config (managed file, do not edit by hand)" "default $LOADER_DEFAULT" "timeout $LOADER_TIMEOUT" "console-mode $LOADER_CONSOLE_MODE" "editor $LOADER_EDITOR"; end
 function _content__etc_kernel_cmdline --description "Generate content for /etc/kernel/cmdline"; test -z "$_ROOT_UUID"; and return $EXIT_GEN_NOUUID; printf '%s %s\n' "rw root=UUID=$_ROOT_UUID" (string join -- " " $KERNEL_PARAMS); end
 function _content__etc_sdboot-manage.conf --description "Generate content for /etc/sdboot-manage.conf"
     printf '%s\n' \
-        "# sdboot-manage configuration — changes require: sudo sdboot-manage gen && sudo sdboot-manage update" \
+        "# ry-install: sdboot-manage config (managed file, do not edit by hand)" \
         "LINUX_OPTIONS=\""(string join -- " " $KERNEL_PARAMS)"\"" \
         "LINUX_FALLBACK_OPTIONS=\"quiet\"" \
         "DEFAULT_ENTRY=\"$SDBOOT_DEFAULT_ENTRY\"" \
@@ -565,7 +565,7 @@ function _content__etc_sdboot-manage.conf --description "Generate content for /e
 end
 function _content__etc_mkinitcpio.conf --description "Generate content for /etc/mkinitcpio.conf"
     printf '%s\n' \
-        "# mkinitcpio configuration — changes require: sudo mkinitcpio -P && sudo sdboot-manage update" \
+        "# ry-install: mkinitcpio config (managed file, do not edit by hand)" \
         "MODULES=("(string join -- " " $MKINITCPIO_MODULES)")" \
         "BINARIES=()" \
         "FILES=()" \
@@ -575,17 +575,19 @@ function _content__etc_mkinitcpio.conf --description "Generate content for /etc/
 end
 
 # ── CONTENT GENERATORS: SYSTEM (resolved, logind, NM, bluetooth, nft, sysctl, udev) ──
-function _content__etc_systemd_resolved.conf.d_99-cachyos-resolved.conf --description "Generate content for systemd-resolved drop-in"; printf '%s\n' "# systemd-resolved: link DNS from DHCP, mDNS/LLMNR off" "[Resolve]" "MulticastDNS=$RESOLVED_MDNS" "LLMNR=$RESOLVED_LLMNR"; end
+function _content__etc_systemd_resolved.conf.d_99-cachyos-resolved.conf --description "Generate content for systemd-resolved drop-in"; printf '%s\n' "# ry-install: systemd-resolved drop-in, link DNS from DHCP, mDNS/LLMNR off (managed file, do not edit by hand)" "[Resolve]" "MulticastDNS=$RESOLVED_MDNS" "LLMNR=$RESOLVED_LLMNR"; end
 function _content__etc_systemd_logind.conf.d_99-cachyos-logind.conf --description "Generate content for systemd-logind drop-in"
-    printf '%s\n' "# systemd-logind configuration — desktop power handling"
+    printf '%s\n' "# ry-install: systemd-logind drop-in, desktop power handling (managed file, do not edit by hand)"
     printf '%s\n' "[Login]"
     for key in $LOGIND_IGNORE_KEYS
         printf '%s\n' "$key=ignore"
     end
 end
-function _content__etc_systemd_system_NetworkManager-dispatcher.service.d_logging.conf --description "Generate content for NetworkManager-dispatcher logging drop-in (journal noise suppression)"; printf '%s\n' "# LogLevelMax drops info-level dispatcher lines (journald-logged; StandardError=null ineffective)" "[Service]" "LogLevelMax=$NM_DISPATCHER_LOGLEVELMAX"; end
+function _content__etc_systemd_system_NetworkManager-dispatcher.service.d_logging.conf --description "Generate content for NetworkManager-dispatcher logging drop-in (journal noise suppression)"
+    printf '%s\n' "# ry-install: NetworkManager-dispatcher logging drop-in (managed file, do not edit by hand)" "# LogLevelMax drops info-level dispatcher lines (journald-logged; StandardError=null ineffective)" "[Service]" "LogLevelMax=$NM_DISPATCHER_LOGLEVELMAX"
+end
 function _content__etc_NetworkManager_conf.d_99-cachyos-nm.conf --description "Generate content for NetworkManager drop-in (wifi.backend from NM_WIFI_BACKEND)"
-    printf '%s\n' "# NetworkManager configuration — $NM_WIFI_BACKEND backend" "[main]" "autoconnect-retries-default=0" "" "[device]" "wifi.backend=$NM_WIFI_BACKEND" "" "[connection]" "wifi.powersave=$NM_WIFI_POWERSAVE" "" "[logging]" "level=$NM_LOG_LEVEL" "" "[connectivity]" "enabled=false"
+    printf '%s\n' "# ry-install: NetworkManager config, $NM_WIFI_BACKEND backend (managed file, do not edit by hand)" "[main]" "autoconnect-retries-default=0" "" "[device]" "wifi.backend=$NM_WIFI_BACKEND" "" "[connection]" "wifi.powersave=$NM_WIFI_POWERSAVE" "" "[logging]" "level=$NM_LOG_LEVEL" "" "[connectivity]" "enabled=false"
 end
 function _content__etc_iw-regdomain --description "Generate content for /etc/iw-regdomain (CachyOS regdomain input)"; printf '%s\n' "# ry-install: wireless regulatory domain (managed file, do not edit by hand)" "COUNTRY=$COUNTRY"; end
 function _content__etc_bluetooth_main.conf --description "Generate content for /etc/bluetooth/main.conf (adapter auto-power-on + paired-sink reconnect)"
@@ -594,7 +596,7 @@ end
 function _content__etc_nftables.conf --description "Generate content for nftables default-deny-inbound ruleset"
     printf '%s\n' \
         "#!/usr/bin/nft -f" \
-        "# ry-install: default-deny-inbound (ufw masked). ICMPv6 is live on the fallback entry. Add inbound ports below." \
+        "# ry-install: default-deny-inbound ruleset, ufw masked (managed file, do not edit by hand)" \
         "flush ruleset" \
         "table inet filter {" \
         "    chain input {" \
@@ -612,9 +614,9 @@ function _content__etc_nftables.conf --description "Generate content for nftable
         "    chain output { type filter hook output priority filter; policy accept; }" \
         "}"
 end
-function _content__etc_default_cpupower-service.conf --description "Generate content for cpupower-service.conf"; printf '%s\n' "# cpupower-service.conf — sourced by /usr/lib/systemd/scripts/cpupower (cpupower.service)" "GOVERNOR='$CPUPOWER_GOVERNOR'"; end
+function _content__etc_default_cpupower-service.conf --description "Generate content for cpupower-service.conf"; printf '%s\n' "# ry-install: cpupower.service governor, sourced by /usr/lib/systemd/scripts/cpupower (managed file, do not edit by hand)" "GOVERNOR='$CPUPOWER_GOVERNOR'"; end
 function _content__etc_sysctl.d_95-ry-overrides.conf --description "Generate content for sysctl drop-in"
-    printf '%s\n' "# ry-install sysctl tunables (priority 95 — loaded after CachyOS vendor 70-cachyos-settings.conf)"
+    printf '%s\n' "# ry-install: sysctl tunables, priority 95 loads after vendor 70-cachyos-settings.conf (managed file, do not edit by hand)"
     set -l _printed 0; set -g _RY_SYSCTL_BAD_ENTRIES
     for entry in $SYSCTL_VALUES
         if not string match -qr '^\s*[A-Za-z0-9._-]+\s*=\s*\S' -- "$entry"; set -ga _RY_SYSCTL_BAD_ENTRIES "$entry"; functions -q _log; and _log "SYSCTL_SKIP_MALFORMED: '$entry' (require key=value, key charset [A-Za-z0-9._-])"; continue; end
@@ -650,7 +652,7 @@ end
 
 # ── CONTENT GENERATORS: USER ($HOME dotfiles; environment.d + MangoHud) ──
 function _content_HOME_.config_environment.d_10-environment.conf --description "Generate content for ~/.config/environment.d/10-environment.conf"
-    printf '%s\n' "# Environment for systemd --user services and graphical sessions (Plasma, Flatpak, D-Bus apps)"
+    printf '%s\n' "# ry-install: session environment for systemd --user services and graphical sessions (managed file, do not edit by hand)"
     set -l _printed 0; set -g _RY_ENVD_BAD_ENTRIES
     for var in $ENV_VARS
         if not string match -qr '^[A-Za-z_][A-Za-z0-9_]*=' -- "$var"; set -ga _RY_ENVD_BAD_ENTRIES "$var"; functions -q _log; and _log "ENVD_SKIP_MALFORMED: '$var' (require KEY=value, KEY charset [A-Za-z_][A-Za-z0-9_]*)"; continue; end
@@ -1302,17 +1304,23 @@ function _verify_static_boot --description "Verify loader.conf, sdboot-manage, k
 
 # ── VERIFY-STATIC: SYSTEM + USER (drop-ins, env.d) ──
 function _vss_logind --description "_verify_static_system sub: logind.conf.d keys"
+    _echo "── logind.conf ──"
     _chk_file /etc/systemd/logind.conf.d/99-cachyos-logind.conf; or return 0
     for key in $LOGIND_IGNORE_KEYS
         _chk_grep /etc/systemd/logind.conf.d/99-cachyos-logind.conf "$key=ignore" "$key"
     end
 end
-function _vss_nmdispatch --description "_verify_static_system sub: NetworkManager-dispatcher logging drop-in"; _chk_file /etc/systemd/system/NetworkManager-dispatcher.service.d/logging.conf; or return 0; _chk_grep /etc/systemd/system/NetworkManager-dispatcher.service.d/logging.conf "LogLevelMax=$NM_DISPATCHER_LOGLEVELMAX" "dispatcher LogLevelMax=$NM_DISPATCHER_LOGLEVELMAX"; end
+function _vss_nmdispatch --description "_verify_static_system sub: NetworkManager-dispatcher logging drop-in"
+    _echo "── NetworkManager-dispatcher logging ──"
+    _chk_file /etc/systemd/system/NetworkManager-dispatcher.service.d/logging.conf; or return 0
+    _chk_grep /etc/systemd/system/NetworkManager-dispatcher.service.d/logging.conf "LogLevelMax=$NM_DISPATCHER_LOGLEVELMAX" "dispatcher LogLevelMax=$NM_DISPATCHER_LOGLEVELMAX"
+end
 function _vss_nm --description "_verify_static_system sub: NetworkManager config"
+    _echo "── NetworkManager ──"
     _chk_file /etc/NetworkManager/conf.d/99-cachyos-nm.conf; or return 0
     _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "autoconnect-retries-default=0" "autoconnect retries unlimited"
-    _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "wifi.backend=$NM_WIFI_BACKEND" "wifi backend $NM_WIFI_BACKEND"
-    _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "wifi.powersave=$NM_WIFI_POWERSAVE" "WiFi powersave $NM_WIFI_POWERSAVE"
+    _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "wifi.backend=$NM_WIFI_BACKEND" "Wi-Fi backend $NM_WIFI_BACKEND"
+    _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "wifi.powersave=$NM_WIFI_POWERSAVE" "Wi-Fi powersave $NM_WIFI_POWERSAVE"
     _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "level=$NM_LOG_LEVEL" "logging level $NM_LOG_LEVEL"
     _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "enabled=false" "connectivity checking disabled"
 end
@@ -1339,12 +1347,14 @@ function _vss_udev --description "_verify_static_system sub: Combined udev perf 
     _chk_grep /etc/udev/rules.d/99-ry-perf.rules 'KERNEL=="card[0-9]*"' "GPU rule card-scoped"
 end
 function _vss_nft --description "_verify_static_system sub: nftables default-deny-inbound + IPv4 ping and ICMPv6 base accept"
+    _echo "── nftables ──"
     _chk_file /etc/nftables.conf; or return 0
     _chk_grep /etc/nftables.conf "policy drop" "nftables input policy drop"
     _chk_grep /etc/nftables.conf "echo-request" "nftables IPv4 ping accept" # regression guard: inbound ping must stay enabled
     _chk_grep /etc/nftables.conf "icmpv6 type" "nftables ICMPv6 base accept" # NDP/MLD; the fallback entry boots with IPv6 up
 end
 function _vss_modprobe --description "_verify_static_system sub: modprobe drop-in + unmanaged 60-ry-* sweep"
+    _echo "── modprobe (60-ry-modules.conf) ──"
     set -l _stale (_ry_stale_ry_dropins) # same sweep --check records; one implementation, two modes
     if test (count $_stale) -gt 0
         _warn "  /etc/modprobe.d: unmanaged ry drop-in(s): $_stale — superseded by 60-ry-modules.conf; confirm with pacman -Qo, then remove"
@@ -1353,16 +1363,13 @@ function _vss_modprobe --description "_verify_static_system sub: modprobe drop-i
     _chk_file /etc/modprobe.d/60-ry-modules.conf; or return 0
     test "$BLACKLIST_AMDXDNA" = true; and _chk_grep /etc/modprobe.d/60-ry-modules.conf 'blacklist amdxdna' 'amdxdna blacklisted'
 end
-function _verify_static_system --description "Verify resolved, logind, NM, regdom, bluetooth, cpupower-service.conf, sysctl, udev, modprobe"
+function _verify_static_system --description "Verify resolved, logind, NM, regdom, bluetooth, cpupower, sysctl, udev, modprobe, nftables"
     _echo "SYSTEM CONFIGURATION"; _echo "── resolved ──"
     if _chk_file /etc/systemd/resolved.conf.d/99-cachyos-resolved.conf
         for kv in "MulticastDNS=$RESOLVED_MDNS" "LLMNR=$RESOLVED_LLMNR"; _chk_grep /etc/systemd/resolved.conf.d/99-cachyos-resolved.conf "$kv"; end
     end
-    _echo "── logind.conf ──"
     _vss_logind
-    _echo "── NetworkManager-dispatcher logging ──"
     _vss_nmdispatch
-    _echo "── NetworkManager ──"
     _vss_nm
     _vss_regdom
     _vss_bluetooth
@@ -1370,9 +1377,7 @@ function _verify_static_system --description "Verify resolved, logind, NM, regdo
     _chk_file /etc/default/cpupower-service.conf; and _chk_grep /etc/default/cpupower-service.conf "GOVERNOR='$CPUPOWER_GOVERNOR'" "GOVERNOR=$CPUPOWER_GOVERNOR"
     _vss_sysctl
     _vss_udev
-    _echo "── modprobe (60-ry-modules.conf) ──"
     _vss_modprobe
-    _echo "── nftables ──"
     _vss_nft
 end
 function _verify_static_user --description "Verify environment.d ENV_VARS + MangoHud HUD config"
@@ -2077,7 +2082,7 @@ function _vrsv_wifi_nm_backend --description "_vrsv_wifi sub: Verify NM effectiv
     if not command -q NetworkManager
         _info "  NetworkManager binary absent — backend check skipped"; return 0
     end
-    set -l _eff (_as true NetworkManager --print-config 2>/dev/null | command grep -E -- '^[[:space:]]*wifi\.backend[[:space:]]*=' | command head -n1 | string replace -r '.*=[[:space:]]*' '' | string trim --)
+    set -l _eff (_as true NetworkManager --print-config 2>/dev/null | command grep -E -- '^[[:space:]]*wifi\.backend[[:space:]]*=' | command head -n 1 | string replace -r '.*=[[:space:]]*' '' | string trim --)
     if test -z "$_eff"
         if not sudo -n true 2>/dev/null
             _warn "  NM effective wifi.backend: sudo cache lapsed — cannot determine"; return 0
@@ -2090,30 +2095,30 @@ function _vrsv_wifi_nm_backend --description "_vrsv_wifi sub: Verify NM effectiv
         _fail "  NM effective wifi.backend: $_eff (expected: $NM_WIFI_BACKEND)"
     end
 end
-function _vrsv_wifi --description "_verify_runtime_services sub: WiFi + NM backend + NM state"
+function _vrsv_wifi --description "_verify_runtime_services sub: Wi-Fi + NM backend + NM state"
     _echo; _echo "WIFI STATE"
     _echo
     if test "$_RY_PROFILE_USES_WIFI_BACKEND" = false
-        _info "  NetworkManager not managed — skipping WiFi state checks"; return 0
+        _info "  NetworkManager not managed — skipping Wi-Fi state checks"; return 0
     end
     set -l wlan_iface ""
     for iface in /sys/class/net/*/wireless
         if test -d "$iface"; set wlan_iface (command basename -- (command dirname -- "$iface")); break; end
     end
     if test -n "$wlan_iface"
-        _ok "  WiFi interface: $wlan_iface"
+        _ok "  Wi-Fi interface: $wlan_iface"
     else
-        _warn "  WiFi interface: NOT DETECTED"
+        _warn "  Wi-Fi interface: NOT DETECTED"
     end
     _vrsv_wifi_nm_backend
     if command -q nmcli
         set -l nm_wifi_enabled (command nmcli -t -f WIFI general 2>/dev/null | string trim --)
-        test -n "$nm_wifi_enabled"; and _info "  NM wifi radio: $nm_wifi_enabled"
+        test -n "$nm_wifi_enabled"; and _info "  NM Wi-Fi radio: $nm_wifi_enabled"
         set -l wifi_state (command nmcli -t -f TYPE,STATE device 2>/dev/null | string match -rg -- '^wifi:(.*)$')[1]
         if test "$wifi_state" = connected
-            _ok "  WiFi device: connected"
+            _ok "  Wi-Fi device: connected"
         else if test -n "$wifi_state"
-            _warn "  WiFi device: $wifi_state (not connected)"
+            _warn "  Wi-Fi device: $wifi_state (not connected)"
         end
     end
     set -l _ufw (command systemctl is-active ufw.service 2>/dev/null | string trim --)
@@ -2161,7 +2166,7 @@ function _vrsv_user_units --description "_verify_runtime_services sub: Managed u
 end
 
 # ── VERIFY-RUNTIME: SERVICES ORCHESTRATOR (_verify_runtime_services) ──
-function _verify_runtime_services --description "Verify systemd unit states (sys batch) and WiFi runtime"; _echo "SERVICE STATE"; _echo; _vrsv_sys_units; _vrsv_masked_inactive; _vrsv_user_units; _vrsv_wifi; return 0; end
+function _verify_runtime_services --description "Verify systemd unit states (sys batch) and Wi-Fi runtime"; _echo "SERVICE STATE"; _echo; _vrsv_sys_units; _vrsv_masked_inactive; _vrsv_user_units; _vrsv_wifi; return 0; end
 
 # ── VERIFY-RUNTIME: ENVIRONMENT ──
 function _vre_envvars --description "_verify_runtime_env sub: ENV_VARS via systemctl --user show-environment"
@@ -2312,7 +2317,7 @@ function _vrs_nm_perms --description "_verify_runtime_session sub: NetworkManage
         for conn_file in $conn_files; _chk_perms "$conn_file" 600 root:root true; or set bad_perms (math $bad_perms + 1); end
         if test "$bad_perms" -eq 0; set -l conn_count (count $conn_files); _ok "  NetworkManager connections: $conn_count files with correct permissions"; end
     else if begin; command grep -q -- 'wifi.backend=' /etc/NetworkManager/conf.d/99-cachyos-nm.conf 2>/dev/null; or begin; not test -r /etc/NetworkManager/conf.d/99-cachyos-nm.conf; and sudo -n grep -q -- 'wifi.backend=' /etc/NetworkManager/conf.d/99-cachyos-nm.conf 2>/dev/null; end; end # sudo fallback if drop-in is 0600
-        _warn "  NetworkManager connections: no .nmconnection files (WiFi may not auto-connect)"
+        _warn "  NetworkManager connections: no .nmconnection files (Wi-Fi may not auto-connect)"
     else
         _info "  NetworkManager connections: no .nmconnection files found"
     end
