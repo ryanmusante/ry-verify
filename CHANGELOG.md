@@ -3,24 +3,22 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.203.0
+7.204.0
 -------
 
-  - configuration: expects the ry-install managed-file header on every
-    managed file but /etc/kernel/cmdline; checksums move with ry-install
-  - verify: report labels read Wi-Fi, not WiFi or wifi
-  - readme: EXPECTED_SCALING_DRIVER is described as the runtime check it is
-  - changelog: trimmed to expectation changes, coverage and fixes; both
-    prior single-version blocks folded into the range below
+  - kernel: expects nowatchdog and reads it back through kernel.watchdog
+  - perf: expects governor powersave with EPP performance
 
 
-7.190.0 - 7.202.0
+7.190.0 - 7.203.0
 -----------------
 
   - kernel: 7.195.0 expects fsck.mode=force; 7.199.0 adds
     ttm.pages_limit=20971520
   - env: PROTON_FSR4_INDICATOR=1 dropped at 7.195.0
   - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled
+  - configuration: 7.203.0 expects the ry-install managed-file header on
+    every managed file but /etc/kernel/cmdline
   - sysctl: 7.195.0 expects vm.watermark_scale_factor=125
   - verify: 7.195.1 derives module-parameter expectations from KERNEL_PARAMS;
     7.197.0 compare is exact for integer params
@@ -28,6 +26,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     7.200.0 asserts connectivity disabled
   - verify: 7.201.0 drops mode drift for a symlinked destination; 7.202.0
     fails it in the checksum phase instead of reading through it
+  - verify: 7.203.0 report labels read Wi-Fi, not WiFi or wifi
   - check: 7.195.1 - 7.195.2 silence every bootstrap gate; 7.200.1 logs
     CHECK_*_DRIFT with the cause; 7.202.0 records CHECK_SYMLINK_DRIFT
   - split: 7.190.0 moves ry-verify.fish here

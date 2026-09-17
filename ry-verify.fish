@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.203.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.204.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.203.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.204.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -368,7 +368,7 @@ set --erase _ry_dst_count
 # ── EMBEDDED DATA: BOOTLOADER KEYS + KERNEL_PARAMS + MKINITCPIO ──
 set -g LOADER_DEFAULT "@saved"; set -g LOADER_TIMEOUT 0; set -g LOADER_CONSOLE_MODE keep; set -g LOADER_EDITOR no
 set -g SDBOOT_DEFAULT_ENTRY manual; set -g SDBOOT_OVERWRITE yes; set -g SDBOOT_REMOVE_EXISTING yes; set -g SDBOOT_REMOVE_OBSOLETE yes
-set -g KERNEL_PARAMS amd_pstate=active btusb.enable_autosuspend=n fsck.mode=force fsck.repair=yes iommu=pt ipv6.disable=1 mt7925e.disable_aspm=1 nvme_core.default_ps_max_latency_us=0 pcie_aspm.policy=performance processor.max_cstate=1 quiet split_lock_detect=off ttm.pages_limit=20971520 usbcore.autosuspend=-1 zswap.enabled=0
+set -g KERNEL_PARAMS amd_pstate=active btusb.enable_autosuspend=n fsck.mode=force fsck.repair=yes iommu=pt ipv6.disable=1 mt7925e.disable_aspm=1 nowatchdog nvme_core.default_ps_max_latency_us=0 pcie_aspm.policy=performance processor.max_cstate=1 quiet split_lock_detect=off ttm.pages_limit=20971520 usbcore.autosuspend=-1 zswap.enabled=0
 set -g MKINITCPIO_MODULES amdgpu
 set -g MKINITCPIO_HOOKS base systemd autodetect microcode modconf kms keyboard sd-vconsole block filesystems fsck
 set -g MKINITCPIO_COMPRESSION zstd; set -g MKINITCPIO_COMPRESSION_OPTIONS -3 # mkinitcpio prepends -T0 for zstd
@@ -379,7 +379,7 @@ set -g NM_DISPATCHER_LOGLEVELMAX notice # drop info-level dispatcher spam, keep 
 set -g COUNTRY US
 set -g LOGIND_IGNORE_KEYS HandlePowerKey HandlePowerKeyLongPress HandleSuspendKey HandleSuspendKeyLongPress HandleHibernateKey HandleHibernateKeyLongPress HandleRebootKey HandleRebootKeyLongPress
 set -g NM_WIFI_BACKEND wpa_supplicant; set -g NM_WIFI_POWERSAVE 2; set -g NM_LOG_LEVEL WARN # Wi-Fi PS off: MT7925/mt76 PS in software causes latency spikes
-set -g CPUPOWER_GOVERNOR performance
+set -g CPUPOWER_GOVERNOR powersave # performance pins CPPC MinPerf at nominal; EPP carries the hint
 set -g BT_AUTO_ENABLE true; set -g BT_FAST_CONNECTABLE true; set -g BT_RECONNECT_ATTEMPTS 3 # adapter auto-power-on; paired-sink reconnect retries
 set -g GPU_DPM_LEVEL high # gfx1151 dpm; high pins clocks, gating stays active
 set -g _RY_DPM_LEVELS auto low high manual profile_standard profile_min_sclk profile_min_mclk profile_peak perf_determinism # power_dpm_force_performance_level accepted set
@@ -439,7 +439,7 @@ function _ir_precompute_caches --description "Precompute Wi-Fi-backend and canon
 end
 function _ir_validate_counts --description "Refuse to run when array counts drift from expected"
     set -l _expect \
-        KERNEL_PARAMS:15 \
+        KERNEL_PARAMS:16 \
         MKINITCPIO_HOOKS:11 \
         MKINITCPIO_MODULES:1 \
         LOGIND_IGNORE_KEYS:8 \
@@ -1900,12 +1900,13 @@ function _vrkm_param_assert --argument-names mp path want --description "_vrkm_m
         _chk_sysfs_eq "$path" "$want" "$mp"
     end
 end
-function _vrkm_module_params --description "_vrk_module_state sub: Module.param tokens vs /sys/module; expectations read from KERNEL_PARAMS"
+function _vrkm_module_params --description "_vrk_module_state sub: Tokens vs /sys/module + kernel.watchdog; expectations from KERNEL_PARAMS"
     for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled btusb.enable_autosuspend mt7925e.disable_aspm pcie_aspm.policy ipv6.disable ttm.pages_limit # sysfs-readable module_params among the managed tokens
         set -l _want (_vrkm_kp_value "$_mp"); test -n "$_want"; or continue # token absent: nothing to assert
         set -l _path /sys/module/(string replace -a -- '-' '_' (string replace -r '\.[^.]*$' '' -- "$_mp"))/parameters/(string replace -r '^[^.]*\.' '' -- "$_mp")
         _vrkm_param_assert "$_mp" "$_path" "$_want"
     end
+    if contains -- nowatchdog $KERNEL_PARAMS; _chk_sysfs_eq /proc/sys/kernel/watchdog 0 nowatchdog; end # bare token: read back through kernel.watchdog
 end
 function _vrkm_amdgpu --description "_vrk_module_state sub: amdgpu parameters (hex-aware compare; expected from KERNEL_PARAMS)"
     test -d /sys/module/amdgpu/parameters; or return 0
