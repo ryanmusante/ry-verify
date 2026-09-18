@@ -3,30 +3,27 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.204.0
+7.205.0
 -------
 
-  - kernel: expects nowatchdog and reads it back through kernel.watchdog
-  - perf: expects governor powersave with EPP performance
+  - configuration: expects the EnvironmentFile= cpupower-service.conf header
+  - changelog: the prior single-version block folded into the range below
 
 
-7.190.0 - 7.203.0
+7.190.0 - 7.204.0
 -----------------
 
-  - kernel: 7.195.0 expects fsck.mode=force; 7.199.0 adds
-    ttm.pages_limit=20971520
+  - kernel: 7.195.0 fsck.mode=force; 7.199.0 adds ttm.pages_limit=20971520;
+    7.204.0 expects nowatchdog and reads it back through kernel.watchdog
+  - perf: 7.204.0 expects governor powersave with EPP performance
   - env: PROTON_FSR4_INDICATOR=1 dropped at 7.195.0
-  - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled
-  - configuration: 7.203.0 expects the ry-install managed-file header on
-    every managed file but /etc/kernel/cmdline
+  - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled; 7.203.0
+    expects the managed-file header on every file but /etc/kernel/cmdline
   - sysctl: 7.195.0 expects vm.watermark_scale_factor=125
   - verify: 7.195.1 derives module-parameter expectations from KERNEL_PARAMS;
-    7.197.0 compare is exact for integer params
-  - verify: 7.198.0 readback covers every sysfs-readable managed token;
-    7.200.0 asserts connectivity disabled
-  - verify: 7.201.0 drops mode drift for a symlinked destination; 7.202.0
-    fails it in the checksum phase instead of reading through it
-  - verify: 7.203.0 report labels read Wi-Fi, not WiFi or wifi
+    7.197.0 exact integer compare; 7.198.0 reads back every managed token
+  - verify: 7.200.0 asserts connectivity disabled; 7.202.0 fails a symlinked
+    destination in the checksum phase; 7.203.0 labels read Wi-Fi
   - check: 7.195.1 - 7.195.2 silence every bootstrap gate; 7.200.1 logs
     CHECK_*_DRIFT with the cause; 7.202.0 records CHECK_SYMLINK_DRIFT
   - split: 7.190.0 moves ry-verify.fish here
@@ -50,9 +47,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     state, live ext4 opts, MangoHud, .ry.bak, parser complaints
   - check: mode drift sets drift; 7.186.1 - 7.187.0 take every --check
     abbreviation, silent rc 3
-  - preflight: rc 3 on a reserved COUNTRY, NM_WIFI_POWERSAVE outside 0-3; no
-    ipv6.disable=1 warns
-  - logging: millisecond JSONL timestamps
+  - preflight: rc 3 on a reserved COUNTRY, NM_WIFI_POWERSAVE outside 0-3
   - split: 7.177.0 moves verify and check to ry-verify.fish
 
 
