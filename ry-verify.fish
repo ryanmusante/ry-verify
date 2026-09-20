@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.205.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.206.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.205.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.206.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -240,7 +240,7 @@ function _write_footer --argument-names exit_code extra_key --description "Appen
 end
 set -g _CLEANUP_DONE false
 
-# ── CLEANUP ORCHESTRATION: TMPFILES → CHILDREN → GLOBALS ──
+# ── CLEANUP ORCHESTRATION: CHILDREN → TMPFILES → GLOBALS ──
 function _dc_sweep_tmpfiles --description "_do_cleanup sub: Remove tracked tmpfiles/dirs"
     set -l _stuck_tmpfiles
     for _tf in $_TRACKED_TMPFILES
@@ -1334,8 +1334,8 @@ function _vss_regdom --description "_verify_static_system sub: Wireless regdom (
 function _vss_bluetooth --description "_verify_static_system sub: BlueZ main.conf (adapter auto-power-on)"
     _echo "── bluetooth (main.conf) ──"
     _chk_file /etc/bluetooth/main.conf; or return 0
-    _chk_grep /etc/bluetooth/main.conf "AutoEnable=$BT_AUTO_ENABLE"
     _chk_grep /etc/bluetooth/main.conf "FastConnectable=$BT_FAST_CONNECTABLE"
+    _chk_grep /etc/bluetooth/main.conf "AutoEnable=$BT_AUTO_ENABLE"
     _chk_grep /etc/bluetooth/main.conf "ReconnectAttempts=$BT_RECONNECT_ATTEMPTS"
 end
 function _vss_udev --description "_verify_static_system sub: Combined udev perf rules (NVMe scheduler + EPP + GPU clock-floor)"
@@ -1381,7 +1381,7 @@ function _verify_static_system --description "Verify resolved, logind, NM, regdo
     _vss_nft
 end
 function _verify_static_user --description "Verify environment.d ENV_VARS + MangoHud HUD config"
-    _echo "USER CONFIGURATION"
+    _echo "USER CONFIGURATION"; _echo "── environment.d ──"
     if _chk_file "$HOME/.config/environment.d/10-environment.conf"
         for exp in $ENV_VARS; _chk_grep "$HOME/.config/environment.d/10-environment.conf" "$exp"; end
     end
@@ -1410,7 +1410,7 @@ function _vsp_required --description "_verify_static_packages sub: Check PKGS_AD
             if contains -- "$pkg" $argv
                 _ok "  $pkg: installed"
             else
-                _fail "  $pkg: NOT installed (DXVK/VKD3D-Proton requires this)"
+                _fail "  $pkg: NOT INSTALLED (DXVK/VKD3D-Proton requires this)"
                 set -a _vk_missing "$pkg"
             end
         end
@@ -1510,7 +1510,7 @@ function _verify_static_syntax --description "Validate live mkinitcpio HOOKS pre
     end
 end
 
-# ── VERIFY-STATIC: CHECKSUM + DRIVER (SHA256 match + _ry_verify_static) ──
+# ── VERIFY-STATIC: CHECKSUM + DRIVER (byte compare + _ry_verify_static) ──
 function _vsc_check_one --argument-names dst --description "_verify_static_checksum sub: Compare one destination's expected vs installed bytes"
     set -l _sl false; _is_system_dst "$dst"; and set _sl true
     if _is_symlink "$dst" $_sl; _fail "  $dst: symlink — a managed destination must be a regular file"; _log "VERIFY_STATIC_SYMLINK: dst=$dst"; return 0; end
@@ -1594,8 +1594,8 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
     test (count $_stray) -gt 0; and _info "  stray .ry.orig from older releases (mechanism removed; left in place): $_stray"
     return 0
 end
-function _verify_static_checksum --description "Verify embedded content hash matches installed file SHA256"
-    _echo "CHECKSUM VERIFICATION"; _echo
+function _verify_static_checksum --description "Verify installed bytes match the generator output (SHA256 of both logged on mismatch)"
+    _echo "CHECKSUM VERIFICATION"
     _echo "── embedded vs installed ──"
     for dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS
         _vsc_check_one "$dst"
@@ -1624,7 +1624,7 @@ end
 
 # ── --CHECK MODE: SILENT IDEMPOTENCY PROBE ──
 function _check_drift --argument-names key detail --description "Set the check-mode drift flag and record the cause"; set -g _RY_CHECK_DRIFT 1; _log "$key: $detail"; end
-function _check_phase_files --description "Check-mode phase: file content hash compare"
+function _check_phase_files --description "Check-mode phase: file content byte compare"
     for dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS
         set -l _mp 0644; set -l _ms true; contains -- "$dst" $USER_DESTINATIONS; and set _mp 0600; and set _ms false
         _is_symlink "$dst" $_ms; and _check_drift CHECK_SYMLINK_DRIFT "dst=$dst"
@@ -1642,7 +1642,7 @@ function _check_phase_files --description "Check-mode phase: file content hash c
                 _log "CHECK_PREFLIGHT: _installed_bytes returned unexpected rc=$_ib_rc for $dst"; return $EXIT_PREFLIGHT
         end
         test "$expected" = "$actual"; or _check_drift CHECK_CONTENT_DRIFT "dst=$dst reason=content"
-        set -l _mc (_ry_mode_drift "$dst" "$_ms" "$_mp"); test -n "$_mc"; and set -g _RY_CHECK_DRIFT 1; and _log "CHECK_MODE_DRIFT: dst=$dst mode=$_mc expected=$_mp"
+        set -l _mc (_ry_mode_drift "$dst" "$_ms" "$_mp"); test -n "$_mc"; and _check_drift CHECK_MODE_DRIFT "dst=$dst mode=$_mc expected=$_mp"
         set -g _RY_CHECK_FILES_CHECKED (math $_RY_CHECK_FILES_CHECKED + 1)
     end
     return 0
@@ -1906,7 +1906,7 @@ function _vrkm_module_params --description "_vrk_module_state sub: Tokens vs /sy
         set -l _path /sys/module/(string replace -a -- '-' '_' (string replace -r '\.[^.]*$' '' -- "$_mp"))/parameters/(string replace -r '^[^.]*\.' '' -- "$_mp")
         _vrkm_param_assert "$_mp" "$_path" "$_want"
     end
-    if contains -- nowatchdog $KERNEL_PARAMS; _chk_sysfs_eq /proc/sys/kernel/watchdog 0 nowatchdog; end # bare token: read back through kernel.watchdog
+    if contains -- nowatchdog $KERNEL_PARAMS; _chk_sysfs_eq /proc/sys/kernel/watchdog 0 "nowatchdog (kernel.watchdog)"; end # bare token: read back through kernel.watchdog
 end
 function _vrkm_amdgpu --description "_vrk_module_state sub: amdgpu parameters (hex-aware compare; expected from KERNEL_PARAMS)"
     test -d /sys/module/amdgpu/parameters; or return 0
@@ -1966,7 +1966,7 @@ function _vrkm_blacklist_modprobe --description "_vrk_module_state sub: lsmod-ch
     end
 end
 function _vrk_module_state --description "_verify_runtime_kparams sub: Module parameters + blacklist"
-    _echo "MODULE STATE"; _echo
+    _echo "MODULE STATE"
     _echo "── Module parameters ──"
     _vrkm_module_params
     _vrkm_amdgpu
@@ -2157,9 +2157,9 @@ function _vrsv_user_units --description "_verify_runtime_services sub: Managed u
         _info "  plasma-powerdevil.service: unit not present — skipping user-unit health check"; return 0
     end
     if command systemctl --user is-failed --quiet plasma-powerdevil.service 2>/dev/null
-        _fail "plasma-powerdevil.service: failed — journalctl --user -u plasma-powerdevil -b · coredumpctl list org_kde_powerdevil"
+        _fail "  plasma-powerdevil.service: failed — journalctl --user -u plasma-powerdevil -b · coredumpctl list org_kde_powerdevil"
     else
-        _ok "plasma-powerdevil.service: not failed"
+        _ok "  plasma-powerdevil.service: not failed"
     end
     set -l _failed_n (command systemctl --user --failed --plain --no-legend 2>/dev/null | count)
     test "$_failed_n" -gt 0; and _warn "  systemd --user reports $_failed_n failed unit(s) — systemctl --user --failed"
@@ -2274,32 +2274,31 @@ function _vre_ntsync --description "_verify_runtime_env sub: ntsync state via _n
     set -l _ns (_ntsync_state)
     switch "$_ns"
         case loaded
-            _ok "ntsync: /dev/ntsync exists"
+            _ok "  ntsync: /dev/ntsync exists"
         case builtin
             if test -c /dev/ntsync
-                _ok "ntsync: built-in, /dev/ntsync exists"
+                _ok "  ntsync: built-in, /dev/ntsync exists"
             else
-                _warn "ntsync: built-in (CONFIG_NTSYNC=y) but /dev/ntsync missing — check udev rules"
+                _warn "  ntsync: built-in (CONFIG_NTSYNC=y) but /dev/ntsync missing — check udev rules"
             end
         case loaded_nodev
-            _warn "ntsync: module loaded but /dev/ntsync missing"
+            _warn "  ntsync: module loaded but /dev/ntsync missing"
         case missing
-            _info "ntsync: NOT available (module not loaded)"
+            _info "  ntsync: NOT available (module not loaded)"
         case '*'
-            _warn "ntsync: unknown state '$_ns'"
+            _warn "  ntsync: unknown state '$_ns'"
     end
-    _echo
 end
 function _vre_regdom --description "_verify_runtime_env sub: Wireless regulatory domain via iw reg get"
     _echo; _echo "── wireless regdom ──"
     if not command -q iw
-        _info "regdom: iw(8) absent — cannot query (expected $COUNTRY)"; _echo
+        _info "  regdom: iw(8) absent — cannot query (expected $COUNTRY)"; _echo
         return 0
     end
     if command env LC_ALL=C iw reg get 2>/dev/null | string match -qr -- "^country $COUNTRY"
-        _ok "regdom: country $COUNTRY active"
+        _ok "  regdom: country $COUNTRY active"
     else
-        _warn "regdom: country $COUNTRY not active — sudo iw reg set $COUNTRY (persists via /etc/iw-regdomain → cachyos-iw-set-regdomain)"
+        _warn "  regdom: country $COUNTRY not active — sudo iw reg set $COUNTRY (persists via /etc/iw-regdomain → cachyos-iw-set-regdomain)"
     end
     _echo
 end

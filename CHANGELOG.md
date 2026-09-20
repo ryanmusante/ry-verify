@@ -3,14 +3,15 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.205.0
+7.206.0
 -------
 
-  - configuration: expects the EnvironmentFile= cpupower-service.conf header
-  - changelog: the prior single-version block folded into the range below
+  - verify: nowatchdog readback labelled kernel.watchdog; bluetooth keys in
+    emission order; sub-check indents, sub-banners and header blanks uniform
+  - readme: the checksum row says byte compare, as the code does
 
 
-7.190.0 - 7.204.0
+7.190.0 - 7.205.0
 -----------------
 
   - kernel: 7.195.0 fsck.mode=force; 7.199.0 adds ttm.pages_limit=20971520;
@@ -19,6 +20,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - env: PROTON_FSR4_INDICATOR=1 dropped at 7.195.0
   - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled; 7.203.0
     expects the managed-file header on every file but /etc/kernel/cmdline
+  - configuration: 7.205.0 expects the EnvironmentFile=
+    cpupower-service.conf header
   - sysctl: 7.195.0 expects vm.watermark_scale_factor=125
   - verify: 7.195.1 derives module-parameter expectations from KERNEL_PARAMS;
     7.197.0 exact integer compare; 7.198.0 reads back every managed token
