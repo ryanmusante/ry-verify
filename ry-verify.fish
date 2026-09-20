@@ -1,17 +1,17 @@
 #!/usr/bin/env fish
-# ry-verify v7.206.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.207.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.206.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.207.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
-set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro - Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 17
+set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro — Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 17
 set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check h/help v/version verify check # single option-spec source (root guard + main argparse)
 
 # ── HELP TEXT ──
-function _ry_show_help --description "Display usage information and available subcommands"
+function _ry_show_help --description "Display usage information and available options"
     printf '%s\n' \
         "" \
         "ry-verify v$VERSION" \
@@ -226,7 +226,7 @@ function _unit_state_padded --argument-names unit --description "Return LoadStat
     end
 end
 
-# ── JSONL FOOTER + TMPFILE CLEANUP ──
+# ── JSONL FOOTER ──
 function _write_footer --argument-names exit_code extra_key --description "Append JSONL footer to LOG_FILE"
     set -q _FOOTER_WRITTEN; and return 0
     set -q LOG_FILE; or return 0
@@ -325,7 +325,7 @@ function _cleanup --on-signal INT --on-signal TERM --on-signal HUP --on-signal Q
     test "$MODE" = bootstrap; and set -q _RY_ARGV_CHECK_ONLY; and test "$_RY_ARGV_CHECK_ONLY" = true; and set _sig_silent true
     if not set -q _RY_OUTPUT_BROKEN; and test "$_sig_silent" = false
         echo "" >&2
-        echo "[WARN] Caught $_sig_label - cleaning up..." >&2
+        echo "[WARN] Caught $_sig_label — cleaning up..." >&2
     end
     set -l _sig_name (string replace -r '^SIG' '' -- "$_sig_label")
     set -l _sig_exit ""
@@ -521,7 +521,7 @@ function _init_runtime --description "Cache root UUID + validate config + precom
                 _log "HARDWARE_MODEL_UNREADABLE_VERIFY: /proc/cpuinfo missing 'model name'"
             else
                 _err_loud "Hardware check: CPU model unreadable from /proc/cpuinfo (no 'model name' field) — refusing to run"
-                _err_loud_cont "  Checking gfx1151/Strix Halo expectations without CPU validation reports meaningless drift."
+                _err_loud_cont "  Checking gfx1151/Strix Halo expectations without CPU validation reports meaningless drift"
                 _err_loud_cont "  Override (at your risk): RY_INSTALL_SKIP_HARDWARE_CHECK=1 ./ry-verify.fish"
                 _pre_dispatch_exit $EXIT_PREFLIGHT
             end
@@ -534,7 +534,7 @@ function _init_runtime --description "Cache root UUID + validate config + precom
                 _log "HARDWARE_MISMATCH_VERIFY: expected=$EXPECTED_CPU_MATCH detected=$_cpu_model"
             else
                 _err_loud "Hardware mismatch: profile $PROFILE_NAME expects $EXPECTED_CPU_MATCH, detected: $_cpu_model"
-                _err_loud_cont "  Checking gfx1151/Strix Halo expectations on a non-matching CPU reports meaningless drift."
+                _err_loud_cont "  Checking gfx1151/Strix Halo expectations on a non-matching CPU reports meaningless drift"
                 _err_loud_cont "  Override (at your risk): RY_INSTALL_SKIP_HARDWARE_CHECK=1 ./ry-verify.fish"
                 _pre_dispatch_exit $EXIT_PREFLIGHT
             end
@@ -920,7 +920,7 @@ function _echo --description "Print a plain message without level prefix"; set -
 
 # ── VERIFY SUMMARY ──
 function _verify_summary --description "Print verification pass/fail/warn summary"
-    _echo "VERIFICATION SUMMARY"
+    _echo; _echo "VERIFICATION SUMMARY"
     set -l snap_ok $VERIFY_OK; set -l snap_fail $VERIFY_FAIL; set -l snap_warn $VERIFY_WARN; set -l snap_gen_fail 0
     set -q VERIFY_GEN_FAIL; and set snap_gen_fail $VERIFY_GEN_FAIL
     set -l summary "Results: $snap_ok OK"
@@ -1601,12 +1601,12 @@ function _verify_static_checksum --description "Verify installed bytes match the
         _vsc_check_one "$dst"
     end
     _vsc_backups
-    _echo
 end
 function _ry_verify_static --description "Verify installed configs: boot, system, user, packages, services, syntax, checksums"
     _log_section "STATIC VERIFICATION START"
     _ensure_sudo_cached; or begin
         _err_loud "sudo required for verification"
+        _log_section "STATIC VERIFICATION END"
         return $EXIT_PREFLIGHT
     end
     set -g VERIFY_OK 0; set -g VERIFY_FAIL 0; set -g VERIFY_WARN 0; set -g VERIFY_GEN_FAIL 0
@@ -1766,7 +1766,7 @@ end
 
 # ── VERIFY-RUNTIME: KERNEL CMDLINE + PARAM ACCEPTANCE + GPU + CPU ──
 function _vrk_cmdline --description "_verify_runtime_kparams sub: /proc/cmdline token check"
-    _echo "KERNEL CMDLINE"; _echo
+    _echo "KERNEL CMDLINE"
     set -l cmdline (command cat -- /proc/cmdline 2>/dev/null)
     for param in $KERNEL_PARAMS
         set -l _param_re (string escape --style=regex -- "$param")
@@ -1781,7 +1781,6 @@ function _vrk_cmdline --description "_verify_runtime_kparams sub: /proc/cmdline 
     else
         _fail "  rw: NOT in cmdline"
     end
-    _echo
 end
 function _vrk_param_rejects --description "_verify_runtime_kparams sub: Kernel parser rejections naming a managed token"
     _echo "── kernel parameter acceptance ──"
@@ -1875,12 +1874,11 @@ function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor
             end
         end
     end
-    _echo; _echo "── amd_pstate / CPU boost ──"
+    _echo "── amd_pstate / CPU boost ──"
     _chk_sysfs_eq /sys/devices/system/cpu/amd_pstate/status active "amd_pstate status"
     _chk_sysfs_eq /sys/devices/system/cpu/amd_pstate/prefcore enabled "amd_pstate prefcore"
     _chk_sysfs_eq /sys/devices/system/cpu/amd_pstate/dynamic_epp disabled "amd_pstate dynamic_epp" # ships since 7.1; when enabled, manual EPP writes are blocked
     _chk_sysfs_eq /sys/devices/system/cpu/cpufreq/boost 1 "CPU boost"
-    _echo
 end
 
 # ── VERIFY-RUNTIME: MODULE-STATE SUBS (_vrkm_*; feed _vrk_module_state) ──
@@ -1970,16 +1968,15 @@ function _vrk_module_state --description "_verify_runtime_kparams sub: Module pa
     _echo "── Module parameters ──"
     _vrkm_module_params
     _vrkm_amdgpu
-    _echo; _echo "── I/O scheduler (NVMe) ──"
+    _echo "── I/O scheduler (NVMe) ──"
     set -l _nvme_bdevs (command find /sys/block -mindepth 1 -maxdepth 1 -name 'nvme*n*' 2>/dev/null)
     if test (count $_nvme_bdevs) -eq 0; _info "  No NVMe block device present"; end
     for _bdev in $_nvme_bdevs
         _chk_sysfs_match "$_bdev/queue/scheduler" '\[none\]' "io-sched "(command basename -- "$_bdev")
     end
-    _echo; _echo "── Blacklisted modules ──"
+    _echo "── Blacklisted modules ──"
     _vrkm_blacklist
     _vrkm_blacklist_modprobe
-    _echo
 end
 
 # ── VERIFY-RUNTIME: KPARAMS ORCHESTRATOR (_verify_runtime_kparams) ──
@@ -2097,8 +2094,7 @@ function _vrsv_wifi_nm_backend --description "_vrsv_wifi sub: Verify NM effectiv
     end
 end
 function _vrsv_wifi --description "_verify_runtime_services sub: Wi-Fi + NM backend + NM state"
-    _echo; _echo "WIFI STATE"
-    _echo
+    _echo "WIFI STATE"
     if test "$_RY_PROFILE_USES_WIFI_BACKEND" = false
         _info "  NetworkManager not managed — skipping Wi-Fi state checks"; return 0
     end
@@ -2135,7 +2131,7 @@ function _vrsv_wifi --description "_verify_runtime_services sub: Wi-Fi + NM back
     _info "  firewall posture: ufw=$_ufw nft_rules=$_nft"
 end
 function _vrsv_masked_inactive --description "_verify_runtime_services sub: MASK units must be inactive"
-    _echo; _echo "── Masked units (runtime) ──"
+    _echo "── Masked units (runtime) ──"
     for _u in $MASK
         set -l _v (_unit_state_padded $_u)
         if test "$_v[3]" = ERR_NO_DATA
@@ -2167,12 +2163,12 @@ function _vrsv_user_units --description "_verify_runtime_services sub: Managed u
 end
 
 # ── VERIFY-RUNTIME: SERVICES ORCHESTRATOR (_verify_runtime_services) ──
-function _verify_runtime_services --description "Verify systemd unit states (sys batch) and Wi-Fi runtime"; _echo "SERVICE STATE"; _echo; _vrsv_sys_units; _vrsv_masked_inactive; _vrsv_user_units; _vrsv_wifi; return 0; end
+function _verify_runtime_services --description "Verify system units, masked-unit inactivity, user units, and Wi-Fi runtime"; _echo "SERVICE STATE"; _vrsv_sys_units; _vrsv_masked_inactive; _vrsv_user_units; _vrsv_wifi; return 0; end
 
 # ── VERIFY-RUNTIME: ENVIRONMENT ──
 function _vre_envvars --description "_verify_runtime_env sub: ENV_VARS via systemctl --user show-environment"
-    _echo "ENVIRONMENT STATE"; _echo
-    if not _has_user_bus_active; _info "  Skipping ENV_VARS runtime check (no active user-bus — log in graphically or enable-linger to verify)"; _echo; return 0; end
+    _echo "ENVIRONMENT STATE"
+    if not _has_user_bus_active; _info "  Skipping ENV_VARS runtime check (no active user-bus — log in graphically or enable-linger to verify)"; return 0; end
     set -l _user_env (command systemctl --user show-environment 2>/dev/null)
     for exp in $ENV_VARS
         set -l _ev_parts (string split -m1 '=' -- "$exp"); set -l var_name $_ev_parts[1]; set -l expected $_ev_parts[2]; set -l actual ""
@@ -2185,7 +2181,6 @@ function _vre_envvars --description "_verify_runtime_env sub: ENV_VARS via syste
             _warn "  $var_name: NOT SET in current session (re-login or systemctl --user import-environment)"
         end
     end
-    _echo
 end
 function _vre_sysctl_runtime --description "_verify_runtime_env sub: sysctl values via /proc/sys"
     set -q SYSCTL_VALUES; and test (count $SYSCTL_VALUES) -gt 0; or return 0
@@ -2203,7 +2198,6 @@ function _vre_sysctl_runtime --description "_verify_runtime_env sub: sysctl valu
             _warn "  $_key: unreadable"
         end
     end
-    _echo
 end
 function _vre_fstab --description "_verify_runtime_env sub: fstab ext4 entries have noatime,lazytime,commit=10"
     _echo "── fstab mount options ──"
@@ -2236,7 +2230,7 @@ function _vre_fstab --description "_verify_runtime_env sub: fstab ext4 entries h
     test "$_fstab_ok" = true; and _ok "  ext4 entries ("(count $_fstab_ext4)"): noatime,lazytime,commit=10 present"
 end
 function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mounts carry the fstab options"
-    _echo; _echo "── fstab options applied live ──"
+    _echo "── fstab options applied live ──"
     if not command -q findmnt; _warn "  findmnt unavailable — live mount options unverified"; return 0; end
     set -l _rows (command findmnt -rn -t ext4 -o TARGET,OPTIONS 2>/dev/null)
     if test (count $_rows) -eq 0; _info "  no ext4 filesystem mounted"; return 0; end
@@ -2270,7 +2264,7 @@ function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mount
     end
 end
 function _vre_ntsync --description "_verify_runtime_env sub: ntsync state via _ntsync_state dispatch"
-    _echo; _echo "── ntsync support ──"
+    _echo "── ntsync support ──"
     set -l _ns (_ntsync_state)
     switch "$_ns"
         case loaded
@@ -2290,9 +2284,9 @@ function _vre_ntsync --description "_verify_runtime_env sub: ntsync state via _n
     end
 end
 function _vre_regdom --description "_verify_runtime_env sub: Wireless regulatory domain via iw reg get"
-    _echo; _echo "── wireless regdom ──"
+    _echo "── wireless regdom ──"
     if not command -q iw
-        _info "  regdom: iw(8) absent — cannot query (expected $COUNTRY)"; _echo
+        _info "  regdom: iw(8) absent — cannot query (expected $COUNTRY)"
         return 0
     end
     if command env LC_ALL=C iw reg get 2>/dev/null | string match -qr -- "^country $COUNTRY"
@@ -2300,7 +2294,6 @@ function _vre_regdom --description "_verify_runtime_env sub: Wireless regulatory
     else
         _warn "  regdom: country $COUNTRY not active — sudo iw reg set $COUNTRY (persists via /etc/iw-regdomain → cachyos-iw-set-regdomain)"
     end
-    _echo
 end
 
 # ── VERIFY-RUNTIME: ENV ORCHESTRATOR (_verify_runtime_env) ──
@@ -2338,6 +2331,7 @@ function _vrs_installed_file_perms --description "_verify_runtime_session sub: I
             if string match -q '/boot/*' -- "$dst"
                 if _vrs_vfat_skip "$dst" "$_boot_fstype"; set perm_vfat_skipped (math $perm_vfat_skipped + 1); continue; end
             end
+            if _is_symlink "$dst" true; _info "  $dst: symlink — perms not checked (the checksum phase fails it)"; continue; end
             set perm_checked (math $perm_checked + 1)
             _chk_perms "$dst" 644 root:root true; or set perm_bad (math $perm_bad + 1)
         else if not sudo -n true 2>/dev/null # lapse mid-loop: warn once, stop
@@ -2348,6 +2342,7 @@ function _vrs_installed_file_perms --description "_verify_runtime_session sub: I
     set -l _u_uname (command id -un)
     for dst in $USER_DESTINATIONS
         if test -f "$dst"
+            if _is_symlink "$dst" false; _info "  $dst: symlink — perms not checked (the checksum phase fails it)"; continue; end
             set perm_checked (math $perm_checked + 1)
             set -l _actual_grp (command stat -c '%G' -- "$dst" 2>/dev/null) # group from file %G (tolerates setgid ~/.config)
             test -z "$_actual_grp"; and set _actual_grp (command id -gn)
@@ -2418,6 +2413,7 @@ function _ry_verify_runtime --description "Verify runtime kernel params, service
     _log_section "RUNTIME VERIFICATION START"
     _ensure_sudo_cached; or begin
         _err_loud "sudo required for verification"
+        _log_section "RUNTIME VERIFICATION END"
         return $EXIT_PREFLIGHT
     end
     set -g VERIFY_OK 0; set -g VERIFY_FAIL 0; set -g VERIFY_WARN 0; set -g VERIFY_GEN_FAIL 0
