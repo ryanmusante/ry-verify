@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.208.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.209.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.208.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.209.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -379,7 +379,7 @@ set -g NM_DISPATCHER_LOGLEVELMAX notice # drop info-level dispatcher spam, keep 
 set -g COUNTRY US
 set -g LOGIND_IGNORE_KEYS HandlePowerKey HandlePowerKeyLongPress HandleSuspendKey HandleSuspendKeyLongPress HandleHibernateKey HandleHibernateKeyLongPress HandleRebootKey HandleRebootKeyLongPress
 set -g NM_WIFI_BACKEND wpa_supplicant; set -g NM_WIFI_POWERSAVE 2; set -g NM_LOG_LEVEL WARN # Wi-Fi PS off: MT7925/mt76 PS in software causes latency spikes
-set -g CPUPOWER_GOVERNOR powersave # performance pins CPPC MinPerf at nominal; EPP carries the hint
+set -g CPUPOWER_GOVERNOR performance # pins CPPC MinPerf at nominal; EPP writes above 0 return -EBUSY
 set -g BT_AUTO_ENABLE true; set -g BT_FAST_CONNECTABLE true; set -g BT_RECONNECT_ATTEMPTS 3 # adapter auto-power-on; paired-sink reconnect retries
 set -g GPU_DPM_LEVEL high # gfx1151 dpm; high pins clocks, gating stays active
 set -g _RY_DPM_LEVELS auto low high manual profile_standard profile_min_sclk profile_min_mclk profile_peak perf_determinism # power_dpm_force_performance_level accepted set
@@ -2308,7 +2308,7 @@ function _vrs_nm_perms --description "_verify_runtime_session sub: NetworkManage
     if test (count $conn_files) -gt 0
         set -l bad_perms 0
         for conn_file in $conn_files; _chk_perms "$conn_file" 600 root:root true; or set bad_perms (math $bad_perms + 1); end
-        if test "$bad_perms" -eq 0; set -l conn_count (count $conn_files); _ok "  NetworkManager connections: $conn_count files with correct permissions"; end
+        if test "$bad_perms" -eq 0; set -l conn_count (count $conn_files); _ok "  NetworkManager connections: $conn_count file(s) with correct permissions"; end
     else if begin; command grep -q -- 'wifi.backend=' /etc/NetworkManager/conf.d/99-cachyos-nm.conf 2>/dev/null; or begin; not test -r /etc/NetworkManager/conf.d/99-cachyos-nm.conf; and sudo -n grep -q -- 'wifi.backend=' /etc/NetworkManager/conf.d/99-cachyos-nm.conf 2>/dev/null; end; end # sudo fallback if drop-in is 0600
         _warn "  NetworkManager connections: no .nmconnection files (Wi-Fi may not auto-connect)"
     else
