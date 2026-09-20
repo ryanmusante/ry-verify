@@ -3,16 +3,14 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.207.0
+7.208.0
 -------
 
-  - verify: a symlinked destination fails once; its perms row turns INFO
-  - verify: a sudo bail closes its STATIC or RUNTIME VERIFICATION section
-  - verify: runtime groups drop their blank lines like the static half; one
-    blank precedes each VERIFICATION SUMMARY
+  - verify: one blank line, not two, separates a usage error from the help
+    text
 
 
-7.190.0 - 7.206.0
+7.190.0 - 7.207.0
 -----------------
 
   - kernel: 7.195.0 fsck.mode=force; 7.199.0 adds ttm.pages_limit=20971520;
@@ -31,6 +29,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.206.0 nowatchdog readback labeled kernel.watchdog; bluetooth
     keys in emission order
   - verify: 7.206.0 sub-check indents, sub-banners and header blanks uniform
+  - verify: 7.207.0 a symlinked destination fails once; its perms row turns
+    INFO; a sudo bail closes its STATIC or RUNTIME VERIFICATION section
+  - verify: 7.207.0 runtime groups drop their blank lines like the static
+    half; one blank precedes each VERIFICATION SUMMARY
   - check: 7.195.1 - 7.195.2 silence every bootstrap gate; 7.200.1 logs
     CHECK_*_DRIFT with the cause; 7.202.0 records CHECK_SYMLINK_DRIFT
   - split: 7.190.0 moves ry-verify.fish here

@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.207.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.208.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.207.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.208.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -89,7 +89,7 @@ function _ry_exit --argument-names code --description "Set bail sentinel and exi
     exit $code
 end
 function _set_exit --argument-names _code --description "Set both _RY_EXIT_CODE and _INTENDED_EXIT_CODE atomically"; set -g _RY_EXIT_CODE $_code; set -g _INTENDED_EXIT_CODE $_code; end
-function _ry_root_usage --description "Root-guard usage error: print msg + help to stderr, exit EXIT_USAGE"; echo "[ERR] $argv" >&2; echo >&2; _ry_show_help >&2; _ry_exit $EXIT_USAGE; end
+function _ry_root_usage --description "Root-guard usage error: print msg + help to stderr, exit EXIT_USAGE"; echo "[ERR] $argv" >&2; _ry_show_help >&2; _ry_exit $EXIT_USAGE; end
 
 # ── ROOT GUARD + COLOR/TTY + FISH VERSION CHECK ──
 set -g QUIET true; set -g MODE bootstrap # pinned pre-argparse for signal footers
@@ -2544,7 +2544,6 @@ if test "$_argparse_rc" -ne 0
     test -n "$_ap_msg"; or set _ap_msg "Invalid arguments: $_ORIG_ARGV"
     echo "[ERR] $_ap_msg" >&2
     _rm_tmp "$_ap_errfile" false
-    echo >&2
     _ry_show_help >&2
     _pre_dispatch_exit $EXIT_USAGE
 end
@@ -2553,7 +2552,7 @@ if set -q _flag_help; _ry_show_help; _pre_dispatch_exit $EXIT_OK; end
 if set -q _flag_version; echo "v$VERSION"; _pre_dispatch_exit $EXIT_OK; end
 set -q _flag_check; and set -g MODE check # default is verify (set above)
 set --erase _RY_ARGV_CHECK_ONLY # MODE is authoritative past this point
-if test (count $argv) -gt 0; echo "[ERR] Unexpected positional argument(s): $argv" >&2; echo >&2; _ry_show_help >&2; _pre_dispatch_exit $EXIT_USAGE; end
+if test (count $argv) -gt 0; echo "[ERR] Unexpected positional argument(s): $argv" >&2; _ry_show_help >&2; _pre_dispatch_exit $EXIT_USAGE; end
 test "$MODE" != check; and set -g QUIET false
 
 # ── MAIN: LOG RENAME + 0600 CREATE + JSONL HEADER ──
