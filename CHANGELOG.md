@@ -3,73 +3,65 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.210.0
+7.211.0
 -------
 
-  - boot: the missing-entries hints drop --verbose, unknown to sdboot-manage
+  - boot: the missing-entries hints drop --verbose
   - perf: expects governor performance again, reverting 7.204.0
-  - verify: the NetworkManager connection perms count reads file(s)
-  - verify: active but not-enabled units warn 'will not persist across boots'
-  - verify: the powerdevil crash hint matches coredumps by executable path
-  - verify: unset ENV_VARS name systemctl --user daemon-reload
-  - preflight: the COUNTRY and dash-package refusals end '; refuse to run'
-  - cli: glued short flags take only h and v; -Vh and -hV now fail like -V
+  - configuration: expects udev comments with the set EPP and GPU levels and
+    a resolved header without its mDNS/LLMNR claim
+  - verify: connection perms count reads file(s); active but not-enabled
+    units warn; unset ENV_VARS name systemctl --user daemon-reload
+  - verify: the powerdevil crash hint matches coredumps by executable path;
+    the udev group reads GPU DPM level, not clock-floor
+  - preflight: COUNTRY and dash-package refusals end '; refuse to run'; a
+    missing root UUID names the findmnt exit code or an empty result
+  - cli: glued short flags take only h and v; -Vh and -hV fail like -V
+  - logging: a caught signal logs before its stderr line
+  - changelog: same-tag bullets merged, clauses cut
 
 
 7.190.0 - 7.208.0
 -----------------
 
-  - kernel: 7.195.0 fsck.mode=force
-  - kernel: 7.199.0 adds ttm.pages_limit=20971520
-  - kernel: 7.204.0 expects nowatchdog, read back through kernel.watchdog
+  - kernel: 7.195.0 fsck.mode=force; 7.199.0 adds ttm.pages_limit=20971520;
+    7.204.0 expects nowatchdog, read back through kernel.watchdog
   - perf: 7.204.0 expects governor powersave with EPP performance
   - env: PROTON_FSR4_INDICATOR=1 dropped at 7.195.0
-  - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled
-  - configuration: 7.203.0 expects the managed-file header on every file but
-    /etc/kernel/cmdline
+  - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled;
+    7.203.0 the managed-file header on every file but /etc/kernel/cmdline
   - configuration: 7.205.0 cpupower-service.conf header names EnvironmentFile=
   - sysctl: 7.195.0 expects vm.watermark_scale_factor=125
-  - verify: 7.195.1 module-parameter expectations derive from KERNEL_PARAMS
-  - verify: 7.197.0 exact integer compare
-  - verify: 7.198.0 reads back every managed token
-  - verify: 7.200.0 asserts connectivity disabled
-  - verify: 7.202.0 fails a symlinked destination in the checksum phase
-  - verify: 7.203.0 labels read Wi-Fi
-  - verify: 7.206.0 nowatchdog readback labeled kernel.watchdog
-  - verify: 7.206.0 bluetooth keys in emission order
-  - verify: 7.206.0 sub-check indents, sub-banners and header blanks uniform
-  - verify: 7.207.0 a symlinked destination fails once, its perms row INFO
-  - verify: 7.207.0 a sudo bail closes its VERIFICATION section
-  - verify: 7.207.0 runtime groups drop their blank lines
-  - verify: 7.207.0 one blank precedes each VERIFICATION SUMMARY
-  - verify: 7.208.0 one blank line separates a usage error from the help text
-  - check: 7.195.1 - 7.195.2 silence every bootstrap gate
-  - check: 7.200.1 logs CHECK_*_DRIFT with the cause
-  - check: 7.202.0 records CHECK_SYMLINK_DRIFT
+  - verify: 7.195.1 module-parameter expectations derive from KERNEL_PARAMS;
+    7.197.0 exact integer compare; 7.198.0 reads back every managed token
+  - verify: 7.200.0 asserts connectivity disabled; 7.202.0 fails a symlinked
+    destination in the checksum phase, 7.207.0 once, its perms row INFO
+  - verify: 7.206.0 bluetooth keys in emission order; 7.207.0 a sudo bail
+    closes its VERIFICATION section
+  - verify: 7.203.0 - 7.208.0 labels read Wi-Fi and kernel.watchdog; indents,
+    sub-banners and blank lines uniform
+  - check: 7.195.1 - 7.195.2 silence every bootstrap gate; 7.200.1 logs
+    CHECK_*_DRIFT with the cause; 7.202.0 records CHECK_SYMLINK_DRIFT
   - split: 7.190.0 moves ry-verify.fish here
 
 
 7.139.0 - 7.189.0
 -----------------
 
-  - boot: COMPRESSION_OPTIONS -1 -> -3, drop -T0
-  - boot: fsck.mode=force -> auto
-  - kernel: land on iommu=pt
-  - kernel: drop amd_iommu, clearcpuid=umip, amdxdna
+  - boot: COMPRESSION_OPTIONS -1 -> -3, drop -T0; fsck.mode=force -> auto
+  - kernel: land on iommu=pt; drop amd_iommu, clearcpuid=umip, amdxdna
   - dns: drop pinned upstreams, DNSOverTLS= and DNSSEC=; link DNS wins
-  - network: autoconnect-retries-default=0, wlan0 quit after four tries
-  - env: PROTON_FSR4_UPGRADE -> FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1
-  - env: GSK_RENDERER ngl then gl
+  - network: autoconnect-retries-default=0
+  - env: PROTON_FSR4_UPGRADE -> FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1;
+    GSK_RENDERER ngl then gl
   - configuration: assert the nftables ICMPv6 base accept
   - packages: 7.173.0 adds cachyos-benchmarker
   - sysctl: drop both net.core.netdev_budget keys and vm.swappiness=150
-  - backup: .ry.bak moves to ~/ry-install/backups, slash-encoded
-  - backup: .ry.orig strays are INFO
-  - verify: checks every cpufreq policy and non-fallback loader entries
-  - verify: checks resolved unit state, live ext4 opts and MangoHud
-  - verify: checks .ry.bak and parser complaints
-  - check: mode drift sets drift
-  - check: 7.186.1 - 7.187.0 take every --check abbreviation, silent rc 3
+  - backup: .ry.bak moves to ~/ry-install/backups; .ry.orig strays are INFO
+  - verify: checks every cpufreq policy and non-fallback loader entries,
+    resolved unit state, live ext4 opts, MangoHud, .ry.bak, parser complaints
+  - check: mode drift sets drift; 7.186.1 - 7.187.0 take every --check
+    abbreviation, silent rc 3
   - preflight: rc 3 on a reserved COUNTRY, NM_WIFI_POWERSAVE outside 0-3
   - split: 7.177.0 moves verify and check to ry-verify.fish
 
@@ -97,8 +89,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 
   - dns: pin upstreams in resolved and the NM global-dns section
   - kernel: add mt7925e.disable_aspm=1 and kernel.nmi_watchdog=0
-  - env: FSR4_UPGRADE -> PROTON_FSR4_UPGRADE
-  - env: drop VKD3D_CONFIG
+  - env: FSR4_UPGRADE -> PROTON_FSR4_UPGRADE; drop VKD3D_CONFIG
 
 
 7.118.0 - 7.122.0
