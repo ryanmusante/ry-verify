@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.209.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.210.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.209.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.210.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -47,7 +47,7 @@ for _early_arg in $argv
             echo "v$VERSION"
             exit $EXIT_OK
         case '-*'
-            if string match -qr -- '^-[hvV]+$' "$_early_arg" # glued h/v/V only; first h/v wins (getopt order)
+            if string match -qr -- '^-[hv]+$' "$_early_arg" # glued h/v only; first h/v wins (getopt order)
                 for _early_ch in (string split '' -- (string sub -s 2 -- "$_early_arg"))
                     test "$_early_ch" = h; and begin; _ry_show_help; exit $EXIT_OK; end
                     test "$_early_ch" = v; and begin; echo "v$VERSION"; exit $EXIT_OK; end
@@ -114,7 +114,7 @@ set -g _RY_ARGV_CHECK_ONLY false # pre-argparse hint: --check silence must hold 
 test "$_ry_root_silent_check" = true; and test "$_rsc_other_mode" = false; and set -g _RY_ARGV_CHECK_ONLY true
 if test "$_MY_UID" -eq 0
     if test "$_ry_root_silent_check" = true; and test "$_rsc_other_mode" = false; _ry_exit $EXIT_PREFLIGHT; end # --check + valid mode: silent, 3 = cannot probe
-    set -l _rg_msgout (begin; argparse --name=(command basename -- (status filename)) $_RY_ARGPARSE_SPEC -- $argv 2>&1 >/dev/null; echo "@@RC@@$status"; end) # parity argparse in subshell; parent argv intact
+    set -l _rg_msgout (begin; argparse --name=(command basename -- (status filename)) $_RY_ARGPARSE_SPEC -- $argv 2>&1 >/dev/null; echo "@@RC@@$status"; end) # parity argparse in a cmdsub block; parent argv intact
     set -l _rg_prc 0; set -l _rg_msg ""
     for _rg_l in $_rg_msgout
         if string match -q '@@RC@@*' -- "$_rg_l"; set _rg_prc (string replace '@@RC@@' '' -- "$_rg_l"); else if test -z "$_rg_msg"; set _rg_msg (string replace -ra '\e\[[0-9;]*[a-zA-Z]' '' -- "$_rg_l" | string trim --); end
@@ -400,7 +400,7 @@ set -g EXPECTED_VULKAN_PKGS vulkan-radeon lib32-vulkan-radeon # chwd Vulkan driv
 
 # ── EMBEDDED DATA: UNITS (MASK / EXPECTED) ──
 set -g MASK ananicy-cpp.service power-profiles-daemon.service NetworkManager-wait-online.service avahi-daemon.service avahi-daemon.socket ufw.service sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target # avahi+resolved: mDNS off by design; ufw: nft owns the ruleset
-set -g EXPECTED_SERVICES fstrim.timer NetworkManager.service cpupower.service nftables.service bluetooth.service # enabled in Phase 4/6
+set -g EXPECTED_SERVICES fstrim.timer NetworkManager.service cpupower.service nftables.service bluetooth.service # enabled in Phase 4
 set -g EXPECTED_CPU_MATCH "Ryzen AI Max"
 
 # ── RUNTIME INIT: ROOT UUID + INVARIANT VALIDATION + CACHE PRECOMPUTE ──
@@ -474,7 +474,7 @@ function _ir_validate_keys --description "Refuse to run on out-of-domain embedde
     end
     if not string match -qr '^[0-3]$' -- "$NM_WIFI_POWERSAVE"; _err_loud "NM_WIFI_POWERSAVE must be 0|1|2|3 (got: '$NM_WIFI_POWERSAVE') — refuse to run (NetworkManager wifi.powersave accepts no other value)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     if not string match -qr '^[A-Z][A-Z]$' -- "$COUNTRY"; _err_loud "COUNTRY must be an ISO-3166-1 alpha-2 code (got: '$COUNTRY') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
-    if string match -qr '^(AA|Q[M-Z]|X[A-Z]|ZZ)$' -- "$COUNTRY"; _err_loud "COUNTRY '$COUNTRY' is in the ISO-3166-1 user-assigned/reserved range (AA, QM-QZ, XA-XZ, ZZ) — not a real country code; would silently fall back to world regdomain. Refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if string match -qr '^(AA|Q[M-Z]|X[A-Z]|ZZ)$' -- "$COUNTRY"; _err_loud "COUNTRY '$COUNTRY' is in the ISO-3166-1 user-assigned/reserved range (AA, QM-QZ, XA-XZ, ZZ) — not a real country code; would silently fall back to world regdomain; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     if not contains -- "$GPU_DPM_LEVEL" $_RY_DPM_LEVELS; _err_loud "GPU_DPM_LEVEL must be one of "(string join '|' -- $_RY_DPM_LEVELS)" (got: '$GPU_DPM_LEVEL') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
     if not contains -- "$EPP_PREFERENCE" $_RY_EPP_LEVELS; _err_loud "EPP_PREFERENCE must be one of "(string join '|' -- $_RY_EPP_LEVELS)" (got: '$EPP_PREFERENCE') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
     if not string match -qr '^[a-z][a-z0-9_-]*$' -- "$CPUPOWER_GOVERNOR"; _err_loud "CPUPOWER_GOVERNOR must match ^[a-z][a-z0-9_-]*\$ (got: '$CPUPOWER_GOVERNOR') — refuse to run (the domain the cpupower check accepts)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
@@ -546,7 +546,7 @@ function _init_runtime --description "Cache root UUID + validate config + precom
     for _bt in $_RY_BACKUP_TARGETS; if string match -q '*/sysctl.d/*' -- "$_bt"; _err_loud "_RY_BACKUP_TARGETS member '$_bt' uses a side-effecting content generator — the install-side post-write restore would mutate run state; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end; end
     _ir_precompute_caches
     for _pn in $PKGS_ADD $PKGS_DEL
-        if string match -q -- '-*' "$_pn"; _err_loud "Package name starts with dash: '$_pn' — pacman would parse as flag, refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if string match -q -- '-*' "$_pn"; _err_loud "Package name starts with dash: '$_pn' — pacman would parse as flag; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
 end
 
@@ -1292,12 +1292,12 @@ function _vsb_entries --description "_verify_static_boot sub: \$BOOT entries enu
     if test "$_entries_pipe_ok" = false
         _warn "  Boot entries: cannot enumerate $_boot/loader/entries (sudo lapsed or read error)"
     else if test "$_entries_dir_probed" = false
-        _fail "  Boot entries: $_boot/loader/entries/ does not exist"; _info "  System may not boot! Run: sudo sdboot-manage gen --verbose"
+        _fail "  Boot entries: $_boot/loader/entries/ does not exist"; _info "  System may not boot! Run: sudo sdboot-manage gen"
     else if test "$entry_count" -gt 0
         _ok "  Boot entries: $entry_count found"
         _vsb_entry_options $_entries
     else
-        _fail "  Boot entries: NONE in $_boot/loader/entries/"; _info "  System may not boot! Run: sudo sdboot-manage gen --verbose"
+        _fail "  Boot entries: NONE in $_boot/loader/entries/"; _info "  System may not boot! Run: sudo sdboot-manage gen"
     end
 end
 function _verify_static_boot --description "Verify loader.conf, sdboot-manage, kernel cmdline, mkinitcpio, boot entries"; _echo "BOOT CONFIGURATION"; _vsb_loader; _vsb_sdboot; _vsb_sdboot_dropins; _vsb_cmdline; _vsb_mkinitcpio; _vsb_entries; end
@@ -1991,7 +1991,7 @@ function _vrsv_chk_active_enabled --argument-names label rec_str --description "
         if test "$rec[3]" = enabled
             _ok "  $label: active (enabled)"
         else
-            _warn "  $label: active but $rec[3] (will not persist)"
+            _warn "  $label: active but $rec[3] (will not persist across boots)"
         end
     else
         _fail "  $label: $rec[2] (expected: active)"
@@ -2051,7 +2051,7 @@ function _vrsv_chk_cpupower_governor --argument-names rec_str --description "_vr
         if test "$rec[3]" = enabled
             _ok "  cpupower.service: $rec[2] (enabled)"
         else
-            _warn "  cpupower.service: $rec[2] but $rec[3] (will not persist)"
+            _warn "  cpupower.service: $rec[2] but $rec[3] (will not persist across boots)"
         end
         return 0
     end
@@ -2153,7 +2153,7 @@ function _vrsv_user_units --description "_verify_runtime_services sub: Managed u
         _info "  plasma-powerdevil.service: unit not present — skipping user-unit health check"; return 0
     end
     if command systemctl --user is-failed --quiet plasma-powerdevil.service 2>/dev/null
-        _fail "  plasma-powerdevil.service: failed — journalctl --user -u plasma-powerdevil -b · coredumpctl list org_kde_powerdevil"
+        _fail "  plasma-powerdevil.service: failed — journalctl --user -u plasma-powerdevil -b · coredumpctl list /usr/lib/org_kde_powerdevil"
     else
         _ok "  plasma-powerdevil.service: not failed"
     end
@@ -2178,7 +2178,7 @@ function _vre_envvars --description "_verify_runtime_env sub: ENV_VARS via syste
         else if test -n "$actual"
             _fail "  $var_name=$actual (expected: $expected)"
         else
-            _warn "  $var_name: NOT SET in current session (re-login or systemctl --user import-environment)"
+            _warn "  $var_name: NOT SET in current session (re-login or systemctl --user daemon-reload)"
         end
     end
 end
