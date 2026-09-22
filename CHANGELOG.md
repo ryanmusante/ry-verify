@@ -3,15 +3,14 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.212.1
+7.214.0
 -------
 
-  - env: expects RADV_PERFTEST=nggc and MANGOHUD_DLSYM=1
-  - changelog: presentation-only clauses cut, same-tag bullets merged;
-    entry-less versions folded into adjacent blocks
+  - report: new --report runs --verify, then writes a self-contained HTML
+    report (0600) beside the JSONL log; a failed write turns exit 0 into 1
 
 
-7.190.0 - 7.211.0
+7.190.0 - 7.212.1
 -----------------
 
   - boot: 7.211.0 the missing-entries hints drop --verbose
@@ -19,7 +18,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     7.204.0 expects nowatchdog, read back through kernel.watchdog
   - perf: 7.204.0 expects governor powersave with EPP performance; 7.211.0
     expects governor performance again, reverting 7.204.0
-  - env: 7.195.0 PROTON_FSR4_INDICATOR=1 dropped
+  - env: 7.195.0 PROTON_FSR4_INDICATOR=1 dropped; 7.212.1 expects
+    RADV_PERFTEST=nggc and MANGOHUD_DLSYM=1
   - configuration: 7.195.0 expects MangoHud to ship cpu_stats enabled;
     7.203.0 the managed-file header on every file but /etc/kernel/cmdline
   - configuration: 7.205.0 cpupower-service.conf header names EnvironmentFile=

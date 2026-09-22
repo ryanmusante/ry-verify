@@ -1,14 +1,14 @@
 #!/usr/bin/env fish
-# ry-verify v7.212.1 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.214.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.212.1"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.214.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
 set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro — Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 17
-set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check h/help v/version verify check # single option-spec source (root guard + main argparse)
+set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check,report h/help v/version verify check report # single option-spec source (root guard + main argparse)
 
 # ── HELP TEXT ──
 function _ry_show_help --description "Display usage information and available options"
@@ -22,6 +22,7 @@ function _ry_show_help --description "Display usage information and available op
         "  --verify               Check config files + live system state" \
         "  --check                Silent idempotency probe (0=clean 3=preflight 10=drift)" \
         "                         (compares the live /proc/cmdline — a fresh install reads 10 until reboot)" \
+        "  --report               Same as --verify, plus an HTML report beside the log" \
         "  --                     End of options (no positional arguments accepted)" \
         "  -h, --help             Show this help (honored before all checks)" \
         "  -v, --version          Show version (honored before all checks)" \
@@ -31,6 +32,7 @@ function _ry_show_help --description "Display usage information and available op
         "  RY_INSTALL_SKIP_HARDWARE_CHECK=1  Bypass EXPECTED_CPU_MATCH hard-fail." \
         "  NO_COLOR              Disable colored output when set non-empty (no-color.org)." \
         "Log: ~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl" \
+        "Report: ~/ry-install/logs/YYYY-MM-DD/report-YYYYMMDD-HHMMSS±ZZZZ-PID.html (--report)" \
         "Backups: ~/ry-install/backups/<slash-encoded path>.ry.bak" \
         ""
 end
@@ -451,7 +453,7 @@ function _ir_validate_counts --description "Refuse to run when array counts drif
         MASK:11 \
         EXPECTED_VULKAN_PKGS:2 \
         EXPECTED_SERVICES:5 \
-        _RY_ARGPARSE_SPEC:5 \
+        _RY_ARGPARSE_SPEC:6 \
         _RY_BOOT_CRITICAL_DSTS:4 \
         _RY_BACKUP_TARGETS:4 \
         _RY_TMPDIR_GLOBS:2 \
@@ -2456,6 +2458,469 @@ function _ry_verify_all --description "Verify both: static configs + runtime sta
     return $_rc_s
 end
 
+# ── REPORT: LOG PARSE (the run's own JSONL feeds sections 1, 2, 5, 6) ──
+function _rpt_jhtml --argument-names s --description "Decode a JSON-escaped log string straight to HTML-safe text; control escapes become U+FFFD"
+    set -l h (string replace -a -- '&' '&amp;' "$s" | string replace -a -- '<' '&lt;' | string replace -a -- '>' '&gt;' | string replace -a -- '\\\\' \x1e)
+    set h (string replace -a -- '\\"' '&quot;' "$h" | string replace -a -- '\\n' '&#10;' | string replace -a -- '\\t' '&#9;')
+    string replace -ra -- '\\\\(?:[rbf]|u00(?:[01][0-9a-f]|7f))' \uFFFD "$h" | string replace -a -- \x1e '\\'
+end
+function _rpt_esc --description "HTML-escape argv as one text run; newlines become &#10;, controls U+FFFD"; string join -- ' ' $argv | string replace -a -- '&' '&amp;' | string replace -a -- '<' '&lt;' | string replace -a -- '>' '&gt;' | string replace -a -- '"' '&quot;' | string replace -ra -- '[\x01-\x08\x0b-\x1f\x7f]' \uFFFD | string join -- '&#10;'; end
+function _rpt_cap --argument-names s --description "Sentence-case an upper-case log heading"; string join -- '' (string sub -l 1 -- "$s") (string lower -- (string sub -s 2 -- "$s")) | string replace -- Wifi Wi-Fi; end
+function _rpt_glabel --argument-names g --description "Phase and name of ledger group g"; printf '%s › %s' "$_RPT_GPH[$g]" "$_RPT_GRP[$g]"; end
+function _rpt_area --description "_rpt_parse_log sub: Current phase, group, and subsection as one label"; test "$_RPT_PGI" -eq 0; and printf '%s' "$_RPT_PPH"; and return 0; _rpt_glabel $_RPT_PGI; test -n "$_RPT_PSB"; and printf ' › %s' "$_RPT_PSB"; return 0; end
+function _rpt_add_row --argument-names lvl txt --description "_rpt_parse_log sub: Append one ledger row, opening a phase-start group when none is open"
+    if test "$_RPT_PGI" -eq 0; set -ga _RPT_GRP 'Phase start'; set -ga _RPT_GPH "$_RPT_PPH"; set -g _RPT_PGI (count $_RPT_GRP); end
+    set -ga _RPT_LVL $lvl; set -ga _RPT_RGI $_RPT_PGI; set -ga _RPT_SUB "$_RPT_PSB"; set -ga _RPT_MSG "$txt"
+end
+function _rpt_parse_log --description "_rpt_render sub: Split the run's JSONL into ledger rows, groups, result lines, and events"
+    set -g _RPT_GRP Preflight; set -g _RPT_GPH Startup; set -g _RPT_LVL; set -g _RPT_RGI; set -g _RPT_SUB; set -g _RPT_MSG; set -g _RPT_SUM
+    set -g _RPT_ETS; set -g _RPT_EAR; set -g _RPT_ETX; set -g _RPT_T0 ""; set -g _RPT_PGI 1; set -g _RPT_PPH Startup; set -g _RPT_PSB ""; set -l sum false
+    for ln in (command cat -- "$LOG_FILE" 2>/dev/null)
+        set -l m (string match -r -- '^\{"ts":"([^"]*)","event":"(header|log)",(.*)\}$' "$ln"); or continue
+        if test "$m[3]" = header; set -g _RPT_T0 "$m[2]"; continue; end
+        set -l d (string replace -r -- '^"data":"(.*)"$' '$1' "$m[4]"); set -l tx (string replace -r -- '^(OK|WARN|FAIL|ERR|INFO|ECHO): *' '' "$d")
+        switch "$d"
+            case '=== * START ==='
+                set -g _RPT_PPH (_rpt_cap (string match -r -- 'STATIC|RUNTIME' "$d")); set -g _RPT_PGI 0; set -g _RPT_PSB ""; set sum false
+            case '=== * END ==='
+                set -g _RPT_PGI 0; set -g _RPT_PSB ""
+            case 'ECHO: ── * ──'
+                set -g _RPT_PSB (_rpt_jhtml (string replace -r -- '^── (.*) ──$' '$1' "$tx"))
+            case 'ECHO: VERIFICATION SUMMARY'
+                set sum true
+            case 'OK: *' 'WARN: *' 'FAIL: *' 'ERR: *' 'INFO: *' 'ECHO: *'
+                set -l lv (string replace -r -- ':.*$' '' "$d"); test "$lv" = ECHO; and set lv NOTE
+                if test "$sum" = true; set -ga _RPT_SUM "$lv $_RPT_PPH "(_rpt_jhtml "$tx"); continue; end
+                if test "$lv" = NOTE; and string match -qr -- '^[A-Z][A-Z ]+[A-Z]$' "$tx"; set -ga _RPT_GRP (_rpt_cap "$tx"); set -ga _RPT_GPH "$_RPT_PPH"; set -g _RPT_PGI (count $_RPT_GRP); set -g _RPT_PSB ""; continue; end
+                _rpt_add_row $lv (_rpt_jhtml "$tx")
+            case '*'
+                set -l ar Summary; test "$sum" = false; and set ar (_rpt_area)
+                set -ga _RPT_ETS (string sub -s 12 -l 12 -- "$m[2]"); set -ga _RPT_EAR "$ar"; set -ga _RPT_ETX (_rpt_jhtml "$d")
+        end
+    end
+end
+function _rpt_tally --description "_rpt_render sub: Count each group's ledger rows as OK, WARN, FAIL, and other"
+    set -g _RPT_TOK (string replace -r -- '.*' 0 $_RPT_GRP); set -g _RPT_TWA $_RPT_TOK; set -g _RPT_TFA $_RPT_TOK; set -g _RPT_TIN $_RPT_TOK
+    for i in (seq (count $_RPT_LVL))
+        set -l g $_RPT_RGI[$i]
+        switch $_RPT_LVL[$i]
+            case OK
+                set -g _RPT_TOK[$g] (math $_RPT_TOK[$g] + 1)
+            case WARN
+                set -g _RPT_TWA[$g] (math $_RPT_TWA[$g] + 1)
+            case FAIL ERR
+                set -g _RPT_TFA[$g] (math $_RPT_TFA[$g] + 1)
+            case '*'
+                set -g _RPT_TIN[$g] (math $_RPT_TIN[$g] + 1)
+        end
+    end
+end
+
+# ── REPORT: HTML PRIMITIVES (reads, sizes, cells, meters, charts) ──
+function _rpt_rd --argument-names path --description "First line of a readable file, trimmed; nothing when unreadable"; test -r "$path"; or return 1; command head -n 1 -- "$path" 2>/dev/null | string trim --; end
+function _rpt_h --argument-names b --description "Byte count in binary units, GiB or MiB"
+    string match -qr -- '^\d+$' "$b"; or return 1
+    if test "$b" -ge 1073741824; printf '%s GiB' (math -s1 "$b / 1073741824"); else; printf '%s MiB' (math -s0 "$b / 1048576"); end
+end
+function _rpt_sha --description "SHA-256 hex digest of the bytes in argv[1]"; printf '%s' "$argv[1]" | command sha256sum 2>/dev/null | string match -rg -- '^(\S+)'; end
+function _rpt_st --argument-names lvl --description "Status label for a ledger level"; printf '<span class="st st-%s">%s</span>' "$lvl" "$lvl"; end
+function _rpt_state_html --argument-names st --description "Status label for a comparison state, colored by severity"
+    set -l c FAIL; contains -- "$st" match active present enabled masked removed; and set c OK
+    contains -- "$st" unreadable 'sudo lapse' 'pending reboot' 'not set' 'not installed' 'no user bus' 'knob absent' 'no root UUID'; and set c WARN
+    printf '<span class="st st-%s">%s</span>' $c "$st"
+end
+function _rpt_tr --description "Table row from pre-escaped HTML cells"; printf '<tr>'; printf '<td>%s</td>' $argv; printf '</tr>\n'; end
+function _rpt_kv --argument-names k v --description "Key/value row with both sides escaped; an empty value shows a dash"; test -n "$v"; or set v —; set -l a (_rpt_esc "$k"); set -l b (_rpt_esc "$v"); printf '<tr><th>%s</th><td>%s</td></tr>\n' "$a" "$b"; end
+function _rpt_legend --description "Color key from class and label pairs"
+    printf '<ul class="legend">'; for i in (seq 1 2 (count $argv)); printf '<li><i class="c-%s"></i>%s</li>' $argv[$i] $argv[(math $i + 1)]; end; printf '</ul>\n'
+end
+function _rpt_meter --argument-names label used total note cls --description "Labeled bar of used against total, with a caption and an optional fill class"
+    set -l p 0; string match -qr -- '^\d+ \d+$' "$used $total"; and test "$total" -gt 0; and set p (math -s0 "100 * $used / $total")
+    test "$p" -gt 100; and set p 100
+    printf '<div class="meter"><span class="ml">%s</span><span class="bar"><i class="%s" style="width:%s%%"></i></span><span class="mv">%s</span></div>\n' "$label" "$cls" $p "$note"
+end
+function _rpt_use --argument-names label used total --description "Usage meter captioned used of total"; string match -qr -- '^\d+ \d+$' "$used $total"; or return 0; set -l c 'none configured'; test $total -gt 0; and set c (_rpt_h $used)' of '(_rpt_h $total); _rpt_meter "$label" $used $total "$c"; end
+function _rpt_stack --argument-names label max ok wa fa inf --description "One ledger group as a stacked bar scaled to the largest group"
+    printf '<div class="stack"><span class="ml">%s</span><span class="bar">' "$label"
+    for kv in OK:$ok WARN:$wa FAIL:$fa INFO:$inf
+        set -l p (string split -m1 ':' -- $kv); test "$p[2]" -gt 0; or continue
+        printf '<i class="c-%s" style="width:%s%%" title="%s %s"></i>' $p[1] (math -s2 "100 * $p[2] / $max") $p[2] $p[1]
+    end
+    printf '</span><span class="mv">%s</span></div>\n' (math $ok + $wa + $fa + $inf)
+end
+function _rpt_donut --description "OK, WARN, FAIL, and GEN_FAIL counts as an SVG ring of circumference 100"
+    set -l t (math $argv[1] + $argv[2] + $argv[3] + $argv[4]); set -l d $t; test $d -gt 0; or set d 1; set -l off 25; set -l col 46b784 e3aa3d e8645c b58be0
+    printf '<svg class="donut" viewBox="0 0 42 42" role="img" aria-label="%s OK, %s WARN, %s FAIL, %s GEN_FAIL">' $argv[1..4]
+    printf '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#8795a4" stroke-opacity=".35" stroke-width="5"/>'
+    for i in 1 2 3 4
+        test "$argv[$i]" -gt 0; or continue
+        set -l p (math -s3 "100 * $argv[$i] / $d"); set -l q (math -s3 "100 - $p")
+        printf '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#%s" stroke-width="5" stroke-dasharray="%s %s" stroke-dashoffset="%s"/>' $col[$i] $p $q $off; set off (math -s3 "$off - $p")
+    end
+    printf '<text x="21" y="23.8" fill="currentColor" text-anchor="middle" font-size="8" font-weight="650">%s</text></svg>\n' $t
+end
+
+# ── REPORT: DOCUMENT FRAME (head, stylesheet, footer) ──
+function _rpt_css --description "_rpt_head sub: Base styles for tokens, type, layout, and tables"
+    printf '%s\n' \
+        ':root{--bg:#162029;--panel:#1c2834;--rule:#2c3b4a;--ink:#e3e9ef;--mute:#93a2b2;--acc:#62bcd3;--ok:#46b784;--warn:#e3aa3d;--fail:#e8645c;--info:#79a3da;--gen:#b58be0;--note:#8795a4;color-scheme:dark}' \
+        '*{box-sizing:border-box}' \
+        'html{background:var(--bg);color:var(--ink);font:15px/1.55 "Inter","Noto Sans","Segoe UI","DejaVu Sans",system-ui,sans-serif;-webkit-text-size-adjust:100%}' \
+        'body{margin:0 auto;max-width:1080px;padding:40px 32px 72px}' \
+        'a{color:var(--acc);text-decoration:none}a:hover,a:focus-visible{text-decoration:underline}:focus-visible{outline:2px solid var(--acc);outline-offset:2px}' \
+        'code,pre,.m{font-family:"JetBrains Mono","Noto Sans Mono","DejaVu Sans Mono",ui-monospace,monospace;font-size:.84em}' \
+        'header.mast{padding-bottom:22px;border-bottom:2px solid var(--rule)}.kick,.sub{color:var(--mute);margin:0}' \
+        'h1{font-size:2rem;line-height:1.2;font-weight:650;letter-spacing:-.01em;margin:6px 0 8px}' \
+        'nav.toc{display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:18px}nav.toc a{color:var(--ink)}nav.toc b,h2 b{color:var(--acc);font-weight:600;margin-right:8px}' \
+        'h2{font-size:1.35rem;font-weight:620;margin:56px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--rule)}' \
+        'h3{font-size:1rem;font-weight:620;margin:30px 0 10px}p.lede{color:var(--mute);max-width:74ch;margin:0 0 16px}' \
+        '.tw{overflow-x:auto;margin:0 0 8px}table{width:100%;border-collapse:collapse;font-size:.875rem;font-variant-numeric:tabular-nums}' \
+        'th,td{text-align:left;vertical-align:top;padding:7px 10px;border-bottom:1px solid var(--rule);overflow-wrap:anywhere}' \
+        'thead th{color:var(--mute);font-weight:600;border-bottom-color:var(--mute);white-space:nowrap;overflow-wrap:normal}' \
+        'table.kv th{width:34%;color:var(--mute);font-weight:500}.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px 40px}'
+end
+function _rpt_css_parts --description "_rpt_head sub: Component, chart, small-screen, and print styles"
+    printf '%s\n' \
+        '.st{font-weight:650;white-space:nowrap}.st-OK{color:var(--ok)}.st-WARN{color:var(--warn)}.st-FAIL,.st-ERR{color:var(--fail)}.st-INFO{color:var(--info)}.st-NOTE{color:var(--note);font-weight:500}' \
+        'tr.r-FAIL td,tr.r-ERR td{background:rgba(232,100,92,.1)}tr.r-WARN td{background:rgba(227,170,61,.09)}.hint{display:block;color:var(--mute);margin-top:4px}' \
+        '.verdict{--vc:var(--ok);display:grid;grid-template-columns:132px 1fr;gap:28px;align-items:center;background:var(--panel);border:1px solid var(--rule);border-left:6px solid var(--vc);padding:22px 26px;margin:8px 0 12px}' \
+        '.v-WARN{--vc:var(--warn)}.v-FAIL{--vc:var(--fail)}.v-PREFLIGHT{--vc:var(--info)}.vw{font-size:2.1rem;font-weight:700;line-height:1.1;color:var(--vc);margin:0}.vs{margin:8px 0 0}' \
+        '.donut{width:132px;height:132px;display:block}' \
+        '.legend{display:flex;flex-wrap:wrap;gap:4px 18px;margin:10px 0 0;padding:0;list-style:none;color:var(--mute)}.legend i{display:inline-block;width:10px;height:10px;margin-right:6px}' \
+        '.meter,.stack{display:grid;grid-template-columns:minmax(120px,220px) 1fr minmax(88px,auto);gap:14px;align-items:center;margin:7px 0}.ml{color:var(--mute)}.mv{white-space:nowrap;font-variant-numeric:tabular-nums}' \
+        '.bar{display:flex;height:12px;background:var(--rule);overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}' \
+        'i.c-OK{background:var(--ok)}i.c-WARN{background:var(--warn)}i.c-FAIL{background:var(--fail)}i.c-INFO{background:var(--info)}i.c-GEN{background:var(--gen)}' \
+        '.clk{display:flex;align-items:flex-end;gap:2px;height:84px;margin:6px 0 2px;border-bottom:1px solid var(--rule)}.clk i{flex:1;min-height:1px;background:var(--acc)}' \
+        'details.grp{border-top:1px solid var(--rule)}details.grp>summary{cursor:pointer;padding:12px 2px}.gm{color:var(--mute);margin-left:10px;font-weight:400}' \
+        'pre{background:var(--panel);border:1px solid var(--rule);padding:12px 14px;margin:6px 0 14px;overflow-x:auto;white-space:pre}td.m{white-space:nowrap;overflow-wrap:normal}' \
+        'footer{margin-top:64px;padding-top:14px;border-top:1px solid var(--rule);color:var(--mute);font-size:.85rem}' \
+        '@media (max-width:700px){body{padding:24px 16px 48px}.verdict{grid-template-columns:1fr}.meter,.stack{grid-template-columns:1fr;gap:4px}}' \
+        '@media print{:root{--bg:#fff;--panel:#f4f6f8;--rule:#d3d9df;--ink:#111;--mute:#555;--acc:#0b6b82;--ok:#1a7f37;--warn:#9a5b00;--fail:#b42318;--info:#1f5fbf;--gen:#6f3fc4;--note:#4b5563;color-scheme:light}body{max-width:none;padding:0}nav.toc{display:none}h2,h3{break-after:avoid}tr,.meter,.stack,.verdict{break-inside:avoid}}' \
+        '@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+end
+function _rpt_head --argument-names now --description "_rpt_render sub: Doctype, head with the stylesheet, masthead, and contents list"
+    set -l hh (_rpt_esc (command uname -n 2>/dev/null)); set -l pd (_rpt_esc "$PROFILE_DESC")
+    printf '%s\n' '<!DOCTYPE html>' '<html lang="en">' '<head>' '<meta charset="utf-8">' '<meta name="viewport" content="width=device-width, initial-scale=1">'
+    printf '<meta name="generator" content="ry-verify %s">\n<title>ry-verify report, %s, %s</title>\n<style>\n' $VERSION "$hh" "$now"
+    _rpt_css; _rpt_css_parts
+    printf '</style>\n</head>\n<body>\n<header class="mast"><p class="kick">ry-verify %s report</p><h1>Verification report for %s</h1><p class="sub">%s. Written %s.</p>\n' $VERSION "$hh" "$pd" "$now"
+    printf '<nav class="toc" aria-label="Contents"><a href="#verdict"><b>1</b>Verdict</a><a href="#actions"><b>2</b>Action items</a><a href="#system"><b>3</b>System</a><a href="#profile"><b>4</b>Profile changes</a>'
+    printf '<a href="#ledger"><b>5</b>Verification ledger</a><a href="#appendix"><b>6</b>Appendix</a></nav>\n</header>\n<main>\n'
+end
+function _rpt_tail --argument-names now --description "_rpt_render sub: Footer and closing tags"; set -l pd (_rpt_esc "$PROFILE_DESC"); printf '</main>\n<footer>Generated by ry-verify %s for %s, %s.</footer>\n</body>\n</html>\n' $VERSION "$pd" "$now"; end
+
+# ── REPORT: SECTIONS 1-2 (verdict + action items) ──
+function _rpt_verdict_word --description "_rpt_sec_verdict sub: PASS, PASS-WITH-WARNINGS, FAIL, or PREFLIGHT"
+    if test "$_RY_EXIT_CODE" -eq "$EXIT_PREFLIGHT"
+        echo PREFLIGHT
+    else if test "$VERIFY_FAIL" -gt 0; or test "$VERIFY_GEN_FAIL" -gt 0
+        echo FAIL
+    else if test "$VERIFY_WARN" -gt 0
+        echo PASS-WITH-WARNINGS
+    else
+        echo PASS
+    end
+end
+function _rpt_sec_verdict --argument-names dst now --description "_rpt_render sub: Section 1, verdict, counts ring, result lines, and run metadata"
+    set -l w (_rpt_verdict_word); set -l vc (string replace -- PASS-WITH-WARNINGS WARN $w); set -l s 'Every check passed.'; set -l x
+    test "$VERIFY_GEN_FAIL" -gt 0; and set -a x "$VERIFY_GEN_FAIL generator failure(s)"; test "$VERIFY_WARN" -gt 0; and set -a x "$VERIFY_WARN warning(s)"
+    test $w = PASS-WITH-WARNINGS; and set s "No failed checks; $VERIFY_WARN warning(s) to review."
+    test $w = FAIL; and set s (string join ', ' -- "$VERIFY_FAIL failed check(s)" $x)'.'
+    test $w = PREFLIGHT; and set s 'Verification stopped at a preflight gate; the action items name the cause.'
+    test "$_RY_LOG_WRITE_FAIL" = true; and set s "$s Log writes failed, so the ledger may be incomplete."
+    printf '<section id="verdict"><h2><b>1</b>Verdict</h2>\n<div class="verdict v-%s">' $vc
+    _rpt_donut $VERIFY_OK $VERIFY_WARN $VERIFY_FAIL $VERIFY_GEN_FAIL
+    printf '<div><p class="vw">%s</p><p class="vs">%s Exit code %s.</p>' $w "$s" $_RY_EXIT_CODE
+    _rpt_legend OK "$VERIFY_OK OK" WARN "$VERIFY_WARN WARN" FAIL "$VERIFY_FAIL FAIL" GEN "$VERIFY_GEN_FAIL GEN_FAIL"
+    printf '</div></div>\n<div class="cols"><div><h3>Result lines</h3><table class="kv">\n'
+    for r in $_RPT_SUM; set -l p (string split -m2 ' ' -- $r); string match -q 'Combined*' -- "$p[3]"; and set p[2] Combined; printf '<tr><th>%s %s</th><td>%s</td></tr>\n' "$p[2]" (_rpt_st $p[1]) "$p[3]"; end
+    printf '<tr><th>Ledger rows</th><td>%s, counting INFO and note rows too</td></tr>\n</table></div>\n<div><h3>Run</h3><table class="kv">\n' (count $_RPT_LVL)
+    _rpt_kv Command "$_RPT_ARGV"; _rpt_kv Profile "$PROFILE_NAME, $PROFILE_DESC"; _rpt_kv Started "$_RPT_T0"; _rpt_kv 'Report written' "$now"
+    _rpt_kv 'Log file' "$LOG_FILE"; _rpt_kv 'Report file' "$dst"
+    printf '</table></div></div>\n</section>\n'
+end
+function _rpt_sec_actions --description "_rpt_render sub: Section 2, every FAIL then every WARN row, each with the INFO row logged next"
+    printf '<section id="actions"><h2><b>2</b>Action items</h2>\n'; set -l n 0; set -l rows (count $_RPT_LVL)
+    for want in FAIL WARN
+        for i in (seq $rows)
+            set -l l $_RPT_LVL[$i]; test "$l" = ERR; and set l FAIL; test "$l" = "$want"; or continue
+            test $n -eq 0; and printf '<div class="tw"><table><thead><tr><th>Status</th><th>Area</th><th>Finding</th></tr></thead><tbody>\n'
+            set n (math $n + 1); set -l g $_RPT_RGI[$i]; set -l a (_rpt_glabel $g); set -l h ""; set -l j (math $i + 1)
+            test -n "$_RPT_SUB[$i]"; and set a "$a › $_RPT_SUB[$i]"
+            test $j -le $rows; and test "$_RPT_LVL[$j]" = INFO; and test "$_RPT_RGI[$j]" = "$g"; and test "$_RPT_SUB[$j]" = "$_RPT_SUB[$i]"; and set h "<span class=\"hint\">$_RPT_MSG[$j]</span>"
+            printf '<tr class="r-%s"><td>%s</td><td>%s</td><td>%s%s</td></tr>\n' $l (_rpt_st $_RPT_LVL[$i]) "$a" "$_RPT_MSG[$i]" "$h"
+        end
+    end
+    test $n -gt 0; and printf '</tbody></table></div>\n'; or printf '<p class="lede">No FAIL or WARN rows in this run; nothing needs action.</p>\n'
+    printf '</section>\n'
+end
+
+# ── REPORT: SECTION 3 (system facts from /proc, /sys, os-release, pacman) ──
+function _rpt_gpu_dir --description "First amdgpu device directory that exposes a DPM level node"
+    for f in /sys/class/drm/card*/device/power_dpm_force_performance_level; test -f "$f"; and command dirname -- "$f"; and return 0; end
+    return 1
+end
+function _rpt_mi --argument-names key --description "_rpt_sys_mem sub: One /proc/meminfo field in bytes"; set -l v (string match -rg -- "^$key:\s+(\d+) kB" (command cat -- /proc/meminfo 2>/dev/null))[1]; test -n "$v"; and math "$v * 1024"; end
+function _rpt_pkgver --argument-names p --description "Installed version of a package from one cached pacman -Q listing"
+    if not set -q _RPT_PQ; set -g _RPT_PQ (command pacman -Q 2>/dev/null); set -g _RPT_PQN (string replace -r -- ' .*$' '' $_RPT_PQ); end
+    set -l i (contains -i -- "$p" $_RPT_PQN); or return 1
+    string replace -r -- '^\S+ ' '' $_RPT_PQ[$i]
+end
+function _rpt_sys_platform --description "_rpt_sec_system sub: Host, firmware, OS, kernel, init, and boot paths"
+    set -l dmi /sys/class/dmi/id; set -l os (string match -rg -- '^PRETTY_NAME="?([^"]*)"?$' (command cat -- /etc/os-release 2>/dev/null))[1]
+    set -l kr (command uname -r 2>/dev/null); set -l kp (_rpt_rd /usr/lib/modules/$kr/pkgbase); set -l up (string split ' ' -- (_rpt_rd /proc/uptime))[1]; set -l upt; set -l ru; set -l esp; set -l bp
+    string match -qr -- '^\d+(\.\d+)?$' "$up"; and set upt (printf '%sd %sh %sm' (math -s0 "$up / 86400") (math -s0 "$up % 86400 / 3600") (math -s0 "$up % 3600 / 60"))
+    test -n "$_ROOT_UUID"; and set ru "UUID=$_ROOT_UUID"; set -q _RY_ESP_TRIED; and set esp $_RY_ESP_PATH; set -q _RY_BOOT_TRIED; and set bp $_RY_BOOT_PATH
+    printf '<div><h3>Platform</h3><table class="kv">\n'
+    _rpt_kv Host (command uname -n 2>/dev/null); _rpt_kv Machine (string join ' ' -- (_rpt_rd $dmi/sys_vendor) (_rpt_rd $dmi/product_name))
+    _rpt_kv Board (string join ' ' -- (_rpt_rd $dmi/board_vendor) (_rpt_rd $dmi/board_name))
+    _rpt_kv Firmware (string join ' ' -- (_rpt_rd $dmi/bios_vendor) (_rpt_rd $dmi/bios_version) (_rpt_rd $dmi/bios_date))
+    _rpt_kv 'Operating system' "$os"; _rpt_kv Kernel (string join ' ' -- $kr (command uname -m 2>/dev/null)); _rpt_kv 'Kernel package' (string join ' ' -- $kp (_rpt_pkgver "$kp"))
+    _rpt_kv Uptime "$upt"; _rpt_kv Init (command systemctl --version 2>/dev/null)[1]; _rpt_kv Shell "fish $FISH_VERSION"
+    _rpt_kv 'Root filesystem' (string join ' ' -- (command findmnt -n -o FSTYPE / 2>/dev/null) $ru); _rpt_kv ESP "$esp"; _rpt_kv '$BOOT' "$bp"
+    printf '</table></div>\n'
+end
+function _rpt_sys_cpu --description "_rpt_sec_system sub: Processor model, scaling state, and per-CPU clock chart"
+    set -l c /sys/devices/system/cpu; set -l f $c/cpu0/cpufreq; set -l ci (command cat -- /proc/cpuinfo 2>/dev/null); set -l mx (_rpt_rd $f/cpuinfo_max_freq); set -l cur
+    for q in $c/cpu*/cpufreq/scaling_cur_freq; set -a cur (_rpt_rd $q); end
+    printf '<div><h3>Processor</h3><table class="kv">\n'
+    _rpt_kv Model (string match -rg -- '^model name\s*:\s*(.*)$' $ci)[1]; _rpt_kv 'Logical CPUs' (count (string match -r -- '^processor\s*:' $ci))
+    _rpt_kv 'Scaling driver' (_rpt_rd $f/scaling_driver); _rpt_kv Governor (_rpt_rd $f/scaling_governor); _rpt_kv 'Energy preference' (_rpt_rd $f/energy_performance_preference)
+    set -l bo (_rpt_rd $c/cpufreq/boost); test "$bo" = 1; and set bo on; test "$bo" = 0; and set bo off; _rpt_kv 'amd_pstate mode' (_rpt_rd $c/amd_pstate/status); _rpt_kv Boost "$bo"
+    string match -qr -- '^\d+$' "$mx"; and _rpt_kv 'Maximum clock' (math -s2 "$mx / 1000000")' GHz'
+    printf '</table>\n'; string match -qr -- '^\d+$' "$mx"; and test (count $cur) -gt 0; and _rpt_clk $mx $cur
+    printf '</div>\n'
+end
+function _rpt_clk --argument-names mx --description "_rpt_sys_cpu sub: Current clock of each logical CPU as a bar against the maximum"
+    printf '<p class="ml">Current clock of each logical CPU (%s), as a share of %s GHz</p><div class="clk" role="img" aria-label="Per-CPU current clocks">' (count $argv[2..-1]) (math -s2 "$mx / 1000000")
+    for v in $argv[2..-1]
+        string match -qr -- '^\d+$' "$v"; or continue
+        set -l p (math -s0 "100 * $v / $mx"); test $p -gt 100; and set p 100
+        printf '<i style="height:%s%%" title="%s MHz"></i>' $p (math -s0 "$v / 1000")
+    end
+    printf '</div>\n'
+end
+function _rpt_sys_gpu --description "_rpt_sec_system sub: GPU identity, DPM level, clocks, and pool sizes from amdgpu sysfs"
+    set -l d (_rpt_gpu_dir); printf '<div><h3>Graphics</h3><table class="kv">\n'
+    if test -z "$d"; _rpt_kv Device 'no amdgpu DPM node under /sys/class/drm'; printf '</table></div>\n'; return 0; end
+    set -l id (string replace -- 0x '' (_rpt_rd $d/vendor) (_rpt_rd $d/device) (_rpt_rd $d/revision)); set -l gb (_rpt_rd $d/gpu_busy_percent); test -n "$gb"; and set gb "$gb%"
+    _rpt_kv 'PCI ID' (string join ':' -- $id[1..2]); _rpt_kv Revision "$id[3]"; _rpt_kv VBIOS (_rpt_rd $d/vbios_version)
+    _rpt_kv 'DPM level' (_rpt_rd $d/power_dpm_force_performance_level); _rpt_kv 'Shader clock' (string match -r -- '\S+(?= \*$)' (command cat -- $d/pp_dpm_sclk 2>/dev/null))[1]
+    _rpt_kv 'GPU busy' "$gb"; _rpt_kv 'VRAM carveout' (_rpt_h (_rpt_rd $d/mem_info_vram_total)); _rpt_kv 'GTT limit' (_rpt_h (_rpt_rd $d/mem_info_gtt_total))
+    printf '</table></div>\n'
+end
+function _rpt_sys_display --description "_rpt_sec_system sub: Connected DRM connectors with their preferred mode"
+    set -l n 0; printf '<div><h3>Displays</h3><table class="kv">\n'
+    for s in /sys/class/drm/card*-*/status
+        set -l st (_rpt_rd $s); test "$st" = connected; or continue
+        set -l dir (command dirname -- $s); set n (math $n + 1)
+        _rpt_kv (string replace -r -- '^card\d+-' '' (command basename -- $dir)) (_rpt_rd $dir/modes)
+    end
+    test $n -eq 0; and _rpt_kv Connectors 'none connected'
+    printf '</table></div>\n'
+end
+function _rpt_sys_pkgs --description "_rpt_sec_system sub: Installed versions of the packages this profile leans on"
+    set -l kp (_rpt_rd /usr/lib/modules/(command uname -r 2>/dev/null)/pkgbase); printf '<div><h3>Key packages</h3><table class="kv">\n'
+    for p in $kp linux-firmware mesa vulkan-radeon systemd mkinitcpio fish pacman; _rpt_kv $p (_rpt_pkgver $p); end
+    printf '</table></div>\n'
+end
+function _rpt_sys_mem --description "_rpt_sec_system sub: VRAM, GTT, RAM, and swap usage meters"
+    set -l d (_rpt_gpu_dir); set -l mt (_rpt_mi MemTotal); set -l ma (_rpt_mi MemAvailable); set -l st (_rpt_mi SwapTotal); set -l sf (_rpt_mi SwapFree)
+    printf '<h3>Memory</h3>\n'
+    if test -n "$d"
+        set -l vu (_rpt_rd $d/mem_info_vram_used); set -l vt (_rpt_rd $d/mem_info_vram_total); set -l gu (_rpt_rd $d/mem_info_gtt_used); set -l gt (_rpt_rd $d/mem_info_gtt_total)
+        _rpt_use 'VRAM carveout' "$vu" "$vt"; _rpt_use 'GTT pool' "$gu" "$gt"
+    end
+    test -n "$mt"; and test -n "$ma"; and _rpt_use 'System RAM' (math "$mt - $ma") $mt
+    test -n "$st"; and test -n "$sf"; and _rpt_use Swap (math "$st - $sf") $st
+end
+function _rpt_sys_disk --description "_rpt_sec_system sub: Filesystem usage meters for / and the boot partition"
+    printf '<h3>Storage</h3>\n'; set -l bp; set -q _RY_BOOT_TRIED; and set bp $_RY_BOOT_PATH
+    for m in / $bp
+        set -l r (string split -n ' ' -- (command env LC_ALL=C df --output=size,used -B1 -- "$m" 2>/dev/null | command tail -n 1))
+        test (count $r) -eq 2; and _rpt_use (_rpt_esc $m) $r[2] $r[1]
+    end
+end
+function _rpt_sec_system --description "_rpt_render sub: Section 3, hardware and software facts read when the report is written"
+    printf '<section id="system"><h2><b>3</b>System</h2>\n<p class="lede">Read from /proc, /sys, os-release, uname, systemctl, findmnt, df, and pacman while this report was written, without sudo.</p>\n<div class="cols">\n'
+    _rpt_sys_platform; _rpt_sys_cpu; _rpt_sys_gpu; _rpt_sys_display; _rpt_sys_pkgs; printf '</div>\n'; _rpt_sys_mem; _rpt_sys_disk; printf '</section>\n'
+end
+
+# ── REPORT: SECTION 4 (profile changes, embedded values vs live state) ──
+function _rpt_cov --argument-names label ok total --description "Record one coverage bar for section 4"; set -ga _RPT_COV "$label|$ok|$total"; end
+function _rpt_file_state --argument-names dst sl grc exp --description "_rpt_prof_files sub: Installed copy against the generated bytes as one state"
+    if test "$grc" -eq "$EXIT_GEN_NOUUID"; printf 'no root UUID'; return 0; end
+    if test "$grc" -ne 0; printf 'generator rc %s' "$grc"; return 0; end
+    if _is_symlink "$dst" $sl; printf symlink; return 0; end
+    set -l act (_installed_bytes "$dst" | string collect --no-trim-newlines --allow-empty); set -l irc $pipestatus[1]
+    switch "$irc"
+        case 0
+            test "$act" = "$exp"; and printf match; or printf differs
+        case 1
+            _as $sl test -e "$dst" 2>/dev/null; and printf unreadable; or printf missing
+        case 2
+            printf 'sudo lapse'
+        case '*'
+            printf 'read rc %s' "$irc"
+    end
+end
+function _rpt_prof_files --description "_rpt_sec_profile sub: Managed files regenerated and compared with the installed bytes"
+    set -g _RPT_GEN; set -l ok 0; set -l k 0
+    printf '<h3>Managed files</h3><div class="tw"><table><thead><tr><th>#</th><th>Destination</th><th>Scope</th><th>Mode</th><th>Bytes</th><th>SHA-256, first 16</th><th>Installed</th></tr></thead><tbody>\n'
+    for dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS
+        set k (math $k + 1); set -l sl false; set -l sc user; set -l em 600
+        _is_system_dst "$dst"; and set sl true; and set sc system; and set em 644
+        contains -- "$dst" $_RY_BOOT_CRITICAL_DSTS; and set sc boot-critical
+        set -l exp (_ry_content_bytes "$dst" | string collect --no-trim-newlines --allow-empty); set -l grc $pipestatus[1]; set -ga _RPT_GEN "$exp"
+        set -l st (_rpt_file_state "$dst" $sl $grc "$exp"); test "$st" = match; and set ok (math $ok + 1)
+        set -l md (_as $sl stat -c '%a' -- "$dst" 2>/dev/null); set -l n (printf '%s' "$exp" | command wc -c | string trim --)
+        if test -z "$md"; or test "$st" = symlink; set md \xe2\x80\x94; else if string match -q '/boot/*' -- "$dst"; set md "$md, boot partition"; else if test "$md" != "$em"; set md "$md, expected $em"; end
+        set -l h (_rpt_sha "$exp" | string sub -l 16); set -l p (_rpt_esc "$dst")
+        _rpt_tr $k "<code>$p</code>" $sc "$md" "$n" "<code>$h</code>" (_rpt_state_html $st)
+    end
+    printf '</tbody></table></div>\n'; _rpt_cov 'Managed files' $ok $k
+end
+function _rpt_prof_kparams --description "_rpt_sec_profile sub: KERNEL_PARAMS in /etc/kernel/cmdline and in /proc/cmdline"
+    set -l dep (command cat -- /etc/kernel/cmdline 2>/dev/null | string join ' '); set -l live (command cat -- /proc/cmdline 2>/dev/null | string join ' '); set -l ok 0
+    printf '<h3>Kernel parameters</h3><div class="tw"><table><thead><tr><th>Token</th><th>Deployed</th><th>Live</th><th>State</th></tr></thead><tbody>\n'
+    for p in $KERNEL_PARAMS
+        set -l re (string escape --style=regex -- "$p"); set -l d no; set -l l no; set -l st missing; set -l e (_rpt_esc "$p")
+        string match -qr -- "(^|\s)$re(\s|\$)" "$dep"; and set d yes
+        string match -qr -- "(^|\s)$re(\s|\$)" "$live"; and set l yes
+        if test $l = yes; set st active; set ok (math $ok + 1); else if test $d = yes; set st 'pending reboot'; end
+        _rpt_tr "<code>$e</code>" $d $l (_rpt_state_html $st)
+    end
+    printf '</tbody></table></div>\n'; _rpt_cov 'Kernel parameters live' $ok (count $KERNEL_PARAMS)
+end
+function _rpt_prof_sysctl --description "_rpt_sec_profile sub: SYSCTL_VALUES against /proc/sys"
+    set -l ok 0
+    printf '<h3>Kernel tunables</h3><div class="tw"><table><thead><tr><th>Key</th><th>Expected</th><th>Live</th><th>State</th></tr></thead><tbody>\n'
+    for e in $SYSCTL_VALUES
+        set -l kv (string split -m1 '=' -- "$e"); set -l pp /proc/sys/(string replace -a '.' '/' -- "$kv[1]"); set -l want (string replace -ra '\s+' ' ' -- "$kv[2]")
+        set -l lv (command cat -- "$pp" 2>/dev/null | string replace -ra '\s+' ' ' | string trim --); set -l st differs
+        if test "$lv" = "$want"; set st match; set ok (math $ok + 1); else if not test -e "$pp"; set st 'knob absent'; else if test -z "$lv"; set st unreadable; end
+        set -l a (_rpt_esc "$kv[2]"); set -l b (_rpt_esc "$lv"); _rpt_tr "<code>$kv[1]</code>" "<code>$a</code>" "<code>$b</code>" (_rpt_state_html $st)
+    end
+    printf '</tbody></table></div>\n'; _rpt_cov 'sysctl values' $ok (count $SYSCTL_VALUES)
+end
+function _rpt_prof_env --description "_rpt_sec_profile sub: ENV_VARS against the user manager environment"
+    set -l bus true; _has_user_bus_active; or set bus false; set -l ue; test $bus = true; and set ue (command systemctl --user show-environment 2>/dev/null); set -l ok 0
+    printf '<h3>Session environment</h3><div class="tw"><table><thead><tr><th>Variable</th><th>Expected</th><th>Live</th><th>State</th></tr></thead><tbody>\n'
+    for e in $ENV_VARS
+        set -l kv (string split -m1 '=' -- "$e"); set -l re (string escape --style=regex -- "$kv[1]"); set -l lv (string match -rg -- "^$re=(.*)\$" $ue)[1]; set -l st differs
+        set lv (string replace -r -- '^"(.*)"$' '$1' "$lv")
+        if test $bus = false; set st 'no user bus'; else if test "$lv" = "$kv[2]"; set st match; set ok (math $ok + 1); else if test -z "$lv"; set st 'not set'; end
+        set -l a (_rpt_esc "$kv[2]"); set -l b (_rpt_esc "$lv"); _rpt_tr "<code>$kv[1]</code>" "<code>$a</code>" "<code>$b</code>" (_rpt_state_html $st)
+    end
+    printf '</tbody></table></div>\n'; test $bus = true; and _rpt_cov 'Session environment' $ok (count $ENV_VARS)
+end
+function _rpt_prof_pkgs --description "_rpt_sec_profile sub: PKGS_ADD, EXPECTED_VULKAN_PKGS, and PKGS_DEL against pacman -Q"
+    set -l ok 0; set -l n 0
+    printf '<h3>Packages</h3><div class="tw"><table><thead><tr><th>Package</th><th>Role</th><th>Installed</th><th>State</th></tr></thead><tbody>\n'
+    for r in add:$PKGS_ADD vulkan:$EXPECTED_VULKAN_PKGS remove:$PKGS_DEL
+        set -l rp (string split -m1 ':' -- $r); set -l v (_rpt_pkgver $rp[2]); set -l st missing; set n (math $n + 1)
+        if test $rp[1] = remove; set st removed; test -n "$v"; and set st 'still installed'; else if test -n "$v"; set st present; end
+        contains -- "$st" present removed; and set ok (math $ok + 1)
+        _rpt_tr "<code>$rp[2]</code>" $rp[1] (_rpt_esc "$v") (_rpt_state_html $st)
+    end
+    printf '</tbody></table></div>\n'; _rpt_cov Packages $ok $n
+end
+function _rpt_prof_units --description "_rpt_sec_profile sub: EXPECTED_SERVICES and MASK against systemctl show"
+    set -l ok 0; set -l n 0
+    printf '<h3>Units</h3><div class="tw"><table><thead><tr><th>Unit</th><th>Role</th><th>Load</th><th>Active</th><th>Unit file</th><th>State</th></tr></thead><tbody>\n'
+    for r in enable:$EXPECTED_SERVICES mask:$MASK
+        set -l rp (string split -m1 ':' -- $r); set -l s (_unit_state_padded $rp[2]); set -l st 'not enabled'; set n (math $n + 1)
+        if test $rp[1] = mask; set st 'not masked'; string match -q 'masked*' -- $s[1] $s[3]; and set st masked; test "$s[1]" = not-found; and set st 'not installed'; else if string match -q 'enabled*' -- "$s[3]"; set st enabled; end
+        test "$s[1]" = ERR_NO_DATA; and set st unreadable; and set s \xe2\x80\x94 \xe2\x80\x94 \xe2\x80\x94
+        contains -- "$st" masked enabled; and set ok (math $ok + 1)
+        _rpt_tr "<code>$rp[2]</code>" $rp[1] (_rpt_esc "$s[1]") (_rpt_esc "$s[2]") (_rpt_esc "$s[3]") (_rpt_state_html $st)
+    end
+    printf '</tbody></table></div>\n'; _rpt_cov Units $ok $n
+end
+function _rpt_prof_keys --description "_rpt_sec_profile sub: Embedded bootloader, initramfs, and service keys as shipped"
+    printf '<h3>Embedded keys</h3><div class="tw"><table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>\n'
+    for k in LOADER_DEFAULT LOADER_TIMEOUT LOADER_CONSOLE_MODE LOADER_EDITOR SDBOOT_DEFAULT_ENTRY SDBOOT_OVERWRITE SDBOOT_REMOVE_EXISTING SDBOOT_REMOVE_OBSOLETE \
+        MKINITCPIO_MODULES MKINITCPIO_HOOKS MKINITCPIO_COMPRESSION MKINITCPIO_COMPRESSION_OPTIONS RESOLVED_MDNS RESOLVED_LLMNR NM_DISPATCHER_LOGLEVELMAX COUNTRY \
+        LOGIND_IGNORE_KEYS NM_WIFI_BACKEND NM_WIFI_POWERSAVE NM_LOG_LEVEL CPUPOWER_GOVERNOR BT_AUTO_ENABLE BT_FAST_CONNECTABLE BT_RECONNECT_ATTEMPTS GPU_DPM_LEVEL \
+        EPP_PREFERENCE EXPECTED_SCALING_DRIVER BLACKLIST_AMDXDNA
+        set -l v (_rpt_esc $$k); test -n "$v"; or set v unset; _rpt_tr "<code>$k</code>" "<code>$v</code>"
+    end
+    printf '</tbody></table></div>\n'
+end
+function _rpt_sec_profile --description "_rpt_render sub: Section 4, what ry-install deploys set against live state"
+    set -g _RPT_COV; set -l t1 (_rpt_prof_files); set -l t2 (_rpt_prof_kparams); set -l t3 (_rpt_prof_sysctl); set -l t4 (_rpt_prof_env); set -l t5 (_rpt_prof_pkgs); set -l t6 (_rpt_prof_units)
+    printf '<section id="profile"><h2><b>4</b>Profile changes</h2>\n<p class="lede">What ry-install deploys, read from the values embedded in ry-verify %s and set against this system. ' $VERSION
+    printf 'Managed files are regenerated in memory and compared byte for byte; system files are read with sudo -n.</p>\n<h3>Coverage</h3>\n'
+    for c in $_RPT_COV; set -l f (string split '|' -- $c); set -l k c-WARN; test $f[2] -eq $f[3]; and set k c-OK; _rpt_meter "$f[1]" $f[2] $f[3] "$f[2] of $f[3]" $k; end
+    printf '%s\n' $t1 $t2 $t3 $t4 $t5 $t6; _rpt_prof_keys; printf '</section>\n'
+end
+
+# ── REPORT: SECTIONS 5-6 (ledger + appendix) ──
+function _rpt_ledger_group --argument-names g --description "_rpt_sec_ledger sub: One group as a collapsible table of its rows"
+    printf '<details class="grp" open><summary><b>%s</b><span class="gm">%s OK, %s WARN, %s FAIL, %s other</span></summary>\n' (_rpt_glabel $g) $_RPT_TOK[$g] $_RPT_TWA[$g] $_RPT_TFA[$g] $_RPT_TIN[$g]
+    printf '<div class="tw"><table><thead><tr><th>Status</th><th>Subsection</th><th>Check</th></tr></thead><tbody>\n'
+    for i in (seq (count $_RPT_LVL))
+        test "$_RPT_RGI[$i]" = "$g"; or continue
+        printf '<tr class="r-%s"><td>%s</td><td>%s</td><td>%s</td></tr>\n' $_RPT_LVL[$i] (_rpt_st $_RPT_LVL[$i]) "$_RPT_SUB[$i]" "$_RPT_MSG[$i]"
+    end
+    printf '</tbody></table></div></details>\n'
+end
+function _rpt_sec_ledger --description "_rpt_render sub: Section 5, rows per group as a chart, then every row, failing groups first"
+    set -l gs; set -l mx 1
+    for g in (seq (count $_RPT_GRP)); set -l t (math $_RPT_TOK[$g] + $_RPT_TWA[$g] + $_RPT_TFA[$g] + $_RPT_TIN[$g]); test $t -gt 0; or continue; set -a gs $g; test $t -gt $mx; and set mx $t; end
+    printf '<section id="ledger"><h2><b>5</b>Verification ledger</h2>\n<p class="lede">Every row this run logged, grouped as the console printed them. Groups with a FAIL come first, then groups with a WARN; rows keep run order; a group without rows is omitted.</p>\n'
+    _rpt_legend OK OK WARN WARN FAIL FAIL INFO 'INFO and notes'
+    for g in $gs; _rpt_stack (_rpt_glabel $g) $mx $_RPT_TOK[$g] $_RPT_TWA[$g] $_RPT_TFA[$g] $_RPT_TIN[$g]; end
+    for sev in 2 1 0
+        for g in $gs
+            set -l s 0; test $_RPT_TWA[$g] -gt 0; and set s 1; test $_RPT_TFA[$g] -gt 0; and set s 2
+            test $s -eq $sev; and _rpt_ledger_group $g
+        end
+    end
+    printf '</section>\n'
+end
+function _rpt_method --description "_rpt_sec_appendix sub: Where each section's data comes from"
+    printf '<h3>Method</h3>\n<table class="kv">\n'
+    _rpt_kv Verdict 'Run counters and exit code. A completed run restarts the counters at the static phase, so rows logged before it are listed but not counted; a run stopped at a preflight gate counts every row.'
+    _rpt_kv 'Action items and ledger' "This run's JSONL log, row for row. An INFO row logged directly after a FAIL or WARN in the same subsection is shown under that finding."
+    _rpt_kv System '/proc, /sys, /etc/os-release, uname, systemctl --version, findmnt, df, and pacman -Q, read without sudo while the report was written.'
+    _rpt_kv 'Profile changes' "Arrays and keys embedded in ry-verify $VERSION, which ships in lockstep with ry-install; generators rerun in memory."
+    _rpt_kv 'Logged evidence' 'Every structured event from the same JSONL log, in run order.'
+    _rpt_kv 'Log file' "$LOG_FILE"
+    printf '</table>\n'
+end
+function _rpt_sec_appendix --description "_rpt_render sub: Section 6, logged evidence, generated file bodies, and method"
+    printf '<section id="appendix"><h2><b>6</b>Appendix</h2>\n<h3>Logged evidence</h3>\n<p class="lede">Structured JSONL events in run order: file and pattern probes, readbacks, and result records.</p>\n'
+    printf '<div class="tw"><table><thead><tr><th>Time</th><th>Area</th><th>Event</th></tr></thead><tbody>\n'
+    for i in (seq (count $_RPT_ETX)); printf '<tr><td class="m">%s</td><td>%s</td><td><code>%s</code></td></tr>\n' "$_RPT_ETS[$i]" "$_RPT_EAR[$i]" "$_RPT_ETX[$i]"; end
+    printf '</tbody></table></div>\n<h3>Generated file bodies</h3>\n<p class="lede">Byte-exact generator output for each managed file, in deploy order.</p>\n'
+    set -l k 0
+    for dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS
+        set k (math $k + 1); set -l b "$_RPT_GEN[$k]"; set -l n (printf '%s' "$b" | command wc -c | string trim --); set -l h (_rpt_sha "$b"); set -l e (_rpt_esc "$b"); set -l p (_rpt_esc "$dst")
+        printf '<details open><summary><code>%s</code><span class="gm">%s bytes, SHA-256 %s</span></summary><pre>%s</pre></details>\n' "$p" "$n" "$h" "$e"
+    end
+    _rpt_method; printf '</section>\n'
+end
+
+# ── REPORT: ORCHESTRATOR (_rpt_write; tmpfile, then mv -T into the log tree) ──
+function _rpt_fail --argument-names why --description "_rpt_render sub: Loud ERR plus REPORT_WRITE_FAIL; a clean exit becomes 1"; _msg_nocount ERR "Report not written: $why"; _log "REPORT_WRITE_FAIL: $why"; test "$_RY_EXIT_CODE" -eq 0; and _set_exit $EXIT_FAIL; return 0; end
+function _rpt_render --description "_rpt_write sub: Parse the run log, render every section to a tmpfile, move it into place"
+    set -g _RPT_ARGV (string join ' ' -- (status filename) $argv); set -l dst "$LOG_DIR/report-$TIMESTAMP.html"; set -l now (command date $_RY_TS_FMT)
+    set -l tmp (_mktemp_or_null -p "$LOG_DIR" ".report-$TIMESTAMP.XXXXXX")
+    if test "$tmp" = /dev/null; _rpt_fail "no temporary file in $LOG_DIR"; return 0; end
+    _track_tmpfile "$tmp"; _rpt_parse_log; _rpt_tally
+    begin; _rpt_head "$now"; _rpt_sec_verdict "$dst" "$now"; _rpt_sec_actions; _rpt_sec_system; _rpt_sec_profile; _rpt_sec_ledger; _rpt_sec_appendix; _rpt_tail "$now"; end >"$tmp"
+    set -l last (command tail -n 1 -- "$tmp" 2>/dev/null)
+    if test "$last" != '</html>'; _rm_tmp "$tmp" false; _rpt_fail "rendering stopped before the closing tag"; return 0; end
+    command chmod -- 600 "$tmp" 2>/dev/null
+    if not command mv -T -- "$tmp" "$dst" 2>/dev/null; _rm_tmp "$tmp" false; _rpt_fail "mv -T into $dst failed"; return 0; end
+    _untrack_tmpfile "$tmp"; set -l sz (command stat -c %s -- "$dst" 2>/dev/null)
+    _log "REPORT_WRITTEN: path=$dst bytes=$sz rows="(count $_RPT_LVL)" groups="(count $_RPT_GRP)" events="(count $_RPT_ETX)
+    _msg_nocount INFO "Report: $dst"
+end
+function _rpt_erase --description "_rpt_write sub: Erase every report global"; set --erase _RPT_ARGV _RPT_GRP _RPT_GPH _RPT_LVL _RPT_RGI _RPT_SUB _RPT_MSG _RPT_SUM _RPT_ETS _RPT_EAR _RPT_ETX _RPT_T0 _RPT_PGI _RPT_PPH _RPT_PSB; set --erase _RPT_TOK _RPT_TWA _RPT_TFA _RPT_TIN _RPT_COV _RPT_GEN _RPT_PQ _RPT_PQN; return 0; end
+function _rpt_write --description "Write the --report HTML beside this run's JSONL, then erase the report globals"; _rpt_render $argv; _rpt_erase; return 0; end
+
 # ── MISC HELPERS: PERM CHECK, USER-BUS ──
 function _dir_group_or_world_writable --argument-names mode --description "True when octal mode has group or world write bit"
     not string match -qr '^[0-7]+$' -- "$mode"; and return 0 # unparseable mode -> writable (fail-closed)
@@ -2606,6 +3071,7 @@ switch "$MODE"
     case verify
         _ry_verify_all
         _set_exit $status
+        set -q _flag_report; and _rpt_write $_ORIG_ARGV
     case check
         _ry_do_check
         _set_exit $status

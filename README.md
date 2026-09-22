@@ -1,8 +1,8 @@
 # ry-verify
 
-**Version 7.212.1** · [Changelog](CHANGELOG.md)
+**Version 7.214.0** · [Changelog](CHANGELOG.md)
 
-Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
+Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
 ## Quick Start
 
@@ -32,16 +32,16 @@ A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `W
 
 ## Usage
 
-The bare invocation equals `--verify`; `--check` is the silent idempotency probe (the two are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and is an unknown option here, exit `2`. Positional arguments exit `2`. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
+The bare invocation equals `--verify`; `--report` runs `--verify` and writes the [Report](#report); `--check` is the silent idempotency probe (the three are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and is an unknown option here, exit `2`. Positional arguments exit `2`. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
 
-Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl`. A fresh install's `./ry-verify.fish --check` reports drift until reboot.
+Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl`; `--report` adds `report-YYYYMMDD-HHMMSS±ZZZZ-PID.html` (`0600`) beside it. A fresh install's `./ry-verify.fish --check` reports drift until reboot.
 
 ## Exit Codes
 
 | Code | Meaning |
 |---|---|
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
-| `1` | a `--verify` mismatch |
+| `1` | a `--verify` or `--report` mismatch, or a report that could not be written |
 | `2` | bad arguments, root misuse |
 | `3` | missing dependency, uncached sudo, gate mismatch; `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
@@ -77,9 +77,24 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain |
 | Runtime: session | NetworkManager system-connections perms, installed file modes, parent directories of managed files |
 
+## Report
+
+`--report` runs every `--verify` check, then renders the run into one self-contained HTML file beside its JSONL log — inline styles and SVG charts, no scripts, no network. Open it in any browser; print it to PDF for a portable copy. Sections run from most to least urgent:
+
+| Section | Content |
+|---|---|
+| Verdict | `PASS`, `PASS-WITH-WARNINGS`, `FAIL`, or `PREFLIGHT`, a counts ring, the result lines, and run metadata |
+| Action items | every `FAIL`, then every `WARN`, with its group and any `INFO` line logged directly after it |
+| System | host, firmware, OS, kernel, CPU scaling state and per-CPU clocks, GPU IDs and clocks, VRAM, GTT, RAM, swap, and storage meters, displays, key package versions |
+| Profile changes | the 17 [Managed Files](#managed-files) regenerated and compared byte for byte, `KERNEL_PARAMS` deployed and live, `SYSCTL_VALUES`, `ENV_VARS`, packages, units, embedded keys, and a coverage chart |
+| Verification ledger | a per-group chart, then every logged row, groups with a `FAIL` first, then groups with a `WARN` |
+| Appendix | every structured log event, each generated file body with its SHA-256, and the method |
+
+System facts are read without sudo; installed system files are read with `sudo -n` for the byte compare. A report that cannot be written prints `[ERR] Report not written`, logs `REPORT_WRITE_FAIL`, and turns an otherwise clean exit into `1`.
+
 ## Safety and Reliability
 
-**Read-only** — neither mode takes a lock or writes outside its log tree.
+**Read-only** — no mode takes a lock or writes outside its log tree; the report is written there too.
 
 **Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, and any `sdboot-manage.conf.d` drop-in.
 
