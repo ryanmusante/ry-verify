@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.214.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.215.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.214.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.215.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -26,7 +26,7 @@ function _ry_show_help --description "Display usage information and available op
         "  --                     End of options (no positional arguments accepted)" \
         "  -h, --help             Show this help (honored before all checks)" \
         "  -v, --version          Show version (honored before all checks)" \
-        "EXIT CODES: 0 ok · 1 verify-FAIL · 2 usage · 3 preflight · 10 --check drift" \
+        "EXIT CODES: 0 ok · 1 verify-FAIL or report not written · 2 usage · 3 preflight · 10 --check drift" \
         "  (sentinels 11-14/250 are internal; signals exit 128+N)" \
         "ENVIRONMENT (see README.md for detail):" \
         "  RY_INSTALL_SKIP_HARDWARE_CHECK=1  Bypass EXPECTED_CPU_MATCH hard-fail." \
@@ -419,7 +419,7 @@ function _ir_resolve_root_uuid --description "Cache root UUID into _ROOT_UUID"
         case check
             _log "ROOT_UUID_UNAVAILABLE: $_reason (silent for --check)"
             _pre_dispatch_exit $EXIT_PREFLIGHT
-        case verify
+        case verify report
             _warn "Cannot detect root UUID ($_reason) — exact root=UUID match in /etc/kernel/cmdline skipped; other checks continue"
             _log "ROOT_UUID_UNAVAILABLE: $_reason — verify continues with generic root=UUID presence check"
         case '*'
@@ -519,7 +519,7 @@ function _init_runtime --description "Cache root UUID + validate config + precom
             if test "$RY_INSTALL_SKIP_HARDWARE_CHECK" = 1 # fail-closed: empty model requires override
                 _warn_loud "Hardware check (override): CPU model unreadable from /proc/cpuinfo — proceeding"
                 _log "HARDWARE_MODEL_UNREADABLE_OVERRIDE: /proc/cpuinfo missing 'model name'"
-            else if test "$MODE" = verify # read-only: warn and continue
+            else if contains -- "$MODE" verify report # read-only: warn and continue
                 _warn "Hardware check: CPU model unreadable from /proc/cpuinfo — verify continues; deploy would refuse"
                 _log "HARDWARE_MODEL_UNREADABLE_VERIFY: /proc/cpuinfo missing 'model name'"
             else
@@ -532,7 +532,7 @@ function _init_runtime --description "Cache root UUID + validate config + precom
             if test "$RY_INSTALL_SKIP_HARDWARE_CHECK" = 1
                 _warn_loud "Hardware mismatch (override): expected $EXPECTED_CPU_MATCH, detected: $_cpu_model"
                 _log "HARDWARE_MISMATCH_OVERRIDE: expected=$EXPECTED_CPU_MATCH detected=$_cpu_model"
-            else if test "$MODE" = verify # read-only: warn and continue
+            else if contains -- "$MODE" verify report # read-only: warn and continue
                 _warn "Hardware mismatch: expected $EXPECTED_CPU_MATCH, detected: $_cpu_model — verify continues; deploy would refuse"
                 _log "HARDWARE_MISMATCH_VERIFY: expected=$EXPECTED_CPU_MATCH detected=$_cpu_model"
             else
@@ -2524,9 +2524,10 @@ function _rpt_h --argument-names b --description "Byte count in binary units, Gi
 end
 function _rpt_sha --description "SHA-256 hex digest of the bytes in argv[1]"; printf '%s' "$argv[1]" | command sha256sum 2>/dev/null | string match -rg -- '^(\S+)'; end
 function _rpt_st --argument-names lvl --description "Status label for a ledger level"; printf '<span class="st st-%s">%s</span>' "$lvl" "$lvl"; end
-function _rpt_state_html --argument-names st --description "Status label for a comparison state, colored by severity"
+function _rpt_state_html --argument-names st cls --description "Status label for a comparison state, colored by severity; argv[2] forces the class"
     set -l c FAIL; contains -- "$st" match active present enabled masked removed; and set c OK
-    contains -- "$st" unreadable 'sudo lapse' 'pending reboot' 'not set' 'not installed' 'no user bus' 'knob absent' 'no root UUID'; and set c WARN
+    contains -- "$st" unreadable 'not set' 'not installed' 'no user bus' 'knob absent' 'no root UUID' 'still installed'; and set c WARN
+    test -n "$cls"; and set c $cls
     printf '<span class="st st-%s">%s</span>' $c "$st"
 end
 function _rpt_tr --description "Table row from pre-escaped HTML cells"; printf '<tr>'; printf '<td>%s</td>' $argv; printf '</tr>\n'; end
@@ -2681,14 +2682,14 @@ function _rpt_sys_platform --description "_rpt_sec_system sub: Host, firmware, O
     printf '</table></div>\n'
 end
 function _rpt_sys_cpu --description "_rpt_sec_system sub: Processor model, scaling state, and per-CPU clock chart"
-    set -l c /sys/devices/system/cpu; set -l f $c/cpu0/cpufreq; set -l ci (command cat -- /proc/cpuinfo 2>/dev/null); set -l mx (_rpt_rd $f/cpuinfo_max_freq); set -l cur
+    set -l c /sys/devices/system/cpu; set -l f $c/cpu0/cpufreq; set -l ci (command cat -- /proc/cpuinfo 2>/dev/null); set -l mx (_rpt_rd $f/cpuinfo_max_freq); string match -qr -- '^[1-9]\d*$' "$mx"; or set mx; set -l cur # a positive integer or nothing
     for q in $c/cpu*/cpufreq/scaling_cur_freq; set -a cur (_rpt_rd $q); end
     printf '<div><h3>Processor</h3><table class="kv">\n'
     _rpt_kv Model (string match -rg -- '^model name\s*:\s*(.*)$' $ci)[1]; _rpt_kv 'Logical CPUs' (count (string match -r -- '^processor\s*:' $ci))
     _rpt_kv 'Scaling driver' (_rpt_rd $f/scaling_driver); _rpt_kv Governor (_rpt_rd $f/scaling_governor); _rpt_kv 'Energy preference' (_rpt_rd $f/energy_performance_preference)
     set -l bo (_rpt_rd $c/cpufreq/boost); test "$bo" = 1; and set bo on; test "$bo" = 0; and set bo off; _rpt_kv 'amd_pstate mode' (_rpt_rd $c/amd_pstate/status); _rpt_kv Boost "$bo"
-    string match -qr -- '^\d+$' "$mx"; and _rpt_kv 'Maximum clock' (math -s2 "$mx / 1000000")' GHz'
-    printf '</table>\n'; string match -qr -- '^\d+$' "$mx"; and test (count $cur) -gt 0; and _rpt_clk $mx $cur
+    test -n "$mx"; and _rpt_kv 'Maximum clock' (math -s2 "$mx / 1000000")' GHz'
+    printf '</table>\n'; test -n "$mx"; and test (count $cur) -gt 0; and _rpt_clk $mx $cur
     printf '</div>\n'
 end
 function _rpt_clk --argument-names mx --description "_rpt_sys_cpu sub: Current clock of each logical CPU as a bar against the maximum"
@@ -2703,8 +2704,9 @@ end
 function _rpt_sys_gpu --description "_rpt_sec_system sub: GPU identity, DPM level, clocks, and pool sizes from amdgpu sysfs"
     set -l d (_rpt_gpu_dir); printf '<div><h3>Graphics</h3><table class="kv">\n'
     if test -z "$d"; _rpt_kv Device 'no amdgpu DPM node under /sys/class/drm'; printf '</table></div>\n'; return 0; end
-    set -l id (string replace -- 0x '' (_rpt_rd $d/vendor) (_rpt_rd $d/device) (_rpt_rd $d/revision)); set -l gb (_rpt_rd $d/gpu_busy_percent); test -n "$gb"; and set gb "$gb%"
-    _rpt_kv 'PCI ID' (string join ':' -- $id[1..2]); _rpt_kv Revision "$id[3]"; _rpt_kv VBIOS (_rpt_rd $d/vbios_version)
+    set -l vn (_rpt_rd $d/vendor); set -l dn (_rpt_rd $d/device); set -l rv (_rpt_rd $d/revision); set -l id (string replace -- 0x '' "$vn" "$dn" "$rv") # one read per node keeps the fields aligned
+    set -l gb (_rpt_rd $d/gpu_busy_percent); test -n "$gb"; and set gb "$gb%"; set -l pci; test -n "$vn"; and test -n "$dn"; and set pci "$id[1]:$id[2]"
+    _rpt_kv 'PCI ID' "$pci"; _rpt_kv Revision "$id[3]"; _rpt_kv VBIOS (_rpt_rd $d/vbios_version)
     _rpt_kv 'DPM level' (_rpt_rd $d/power_dpm_force_performance_level); _rpt_kv 'Shader clock' (string match -r -- '\S+(?= \*$)' (command cat -- $d/pp_dpm_sclk 2>/dev/null))[1]
     _rpt_kv 'GPU busy' "$gb"; _rpt_kv 'VRAM carveout' (_rpt_h (_rpt_rd $d/mem_info_vram_total)); _rpt_kv 'GTT limit' (_rpt_h (_rpt_rd $d/mem_info_gtt_total))
     printf '</table></div>\n'
@@ -2737,8 +2739,10 @@ end
 function _rpt_sys_disk --description "_rpt_sec_system sub: Filesystem usage meters for / and the boot partition"
     printf '<h3>Storage</h3>\n'; set -l bp; set -q _RY_BOOT_TRIED; and set bp $_RY_BOOT_PATH
     for m in / $bp
-        set -l r (string split -n ' ' -- (command env LC_ALL=C df --output=size,used -B1 -- "$m" 2>/dev/null | command tail -n 1))
-        test (count $r) -eq 2; and _rpt_use (_rpt_esc $m) $r[2] $r[1]
+        set -l r (string split -n ' ' -- (command env LC_ALL=C df --output=size,used,target -B1 -- "$m" 2>/dev/null | command tail -n 1))
+        test (count $r) -eq 3; or continue
+        test "$m" != /; and test "$r[3]" = /; and continue # a plain directory on the root filesystem would repeat the / meter
+        _rpt_use (_rpt_esc $m) $r[2] $r[1]
     end
 end
 function _rpt_sec_system --description "_rpt_render sub: Section 3, hardware and software facts read when the report is written"
@@ -2757,7 +2761,7 @@ function _rpt_file_state --argument-names dst sl grc exp --description "_rpt_pro
         case 0
             test "$act" = "$exp"; and printf match; or printf differs
         case 1
-            _as $sl test -e "$dst" 2>/dev/null; and printf unreadable; or printf missing
+            _as $sl test -e "$dst" 2>/dev/null; and printf 'cannot read'; or printf missing
         case 2
             printf 'sudo lapse'
         case '*'
@@ -2774,7 +2778,7 @@ function _rpt_prof_files --description "_rpt_sec_profile sub: Managed files rege
         set -l exp (_ry_content_bytes "$dst" | string collect --no-trim-newlines --allow-empty); set -l grc $pipestatus[1]; set -ga _RPT_GEN "$exp"
         set -l st (_rpt_file_state "$dst" $sl $grc "$exp"); test "$st" = match; and set ok (math $ok + 1)
         set -l md (_as $sl stat -c '%a' -- "$dst" 2>/dev/null); set -l n (printf '%s' "$exp" | command wc -c | string trim --)
-        if test -z "$md"; or test "$st" = symlink; set md \xe2\x80\x94; else if string match -q '/boot/*' -- "$dst"; set md "$md, boot partition"; else if test "$md" != "$em"; set md "$md, expected $em"; end
+        if test -z "$md"; or test "$st" = symlink; set md —; else if string match -q '/boot/*' -- "$dst"; set md "$md, boot partition"; else if test "$md" != "$em"; set md "$md, expected $em"; end
         set -l h (_rpt_sha "$exp" | string sub -l 16); set -l p (_rpt_esc "$dst")
         _rpt_tr $k "<code>$p</code>" $sc "$md" "$n" "<code>$h</code>" (_rpt_state_html $st)
     end
@@ -2829,11 +2833,12 @@ function _rpt_prof_units --description "_rpt_sec_profile sub: EXPECTED_SERVICES 
     set -l ok 0; set -l n 0
     printf '<h3>Units</h3><div class="tw"><table><thead><tr><th>Unit</th><th>Role</th><th>Load</th><th>Active</th><th>Unit file</th><th>State</th></tr></thead><tbody>\n'
     for r in enable:$EXPECTED_SERVICES mask:$MASK
-        set -l rp (string split -m1 ':' -- $r); set -l s (_unit_state_padded $rp[2]); set -l st 'not enabled'; set n (math $n + 1)
-        if test $rp[1] = mask; set st 'not masked'; string match -q 'masked*' -- $s[1] $s[3]; and set st masked; test "$s[1]" = not-found; and set st 'not installed'; else if string match -q 'enabled*' -- "$s[3]"; set st enabled; end
-        test "$s[1]" = ERR_NO_DATA; and set st unreadable; and set s \xe2\x80\x94 \xe2\x80\x94 \xe2\x80\x94
+        set -l rp (string split -m1 ':' -- $r); set -l s (_unit_state_padded $rp[2]); set -l st 'not enabled'; set -l cls; set n (math $n + 1)
+        if test "$s[1]" = not-found; set st 'not installed'; else if test $rp[1] = mask; set st 'not masked'; test "$s[3]" = masked; and set st masked; test "$st" = masked; and test "$s[2]" = active; and set st 'masked, active'
+        else if test "$s[3]" = enabled; set st enabled; else if test "$s[2]" = active; set st (_rpt_esc "$s[3]")', active'; set cls WARN; end # running but not persisted warns, as the ledger does
+        test "$s[1]" = ERR_NO_DATA; and set st unreadable; and set cls; and set s — — —
         contains -- "$st" masked enabled; and set ok (math $ok + 1)
-        _rpt_tr "<code>$rp[2]</code>" $rp[1] (_rpt_esc "$s[1]") (_rpt_esc "$s[2]") (_rpt_esc "$s[3]") (_rpt_state_html $st)
+        _rpt_tr "<code>$rp[2]</code>" $rp[1] (_rpt_esc "$s[1]") (_rpt_esc "$s[2]") (_rpt_esc "$s[3]") (_rpt_state_html $st $cls)
     end
     printf '</tbody></table></div>\n'; _rpt_cov Units $ok $n
 end
@@ -2885,6 +2890,8 @@ function _rpt_method --description "_rpt_sec_appendix sub: Where each section's 
     _rpt_kv 'Action items and ledger' "This run's JSONL log, row for row. An INFO row logged directly after a FAIL or WARN in the same subsection is shown under that finding."
     _rpt_kv System '/proc, /sys, /etc/os-release, uname, systemctl --version, findmnt, df, and pacman -Q, read without sudo while the report was written.'
     _rpt_kv 'Profile changes' "Arrays and keys embedded in ry-verify $VERSION, which ships in lockstep with ry-install; generators rerun in memory."
+    _rpt_kv 'Profile states' 'Graded as the ledger grades the same finding: match, active, present, enabled, masked, and removed pass; not installed, not set, knob absent, unreadable, still installed, no user bus, no root UUID, and a unit running but not enabled warn; everything else fails.'
+    _rpt_kv 'Unit table' 'Grades the unit file; whether an enabled unit is running is a ledger row.'
     _rpt_kv 'Logged evidence' 'Every structured event from the same JSONL log, in run order.'
     _rpt_kv 'Log file' "$LOG_FILE"
     printf '</table>\n'
@@ -3016,7 +3023,7 @@ end
 _rm_tmp "$_ap_errfile" false
 if set -q _flag_help; _ry_show_help; _pre_dispatch_exit $EXIT_OK; end
 if set -q _flag_version; echo "v$VERSION"; _pre_dispatch_exit $EXIT_OK; end
-set -q _flag_check; and set -g MODE check # default is verify (set above)
+set -q _flag_check; and set -g MODE check; set -q _flag_report; and set -g MODE report # default is verify (set above)
 set --erase _RY_ARGV_CHECK_ONLY # MODE is authoritative past this point
 if test (count $argv) -gt 0; echo "[ERR] Unexpected positional argument(s): $argv" >&2; _ry_show_help >&2; _pre_dispatch_exit $EXIT_USAGE; end
 test "$MODE" != check; and set -g QUIET false
@@ -3068,10 +3075,10 @@ end
 set -g _RY_EXIT_CODE 0
 _init_runtime
 switch "$MODE"
-    case verify
+    case verify report
         _ry_verify_all
         _set_exit $status
-        set -q _flag_report; and _rpt_write $_ORIG_ARGV
+        test "$MODE" = report; and _rpt_write $_ORIG_ARGV
     case check
         _ry_do_check
         _set_exit $status

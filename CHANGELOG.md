@@ -3,14 +3,22 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.214.0
+7.215.0
 -------
 
-  - report: new --report runs --verify, then writes a self-contained HTML
-    report (0600) beside the JSONL log; a failed write turns exit 0 into 1
+  - report: profile states grade as the ledger does; not installed, running
+    but not enabled, and still installed warn, the rest fail
+  - report: a masked unit still active, a deployed parameter not yet live, a
+    managed file that cannot be read, and a sudo lapse fail
+  - report: a --report run logs to report-*.jsonl beside its HTML; a zero
+    maximum clock no longer divides by zero
+  - report: GPU IDs stay aligned when a sysfs node is unreadable; a plain
+    /boot directory no longer repeats the / storage meter
+  - cli: --help names the report-not-written meaning of exit 1
+  - readme: report states, log naming, and a report-not-written entry
 
 
-7.190.0 - 7.212.1
+7.190.0 - 7.214.0
 -----------------
 
   - boot: 7.211.0 the missing-entries hints drop --verbose
@@ -38,6 +46,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     systemctl --user daemon-reload
   - check: 7.195.1 - 7.195.2 silence every bootstrap gate; 7.200.1 logs
     CHECK_*_DRIFT with the cause; 7.202.0 records CHECK_SYMLINK_DRIFT
+  - report: 7.214.0 --report runs --verify, then writes a self-contained HTML
+    report (0600) beside the JSONL log; a failed write turns exit 0 into 1
   - preflight: 7.211.0 a missing root UUID names the findmnt exit code or an
     empty result
   - cli: 7.211.0 glued short flags take only h and v; -Vh and -hV fail like -V

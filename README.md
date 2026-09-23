@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.214.0** · [Changelog](CHANGELOG.md)
+**Version 7.215.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -17,7 +17,7 @@ sudo -v
 ./ry-verify.fish
 ```
 
-A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `WARN`, `FAIL`, and `GEN_FAIL` — see [Exit Codes](#exit-codes).
+A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `WARN`, `FAIL`, and `GEN_FAIL`; `--report` then prints `[INFO] Report: <path>` — see [Exit Codes](#exit-codes).
 
 ## Requirements
 
@@ -34,7 +34,7 @@ A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `W
 
 The bare invocation equals `--verify`; `--report` runs `--verify` and writes the [Report](#report); `--check` is the silent idempotency probe (the three are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and is an unknown option here, exit `2`. Positional arguments exit `2`. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
 
-Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl`; `--report` adds `report-YYYYMMDD-HHMMSS±ZZZZ-PID.html` (`0600`) beside it. A fresh install's `./ry-verify.fish --check` reports drift until reboot.
+Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl`, where `MODE` is `verify`, `check`, or `report`; `--report` adds `report-YYYYMMDD-HHMMSS±ZZZZ-PID.html` (`0600`) beside its log, same stem. A fresh install's `./ry-verify.fish --check` reports drift until reboot.
 
 ## Exit Codes
 
@@ -92,6 +92,8 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 System facts are read without sudo; installed system files are read with `sudo -n` for the byte compare. A report that cannot be written prints `[ERR] Report not written`, logs `REPORT_WRITE_FAIL`, and turns an otherwise clean exit into `1`.
 
+Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not installed`, `not set`, `knob absent`, `unreadable`, `still installed`, `no user bus`, `no root UUID`, and a unit running but not enabled warn; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. The unit table grades the unit file; whether an enabled unit is running is the ledger's `Runtime: services` group. The coverage chart counts passing rows only.
+
 ## Safety and Reliability
 
 **Read-only** — no mode takes a lock or writes outside its log tree; the report is written there too.
@@ -121,6 +123,8 @@ Firmware is not checked — the assumed ceiling and the per-setting walkthrough 
 **Unmanaged 60-ry- drop-in warned** — `pacman -Qo /etc/modprobe.d/*` to confirm ownership, then `sudo rm` the files left by earlier versions.
 
 **Masked unit not in `MASK` reported** — `sudo systemctl unmask <unit>` if an earlier `MASK` masked it; leave distro and hand-made masks alone.
+
+**Report not written** — the HTML is rendered into a temporary file in the log directory and renamed into place, so `~/ry-install/logs/YYYY-MM-DD/` must accept a new file: check free space and the directory mode (`0700`). The JSONL log records `REPORT_WRITE_FAIL` with the reason; the checks themselves are unaffected.
 
 ## Contributing
 
