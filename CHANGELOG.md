@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.216.0
+-------
+
+  - changelog: version bump on the 2026-09-23 audit; the script changes are a
+    description and a comment, no functional change
+
+
 7.215.0
 -------
 
@@ -15,7 +22,6 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - report: GPU IDs stay aligned when a sysfs node is unreadable; a plain
     /boot directory no longer repeats the / storage meter
   - cli: --help names the report-not-written meaning of exit 1
-  - readme: report states, log naming, and a report-not-written entry
 
 
 7.190.0 - 7.214.0
