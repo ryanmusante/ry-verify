@@ -371,7 +371,7 @@ set --erase _ry_dst_count
 # ── EMBEDDED DATA: BOOTLOADER KEYS + KERNEL_PARAMS + MKINITCPIO ──
 set -g LOADER_DEFAULT "@saved"; set -g LOADER_TIMEOUT 0; set -g LOADER_CONSOLE_MODE keep; set -g LOADER_EDITOR no
 set -g SDBOOT_DEFAULT_ENTRY manual; set -g SDBOOT_OVERWRITE yes; set -g SDBOOT_REMOVE_EXISTING yes; set -g SDBOOT_REMOVE_OBSOLETE yes
-set -g KERNEL_PARAMS amd_pstate=active btusb.enable_autosuspend=n fsck.mode=force fsck.repair=yes iommu=pt ipv6.disable=1 mt7925e.disable_aspm=1 nowatchdog nvme_core.default_ps_max_latency_us=0 pcie_aspm.policy=performance processor.max_cstate=1 quiet split_lock_detect=off transparent_hugepage=madvise ttm.pages_limit=20971520 usbcore.autosuspend=-1 zswap.enabled=0
+set -g KERNEL_PARAMS amd_pstate=active btusb.enable_autosuspend=n fsck.mode=force fsck.repair=yes iommu=pt ipv6.disable=1 mt7925e.disable_aspm=1 nowatchdog nvme_core.default_ps_max_latency_us=0 pcie_aspm.policy=performance processor.max_cstate=1 quiet split_lock_detect=off usbcore.autosuspend=-1 zswap.enabled=0
 set -g MKINITCPIO_MODULES amdgpu
 set -g MKINITCPIO_HOOKS base systemd autodetect microcode modconf kms keyboard sd-vconsole block filesystems fsck
 set -g MKINITCPIO_COMPRESSION zstd; set -g MKINITCPIO_COMPRESSION_OPTIONS -3 # mkinitcpio prepends -T0 for zstd
@@ -442,7 +442,7 @@ function _ir_precompute_caches --description "Precompute Wi-Fi-backend and canon
 end
 function _ir_validate_counts --description "Refuse to run when array counts drift from expected"
     set -l _expect \
-        KERNEL_PARAMS:17 \
+        KERNEL_PARAMS:15 \
         MKINITCPIO_HOOKS:11 \
         MKINITCPIO_MODULES:1 \
         LOGIND_IGNORE_KEYS:8 \
@@ -1902,13 +1902,12 @@ function _vrkm_param_assert --argument-names mp path want --description "_vrkm_m
     end
 end
 function _vrkm_module_params --description "_vrk_module_state sub: Tokens vs /sys/module + kernel.watchdog; expectations from KERNEL_PARAMS"
-    for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled btusb.enable_autosuspend mt7925e.disable_aspm pcie_aspm.policy ipv6.disable ttm.pages_limit # sysfs-readable module_params among the managed tokens
+    for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled btusb.enable_autosuspend mt7925e.disable_aspm pcie_aspm.policy ipv6.disable # sysfs-readable module_params among the managed tokens
         set -l _want (_vrkm_kp_value "$_mp"); test -n "$_want"; or continue # token absent: nothing to assert
         set -l _path /sys/module/(string replace -a -- '-' '_' (string replace -r '\.[^.]*$' '' -- "$_mp"))/parameters/(string replace -r '^[^.]*\.' '' -- "$_mp")
         _vrkm_param_assert "$_mp" "$_path" "$_want"
     end
     if contains -- nowatchdog $KERNEL_PARAMS; _chk_sysfs_eq /proc/sys/kernel/watchdog 0 "nowatchdog (kernel.watchdog)"; end # bare token: read back through kernel.watchdog
-    if contains -- transparent_hugepage=madvise $KERNEL_PARAMS; _chk_grep /sys/kernel/mm/transparent_hugepage/enabled '[madvise]' "transparent_hugepage (sysfs enabled)"; end # bare token: read back through the THP policy file
 end
 function _vrkm_amdgpu --description "_vrk_module_state sub: amdgpu parameters (hex-aware compare; expected from KERNEL_PARAMS)"
     test -d /sys/module/amdgpu/parameters; or return 0

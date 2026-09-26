@@ -72,7 +72,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Static: services | `MASK` unit state, plus masked units the profile no longer declares |
 | Static: syntax | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
 | Static: checksum | installed bytes compared with generator output, a symlinked destination rejected rather than followed, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty |
-| Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, THP policy, NVMe I/O scheduler, blacklists |
+| Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, NVMe I/O scheduler, blacklists |
 | Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, `MASK` units inactive, user-scope units, Wi-Fi and NM backend |
 | Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain |
 | Runtime: session | NetworkManager system-connections perms, installed file modes, parent directories of managed files |
