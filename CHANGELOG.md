@@ -3,28 +3,18 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.216.0
+7.217.0
 -------
 
-  - changelog: version bump on the 2026-09-23 audit; the script changes are a
-    description and a comment, no functional change
+  - kernel: transparent_hugepage=madvise; THP only where a program asks for
+    it, background allocation stalls leave the frame budget
+  - env: RADV_PERFTEST=nggc,nircache; the per-stage NIR cache shortens
+    pipeline compiles on a cold shader cache
+  - verify: the THP policy file reads back [madvise] under the kernel
+    parameter check
 
 
-7.215.0
--------
-
-  - report: profile states grade as the ledger does; not installed, running
-    but not enabled, and still installed warn, the rest fail
-  - report: a masked unit still active, a deployed parameter not yet live, a
-    managed file that cannot be read, and a sudo lapse fail
-  - report: a --report run logs to report-*.jsonl beside its HTML; a zero
-    maximum clock no longer divides by zero
-  - report: GPU IDs stay aligned when a sysfs node is unreadable; a plain
-    /boot directory no longer repeats the / storage meter
-  - cli: --help names the report-not-written meaning of exit 1
-
-
-7.190.0 - 7.214.0
+7.190.0 - 7.216.0
 -----------------
 
   - boot: 7.211.0 the missing-entries hints drop --verbose
@@ -54,9 +44,18 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     CHECK_*_DRIFT with the cause; 7.202.0 records CHECK_SYMLINK_DRIFT
   - report: 7.214.0 --report runs --verify, then writes a self-contained HTML
     report (0600) beside the JSONL log; a failed write turns exit 0 into 1
+  - report: 7.215.0 profile states grade as the ledger does; not installed,
+    running but not enabled, and still installed warn, the rest fail
+  - report: 7.215.0 a masked unit still active, a deployed parameter not yet
+    live, a managed file that cannot be read, and a sudo lapse fail
+  - report: 7.215.0 a --report run logs to report-*.jsonl beside its HTML; a
+    zero maximum clock no longer divides by zero
+  - report: 7.215.0 GPU IDs stay aligned when a sysfs node is unreadable; a
+    plain /boot directory no longer repeats the / storage meter
   - preflight: 7.211.0 a missing root UUID names the findmnt exit code or an
     empty result
   - cli: 7.211.0 glued short flags take only h and v; -Vh and -hV fail like -V
+  - cli: 7.215.0 --help names the report-not-written meaning of exit 1
   - logging: 7.211.0 a caught signal logs before its stderr line
   - split: 7.190.0 moves ry-verify.fish here
 

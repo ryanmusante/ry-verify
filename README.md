@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.216.0** · [Changelog](CHANGELOG.md)
+**Version 7.217.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -72,7 +72,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Static: services | `MASK` unit state, plus masked units the profile no longer declares |
 | Static: syntax | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
 | Static: checksum | installed bytes compared with generator output, a symlinked destination rejected rather than followed, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty |
-| Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, NVMe I/O scheduler, blacklists |
+| Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, THP policy, NVMe I/O scheduler, blacklists |
 | Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, `MASK` units inactive, user-scope units, Wi-Fi and NM backend |
 | Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain |
 | Runtime: session | NetworkManager system-connections perms, installed file modes, parent directories of managed files |
