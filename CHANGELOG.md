@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.218.0
+-------
+
+  - checks: a sysctl or environment.d generator failure names the
+    malformed entries
+
+
 7.217.0
 -------
 

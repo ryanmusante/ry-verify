@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.217.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.218.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.217.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.218.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -1521,7 +1521,9 @@ function _vsc_check_one --argument-names dst --description "_verify_static_check
     set -l _gen_rc $pipestatus[1]
     if test "$_gen_rc" -ne 0
         if test "$_gen_rc" -eq "$EXIT_GEN_NOUUID"; and test -z "$_ROOT_UUID"; _vsc_uuid_fallback "$dst"; return 0; end
-        _msg_nocount FAIL "  $dst: generator failed (rc=$_gen_rc)"; set -g VERIFY_GEN_FAIL (math $VERIFY_GEN_FAIL + 1); _log "VERIFY_STATIC_GEN_FAIL: dst=$dst rc=$_gen_rc"; return 0
+        set -l _bad; test "$_gen_rc" -eq "$EXIT_GEN_SYSCTL"; and set _bad $_RY_SYSCTL_BAD_ENTRIES; test "$_gen_rc" -eq "$EXIT_GEN_ENVD"; and set _bad $_RY_ENVD_BAD_ENTRIES
+        set -l _why ""; set -q _bad[1]; and set _why " — malformed entries: "(string join ', ' -- $_bad)
+        _msg_nocount FAIL "  $dst: generator failed (rc=$_gen_rc)$_why"; set -g VERIFY_GEN_FAIL (math $VERIFY_GEN_FAIL + 1); _log "VERIFY_STATIC_GEN_FAIL: dst=$dst rc=$_gen_rc"; return 0
     end
     set -l actual (_installed_bytes "$dst" | string collect --no-trim-newlines --allow-empty)
     set -l _ib_rc $pipestatus[1]
