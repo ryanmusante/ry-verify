@@ -8,6 +8,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 
   - verify: the nftables input-policy and IPv4-ping checks match their own
     rules, not the forward chain or the ICMPv6 line
+  - verify: an expected unit whose state systemctl cannot read warns, as the
+    MASK checks do, instead of failing on ERR_NO_DATA
 
 
 7.218.0

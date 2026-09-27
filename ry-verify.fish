@@ -1990,6 +1990,7 @@ function _verify_runtime_kparams --description "Verify /proc/cmdline, hardware s
 # ── VERIFY-RUNTIME: SERVICES (units, resolved, cpupower, nftables) ──
 function _vrsv_chk_active_enabled --argument-names label rec_str --description "_vrsv_sys_units sub: OK if active+enabled, warn if active only, fail otherwise"
     set -l rec (string split ':' -- "$rec_str")
+    if test "$rec[1]" = ERR_NO_DATA; _warn "  $label: systemctl state unavailable (absent or no running manager) — cannot verify"; return 0; end
     if test "$rec[1]" = not-found
         _warn "  $label: not installed"; return 0
     else if test "$rec[2]" = active
@@ -2013,6 +2014,7 @@ end
 function _vrsv_chk_nftables --argument-names label rec_str --description "_vrsv_sys_units sub: nftables.service: oneshot reads inactive after clean load"
     set -l rec (string split ':' -- "$rec_str")
     if test "$rec[1]" = not-found; _warn "  $label: not installed"; return 0; end
+    if test "$rec[1]" = ERR_NO_DATA; _warn "  $label: systemctl state unavailable (absent or no running manager) — cannot verify"; return 0; end
     set -l _nft_probe_ok false
     command -q nft; and sudo -n true 2>/dev/null; and set _nft_probe_ok true
     if test "$rec[2]" = active
@@ -2041,6 +2043,7 @@ function _vrsv_chk_resolved --argument-names rec_str --description "_vrsv_sys_un
     set -l rec (string split ':' -- "$rec_str")
     test -f /etc/systemd/resolved.conf.d/99-cachyos-resolved.conf; or return 0
     if test "$rec[1]" = not-found; _warn "  systemd-resolved: not installed"; return 0; end
+    if test "$rec[1]" = ERR_NO_DATA; _warn "  systemd-resolved: systemctl state unavailable (absent or no running manager) — cannot verify"; return 0; end
     if test "$rec[2]" != active
         _fail "  systemd-resolved: $rec[2] (expected: active — DNS may be broken)"
     else if contains -- "$rec[3]" enabled static
@@ -2052,6 +2055,7 @@ end
 function _vrsv_chk_cpupower_governor --argument-names rec_str --description "_vrsv_sys_units sub: Check cpupower.service (RemainAfterExit oneshot reads active)"
     set -l rec (string split ':' -- "$rec_str")
     if test "$rec[1]" = not-found; _warn "  cpupower.service: not installed (cpupower is a CachyOS default; pacman db may be stale)"; return 0; end
+    if test "$rec[1]" = ERR_NO_DATA; _warn "  cpupower.service: systemctl state unavailable (absent or no running manager) — cannot verify"; return 0; end
     if test "$rec[2]" = active
         if test "$rec[3]" = enabled
             _ok "  cpupower.service: $rec[2] (enabled)"
