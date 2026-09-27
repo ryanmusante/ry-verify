@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.219.0
+-------
+
+  - verify: the nftables input-policy and IPv4-ping checks match their own
+    rules, not the forward chain or the ICMPv6 line
+
+
 7.218.0
 -------
 
