@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.223.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.224.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.223.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.224.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -2278,21 +2278,23 @@ function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mount
     if test (count $_rows) -eq 0; _info "  no ext4 filesystem mounted"; return 0; end
     set -l _fstab_mps
     if test -r /etc/fstab
-        set _fstab_mps (command awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 }')
+        set _fstab_mps (command awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 " " $4 }')
     else if sudo -n test -r /etc/fstab 2>/dev/null
-        set _fstab_mps (sudo -n awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 }')
+        set _fstab_mps (sudo -n awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 " " $4 }')
     else
         _warn "  /etc/fstab not readable (even via sudo) — live mount options unverified"; return 0
     end
-    set -l _fstab_paths # fstab escapes \040, findmnt -r escapes \x20 — compare decoded
-    for _m in $_fstab_mps; set -a _fstab_paths (printf '%b' "$_m"); end
+    set -l _fstab_paths; set -l _fstab_opts # fstab escapes \040, findmnt -r escapes \x20 — compare decoded
+    for _m in $_fstab_mps; set -l _mo (string split -m1 ' ' -- "$_m"); set -a _fstab_paths (printf '%b' "$_mo[1]"); set -a _fstab_opts "$_mo[2]"; end
     set -l _pending; set -l _checked 0; set -l _skipped 0
     for _row in $_rows
         set -l _f (string split -m1 ' ' -- "$_row"); set -l _mp (printf '%b' "$_f[1]"); set -l _opts "$_f[2]"
-        if not contains -- "$_mp" $_fstab_paths; set _skipped (math $_skipped + 1); continue; end
+        set -l _ix (contains -i -- "$_mp" $_fstab_paths)
+        if test -z "$_ix"; set _skipped (math $_skipped + 1); continue; end
         set _checked (math $_checked + 1)
         for _tok in noatime lazytime commit=10 # same triad the rewrite writes
             set -l _re (string escape --style=regex -- "$_tok")
+            string match -qr -- '(^|,)'$_re'(,|$)' "$_fstab_opts[$_ix]"; or continue # not in fstab: _vre_fstab reports it
             string match -qr -- '(^|,)'$_re'(,|$)' "$_opts"; or set -a _pending "$_mp:$_tok"
         end
     end
@@ -2300,7 +2302,7 @@ function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mount
     if test "$_checked" -eq 0
         _info "  no fstab-listed ext4 filesystem is mounted"
     else if test (count $_pending) -eq 0
-        _ok "  ext4 mounts ($_checked): noatime,lazytime,commit=10 live"
+        _ok "  ext4 mounts ($_checked): fstab options live"
     else
         _warn "  written to fstab but not live: $_pending — sudo mount -o remount <target>, or reboot"; _log "FSTAB_REMOUNT_PENDING: "(string join ',' -- $_pending)
     end

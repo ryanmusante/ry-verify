@@ -3,24 +3,26 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.217.0 - 7.223.0
+7.217.0 - 7.224.0
 -----------------
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
   - perf: 7.217.0 governor performance -> powersave, EPP performance kept
   - env: 7.217.0 RADV_PERFTEST=nggc -> nggc,nircache
-  - env: 7.223.0 expect SDL_GAMECONTROLLER_IGNORE_DEVICES
-  - packages: 7.223.0 expect pipewire-jack installed
+  - env: 7.224.0 expect SDL_GAMECONTROLLER_IGNORE_DEVICES
+  - packages: 7.224.0 expect pipewire-jack installed
   - verify: 7.219.0 the nftables input-policy and IPv4-ping checks match their
     own rules, not the forward chain or the ICMPv6 line
   - verify: 7.219.0 an expected unit whose state systemctl cannot read warns,
     as the MASK checks do, instead of failing on ERR_NO_DATA
-  - verify: 7.223.0 the WirePlumber soft-mixer rule is checked in place and
+  - verify: 7.224.0 the WirePlumber soft-mixer rule is checked in place and
     live through pactl
-  - verify: 7.223.0 the NetworkManager Wi-Fi P2P section is checked in the
+  - verify: 7.224.0 the NetworkManager Wi-Fi P2P section is checked in the
     drop-in, and p2p-dev-<iface> must read unmanaged
-  - verify: 7.223.0 kernel parameter acceptance also catches invalid-value and
+  - verify: 7.224.0 kernel parameter acceptance also catches invalid-value and
     loaded-module rejections
+  - verify: 7.224.0 the live fstab check compares mounts with the options
+    fstab holds, not with the profile triad
   - checks: 7.218.0 a sysctl or environment.d generator failure names the
     malformed entries
 

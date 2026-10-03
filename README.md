@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.223.0** · [Changelog](CHANGELOG.md)
+**Version 7.224.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -77,7 +77,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Report
 
-`--report` runs every `--verify` check, then renders the run into one self-contained HTML file beside its JSONL log — inline styles and SVG charts, no scripts, no network. Open it in any browser; print it to PDF for a portable copy. Sections run from most to least urgent:
+`--report` runs every `--verify` check, then renders the run into one self-contained HTML file beside its JSONL log — inline styles and SVG charts, no scripts, no network. Open it in any browser. Sections run from most to least urgent:
 
 | Section | Content |
 |---|---|
@@ -103,7 +103,7 @@ Profile-change states are graded as the ledger grades the same finding: `match`,
 > [!CAUTION]
 > `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship in lockstep; clone both repos at the same version. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
 
-Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below are verify-side alone. Edit both repos in lockstep.
+Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below are verify-side alone.
 
 ### Verify-only Keys
 
@@ -120,7 +120,7 @@ Firmware is not checked — the assumed ceiling and the per-setting walkthrough 
 
 **Masked unit not in `MASK` reported** — `sudo systemctl unmask <unit>` if an earlier `MASK` masked it; leave distro and hand-made masks alone.
 
-**Report not written** — the HTML is rendered into a temporary file in the log directory and renamed into place, so `~/ry-install/logs/YYYY-MM-DD/` must accept a new file: check free space and the directory mode (`0700`). The JSONL log records `REPORT_WRITE_FAIL` with the reason; the checks themselves are unaffected.
+**Report not written** — `~/ry-install/logs/YYYY-MM-DD/` must accept a new file: check free space and the directory mode (`0700`). The JSONL log records `REPORT_WRITE_FAIL` with the reason; the checks themselves are unaffected.
 
 ## Contributing
 
