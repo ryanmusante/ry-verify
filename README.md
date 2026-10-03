@@ -50,10 +50,8 @@ Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYY
 
 Skipping the hardware check is the risky override — a wrong-CPU run compares against an incorrect kernel cmdline and initramfs `MODULES`.
 
-| Variable | Effect |
-|---|---|
-| `RY_INSTALL_SKIP_HARDWARE_CHECK=1` | bypass the `EXPECTED_CPU_MATCH` hard-fail |
-| `NO_COLOR` | disable colored output when set to a non-empty value ([no-color.org](https://no-color.org)) |
+- `RY_INSTALL_SKIP_HARDWARE_CHECK=1` — bypass the `EXPECTED_CPU_MATCH` hard-fail
+- `NO_COLOR` — disable colored output when set to a non-empty value ([no-color.org](https://no-color.org))
 
 ## Managed Files
 
@@ -109,10 +107,8 @@ Value tables, package and unit sets, and tuning rationale live in [ry-install](h
 
 ### Verify-only Keys
 
-| Key | Value | Checked as |
-|---|---|---|
-| `EXPECTED_SCALING_DRIVER` | `amd-pstate-epp` | live scaling driver (Runtime: kernel) |
-| `EXPECTED_VULKAN_PKGS` | `vulkan-radeon`, `lib32-vulkan-radeon` | presence, with `PKGS_ADD` (Static: packages) |
+- `EXPECTED_SCALING_DRIVER` = `amd-pstate-epp` — live scaling driver (Runtime: kernel)
+- `EXPECTED_VULKAN_PKGS` = `vulkan-radeon`, `lib32-vulkan-radeon` — presence, with `PKGS_ADD` (Static: packages)
 
 ## BIOS
 
