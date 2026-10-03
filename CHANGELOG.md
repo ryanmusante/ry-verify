@@ -3,6 +3,18 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.220.0
+-------
+
+  - env: expect SDL_GAMECONTROLLER_IGNORE_DEVICES for the Keychron K2 HE and
+    Link receiver
+  - packages: expect pipewire-jack installed and jack2 removed
+  - verify: the WirePlumber soft-mixer rule (a new managed user file) is
+    checked in place and live through pactl
+  - verify: the NetworkManager Wi-Fi P2P section is checked in the drop-in,
+    and p2p-dev-<iface> must read unmanaged
+
+
 7.219.0
 -------
 

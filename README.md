@@ -1,8 +1,8 @@
 # ry-verify
 
-**Version 7.219.0** · [Changelog](CHANGELOG.md)
+**Version 7.220.0** · [Changelog](CHANGELOG.md)
 
-Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
+Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
 ## Quick Start
 
@@ -57,7 +57,7 @@ Skipping the hardware check is the risky override — a wrong-CPU run compares a
 
 ## Managed Files
 
-The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-install)'s Managed Files, in deploy order. System files are checked against `0644` where the filesystem records modes, user files against `0600`.
+The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-install)'s Managed Files, in deploy order. System files are checked against `0644` where the filesystem records modes, user files against `0600`.
 
 ## Checks
 
@@ -67,14 +67,14 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 |---|---|
 | Static: boot | `loader.conf`, `sdboot-manage.conf`, `sdboot-manage.conf.d` drop-ins that outrank it, `/etc/kernel/cmdline` (`KERNEL_PARAMS`, `root=UUID`, `rw`), `mkinitcpio.conf`, `$BOOT` entries |
 | Static: system | resolved, logind, NetworkManager dispatcher logging, NetworkManager, `iw-regdomain`, bluetooth, `cpupower-service.conf`, sysctl drop-in, udev, modprobe plus the unmanaged `60-ry-*` sweep, nftables |
-| Static: user | `environment.d` (`ENV_VARS`), MangoHud |
+| Static: user | `environment.d` (`ENV_VARS`), MangoHud, WirePlumber soft-mixer rule |
 | Static: packages | `PKGS_ADD` and `EXPECTED_VULKAN_PKGS` present, `PKGS_DEL` absent, `pacman.conf` `IgnorePkg` and `ParallelDownloads` |
 | Static: services | `MASK` unit state, plus masked units the profile no longer declares |
 | Static: syntax | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
 | Static: checksum | installed bytes compared with generator output, a symlinked destination rejected rather than followed, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty |
 | Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, NVMe I/O scheduler, blacklists |
-| Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, `MASK` units inactive, user-scope units, Wi-Fi and NM backend |
-| Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain |
+| Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, `MASK` units inactive, user-scope units, Wi-Fi, NM backend, unmanaged Wi-Fi P2P device |
+| Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain, POROSVOC soft mixer |
 | Runtime: session | NetworkManager system-connections perms, installed file modes, parent directories of managed files |
 
 ## Report
@@ -86,7 +86,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Verdict | `PASS`, `PASS-WITH-WARNINGS`, `FAIL`, or `PREFLIGHT`, a counts ring, the result lines, and run metadata |
 | Action items | every `FAIL`, then every `WARN`, with its group and any `INFO` line logged directly after it |
 | System | host, firmware, OS, kernel, CPU scaling state and per-CPU clocks, GPU IDs and clocks, VRAM, GTT, RAM, swap, and storage meters, displays, key package versions |
-| Profile changes | the 17 [Managed Files](#managed-files) regenerated and compared byte for byte, `KERNEL_PARAMS` deployed and live, `SYSCTL_VALUES`, `ENV_VARS`, packages, units, embedded keys, and a coverage chart |
+| Profile changes | the 18 [Managed Files](#managed-files) regenerated and compared byte for byte, `KERNEL_PARAMS` deployed and live, `SYSCTL_VALUES`, `ENV_VARS`, packages, units, embedded keys, and a coverage chart |
 | Verification ledger | a per-group chart, then every logged row, groups with a `FAIL` first, then groups with a `WARN` |
 | Appendix | every structured log event, each generated file body with its SHA-256, and the method |
 

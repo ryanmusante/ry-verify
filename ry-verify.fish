@@ -1,13 +1,13 @@
 #!/usr/bin/env fish
-# ry-verify v7.219.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.220.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.219.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.220.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
-set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro — Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 17
+set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro — Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 18
 set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check,report h/help v/version verify check report # single option-spec source (root guard + main argparse)
 
 # ── HELP TEXT ──
@@ -363,7 +363,7 @@ set -g SYSTEM_DESTINATIONS \
     "/etc/systemd/system/NetworkManager-dispatcher.service.d/logging.conf" "/etc/NetworkManager/conf.d/99-cachyos-nm.conf" \
     "/etc/iw-regdomain" "/etc/bluetooth/main.conf" "/etc/nftables.conf" "/etc/default/cpupower-service.conf" \
     "/etc/sysctl.d/95-ry-overrides.conf" "/etc/udev/rules.d/99-ry-perf.rules" "/etc/modprobe.d/60-ry-modules.conf"
-set -g USER_DESTINATIONS "$HOME/.config/environment.d/10-environment.conf" "$HOME/.config/MangoHud/MangoHud.conf"
+set -g USER_DESTINATIONS "$HOME/.config/environment.d/10-environment.conf" "$HOME/.config/MangoHud/MangoHud.conf" "$HOME/.config/wireplumber/wireplumber.conf.d/51-porosvoc-softmixer.conf"
 set -l _ry_dst_count (count $SYSTEM_DESTINATIONS $USER_DESTINATIONS)
 if test "$_ry_dst_count" -ne "$_RY_MANAGED_FILE_COUNT"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] _RY_MANAGED_FILE_COUNT drift: declared=$_RY_MANAGED_FILE_COUNT computed=$_ry_dst_count" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set --erase _ry_dst_count
@@ -391,14 +391,14 @@ set -g EXPECTED_SCALING_DRIVER amd-pstate-epp # scaling_driver under amd_pstate=
 set -g BLACKLIST_AMDXDNA false # false + iommu=pt enables the NPU
 
 # ── EMBEDDED DATA: ENV_VARS + SYSCTL_VALUES ──
-set -g ENV_VARS "DXVK_LOG_LEVEL=none" "GSK_RENDERER=gl" "MANGOHUD=1" "MANGOHUD_DLSYM=1" "MESA_SHADER_CACHE_MAX_SIZE=16G" "POWERDEVIL_NO_DDCUTIL=1" "PROTON_LOCAL_SHADER_CACHE=1" "RADV_PERFTEST=nggc,nircache" "VKD3D_DEBUG=none" "VKD3D_SHADER_DEBUG=none" "WINEDEBUG=-all"
+set -g ENV_VARS "DXVK_LOG_LEVEL=none" "GSK_RENDERER=gl" "MANGOHUD=1" "MANGOHUD_DLSYM=1" "MESA_SHADER_CACHE_MAX_SIZE=16G" "POWERDEVIL_NO_DDCUTIL=1" "PROTON_LOCAL_SHADER_CACHE=1" "RADV_PERFTEST=nggc,nircache" "SDL_GAMECONTROLLER_IGNORE_DEVICES=0x3434/0x0e20,0x3434/0xd030" "VKD3D_DEBUG=none" "VKD3D_SHADER_DEBUG=none" "WINEDEBUG=-all"
 set -g SYSCTL_VALUES "kernel.nmi_watchdog=0" "net.core.default_qdisc=fq" "net.ipv4.tcp_congestion_control=bbr" "net.ipv4.tcp_notsent_lowat=16384" "net.ipv4.tcp_slow_start_after_idle=0" "vm.compaction_proactiveness=0" "vm.max_map_count=2147483642" "vm.watermark_boost_factor=0" "vm.watermark_scale_factor=125"
 
 # ── EMBEDDED DATA: PACKAGES (ADD / DEL / VULKAN) ──
 set -g PKGS_ADD \
     nvme-cli cachyos-gaming-meta cachyos-gaming-applications cachyos-benchmarker lib32-mesa mkinitcpio-firmware fd sd dust procs \
-    bottom htop lm_sensors rtkit realtime-privileges nftables pacman-contrib # pacman-contrib: pactree + paccache
-set -g PKGS_DEL plymouth cachyos-plymouth-bootanimation cachyos-plymouth-theme breeze-plymouth plymouth-kcm micro cachyos-micro-settings cachy-update kdeconnect
+    bottom htop lm_sensors rtkit realtime-privileges pipewire-jack nftables pacman-contrib # pacman-contrib: pactree + paccache
+set -g PKGS_DEL plymouth cachyos-plymouth-bootanimation cachyos-plymouth-theme breeze-plymouth plymouth-kcm micro cachyos-micro-settings cachy-update kdeconnect jack2
 set -g EXPECTED_VULKAN_PKGS vulkan-radeon lib32-vulkan-radeon # chwd Vulkan drivers
 
 # ── EMBEDDED DATA: UNITS (MASK / EXPECTED) ──
@@ -446,10 +446,10 @@ function _ir_validate_counts --description "Refuse to run when array counts drif
         MKINITCPIO_HOOKS:11 \
         MKINITCPIO_MODULES:1 \
         LOGIND_IGNORE_KEYS:8 \
-        ENV_VARS:11 \
+        ENV_VARS:12 \
         SYSCTL_VALUES:9 \
-        PKGS_ADD:17 \
-        PKGS_DEL:9 \
+        PKGS_ADD:18 \
+        PKGS_DEL:10 \
         MASK:11 \
         EXPECTED_VULKAN_PKGS:2 \
         EXPECTED_SERVICES:5 \
@@ -458,7 +458,7 @@ function _ir_validate_counts --description "Refuse to run when array counts drif
         _RY_BACKUP_TARGETS:4 \
         _RY_TMPDIR_GLOBS:2 \
         SYSTEM_DESTINATIONS:15 \
-        USER_DESTINATIONS:2 \
+        USER_DESTINATIONS:3 \
         MKINITCPIO_COMPRESSION_OPTIONS:1 # drift tripwires; sync arrays + docs on change
     for _kv in $_expect
         set -l _parts (string split -m1 ':' -- "$_kv"); set -l _name $_parts[1]; set -l _want $_parts[2]; set -l _got (count $$_name)
@@ -590,7 +590,10 @@ function _content__etc_systemd_system_NetworkManager-dispatcher.service.d_loggin
     printf '%s\n' "# ry-install: NetworkManager-dispatcher logging drop-in (managed file, do not edit by hand)" "# LogLevelMax drops info-level dispatcher lines (journald-logged; StandardError=null ineffective)" "[Service]" "LogLevelMax=$NM_DISPATCHER_LOGLEVELMAX"
 end
 function _content__etc_NetworkManager_conf.d_99-cachyos-nm.conf --description "Generate content for NetworkManager drop-in (wifi.backend from NM_WIFI_BACKEND)"
-    printf '%s\n' "# ry-install: NetworkManager config, $NM_WIFI_BACKEND backend (managed file, do not edit by hand)" "[main]" "autoconnect-retries-default=0" "" "[device]" "wifi.backend=$NM_WIFI_BACKEND" "" "[connection]" "wifi.powersave=$NM_WIFI_POWERSAVE" "" "[logging]" "level=$NM_LOG_LEVEL" "" "[connectivity]" "enabled=false"
+    printf '%s\n' "# ry-install: NetworkManager config, $NM_WIFI_BACKEND backend (managed file, do not edit by hand)" \
+        "[main]" "autoconnect-retries-default=0" "" "[device]" "wifi.backend=$NM_WIFI_BACKEND" "" \
+        "[device-no-p2p]" "match-device=type:wifi-p2p" "managed=0" "" \
+        "[connection]" "wifi.powersave=$NM_WIFI_POWERSAVE" "" "[logging]" "level=$NM_LOG_LEVEL" "" "[connectivity]" "enabled=false"
 end
 function _content__etc_iw-regdomain --description "Generate content for /etc/iw-regdomain (CachyOS regdomain input)"; printf '%s\n' "# ry-install: wireless regulatory domain (managed file, do not edit by hand)" "COUNTRY=$COUNTRY"; end
 function _content__etc_bluetooth_main.conf --description "Generate content for /etc/bluetooth/main.conf (adapter auto-power-on + paired-sink reconnect)"
@@ -653,7 +656,7 @@ function _content__etc_modprobe.d_60-ry-modules.conf --description "Generate con
     end
 end
 
-# ── CONTENT GENERATORS: USER ($HOME dotfiles; environment.d + MangoHud) ──
+# ── CONTENT GENERATORS: USER ($HOME dotfiles; environment.d + MangoHud + WirePlumber) ──
 function _content_HOME_.config_environment.d_10-environment.conf --description "Generate content for ~/.config/environment.d/10-environment.conf"
     printf '%s\n' "# ry-install: session environment for systemd --user services and graphical sessions (managed file, do not edit by hand)"
     set -l _printed 0; set -g _RY_ENVD_BAD_ENTRIES
@@ -689,6 +692,16 @@ function _content_HOME_.config_MangoHud_MangoHud.conf --description "Generate co
         "font_size=20" \
         "text_outline" \
         "background_alpha=0.4"
+end
+function _content_HOME_.config_wireplumber_wireplumber.conf.d_51-porosvoc-softmixer.conf --description "Generate content for ~/.config/wireplumber/wireplumber.conf.d/51-porosvoc-softmixer.conf"
+    printf '%s\n' "# ry-install: WirePlumber soft mixer for the POROSVOC USB microphone (managed file, do not edit by hand)" \
+        "# its hardware Mic Capture Volume spans about 0.39 dB, so PipeWire applies the volume in software" \
+        "monitor.alsa.rules = [" \
+        "  {" \
+        "    matches = [ { device.name = \"~alsa_card.usb-POROSVOC.*\" } ]" \
+        "    actions = { update-props = { api.alsa.soft-mixer = true } }" \
+        "  }" \
+        "]"
 end
 
 # ── CONTENT DISPATCH (_ry_get_file_content; fn name derived via _content_fn_for) ──
@@ -1323,6 +1336,8 @@ function _vss_nm --description "_verify_static_system sub: NetworkManager config
     _chk_file /etc/NetworkManager/conf.d/99-cachyos-nm.conf; or return 0
     _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "autoconnect-retries-default=0" "autoconnect retries unlimited"
     _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "wifi.backend=$NM_WIFI_BACKEND" "Wi-Fi backend $NM_WIFI_BACKEND"
+    _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "match-device=type:wifi-p2p" "Wi-Fi P2P device matched"
+    _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "managed=0" "Wi-Fi P2P device unmanaged"
     _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "wifi.powersave=$NM_WIFI_POWERSAVE" "Wi-Fi powersave $NM_WIFI_POWERSAVE"
     _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "level=$NM_LOG_LEVEL" "logging level $NM_LOG_LEVEL"
     _chk_grep /etc/NetworkManager/conf.d/99-cachyos-nm.conf "enabled=false" "connectivity checking disabled"
@@ -1383,7 +1398,7 @@ function _verify_static_system --description "Verify resolved, logind, NM, regdo
     _vss_modprobe
     _vss_nft
 end
-function _verify_static_user --description "Verify environment.d ENV_VARS + MangoHud HUD config"
+function _verify_static_user --description "Verify environment.d ENV_VARS, MangoHud HUD config, WirePlumber soft-mixer rule"
     _echo "USER CONFIGURATION"; _echo "── environment.d ──"
     if _chk_file "$HOME/.config/environment.d/10-environment.conf"
         for exp in $ENV_VARS; _chk_grep "$HOME/.config/environment.d/10-environment.conf" "$exp"; end
@@ -1392,6 +1407,12 @@ function _verify_static_user --description "Verify environment.d ENV_VARS + Mang
     if _chk_file "$HOME/.config/MangoHud/MangoHud.conf"
         for _hud in horizontal legacy_layout=0 position=top-left toggle_hud=Shift_R+F12 fps frametime frame_timing gpu_stats gpu_temp gpu_core_clock gpu_power cpu_stats cpu_mhz cpu_power vram ram font_size=20 text_outline background_alpha=0.4 # every generator directive, emission order; lockstep
             _chk_grep "$HOME/.config/MangoHud/MangoHud.conf" "$_hud"
+        end
+    end
+    _echo "── WirePlumber (POROSVOC soft mixer) ──"
+    if _chk_file "$HOME/.config/wireplumber/wireplumber.conf.d/51-porosvoc-softmixer.conf"
+        for _wp in 'device.name = "~alsa_card.usb-POROSVOC.*"' "api.alsa.soft-mixer = true"
+            _chk_grep "$HOME/.config/wireplumber/wireplumber.conf.d/51-porosvoc-softmixer.conf" "$_wp"
         end
     end
 end
@@ -2102,7 +2123,7 @@ function _vrsv_wifi_nm_backend --description "_vrsv_wifi sub: Verify NM effectiv
         _fail "  NM effective wifi.backend: $_eff (expected: $NM_WIFI_BACKEND)"
     end
 end
-function _vrsv_wifi --description "_verify_runtime_services sub: Wi-Fi + NM backend + NM state"
+function _vrsv_wifi --description "_verify_runtime_services sub: Wi-Fi + NM backend + NM state + P2P device"
     _echo "WIFI STATE"
     if test "$_RY_PROFILE_USES_WIFI_BACKEND" = false
         _info "  NetworkManager not managed — skipping Wi-Fi state checks"; return 0
@@ -2125,6 +2146,16 @@ function _vrsv_wifi --description "_verify_runtime_services sub: Wi-Fi + NM back
             _ok "  Wi-Fi device: connected"
         else if test -n "$wifi_state"
             _warn "  Wi-Fi device: $wifi_state (not connected)"
+        end
+        if test -n "$wlan_iface"
+            set -l _p2p (command nmcli -g GENERAL.STATE device show "p2p-dev-$wlan_iface" 2>/dev/null)[1]
+            if string match -q -- '*unmanaged*' "$_p2p"
+                _ok "  p2p-dev-$wlan_iface: unmanaged"
+            else if test -n "$_p2p"
+                _fail "  p2p-dev-$wlan_iface: $_p2p (expected: unmanaged — restart NetworkManager)"
+            else
+                _info "  p2p-dev-$wlan_iface: not listed by NetworkManager"
+            end
         end
     end
     set -l _ufw (command systemctl is-active ufw.service 2>/dev/null | string trim --)
@@ -2304,9 +2335,32 @@ function _vre_regdom --description "_verify_runtime_env sub: Wireless regulatory
         _warn "  regdom: country $COUNTRY not active — sudo iw reg set $COUNTRY (persists via /etc/iw-regdomain → cachyos-iw-set-regdomain)"
     end
 end
+function _vre_softmixer --description "_verify_runtime_env sub: POROSVOC soft mixer via pactl (WirePlumber rule)"
+    _echo "── WirePlumber soft mixer ──"
+    if not command -q pactl; _info "  soft mixer: pactl(1) absent — cannot query (expected api.alsa.soft-mixer=true)"; return 0; end
+    if not _has_user_bus_active; _info "  Skipping soft-mixer check (no active user-bus — log in graphically or enable-linger to verify)"; return 0; end
+    set -l _card (command pactl list short cards 2>/dev/null | string match -rg -- '^\d+\t(alsa_card\.usb-POROSVOC\S*)')[1]
+    if test -z "$_card"; _info "  POROSVOC card not present — soft-mixer check skipped"; return 0; end
+    set -l _in false; set -l _val
+    for _l in (command env LC_ALL=C pactl list cards 2>/dev/null)
+        if string match -qr -- '^\s*Name: ' "$_l"
+            set _in false; test (string trim -- "$_l") = "Name: $_card"; and set _in true
+        else if test "$_in" = true
+            set -l _m (string match -rg -- '^\s*api\.alsa\.soft-mixer = "(\w+)"' "$_l")
+            if test -n "$_m"; set _val $_m; break; end
+        end
+    end
+    if test "$_val" = true
+        _ok "  $_card: api.alsa.soft-mixer=true"
+    else if test -n "$_val"
+        _fail "  $_card: api.alsa.soft-mixer=$_val (expected: true)"
+    else
+        _warn "  $_card: soft mixer not applied in the running WirePlumber (systemctl --user restart wireplumber)"
+    end
+end
 
 # ── VERIFY-RUNTIME: ENV ORCHESTRATOR (_verify_runtime_env) ──
-function _verify_runtime_env --description "Verify ENV_VARS, sysctl, fstab, ntsync, regdom runtime"; _vre_envvars; _vre_sysctl_runtime; _vre_fstab; _vre_fstab_live; _vre_ntsync; _vre_regdom; end
+function _verify_runtime_env --description "Verify ENV_VARS, sysctl, fstab, ntsync, regdom, soft-mixer runtime"; _vre_envvars; _vre_sysctl_runtime; _vre_fstab; _vre_fstab_live; _vre_ntsync; _vre_regdom; _vre_softmixer; end
 
 # ── VERIFY-RUNTIME: SESSION + PERMS ──
 function _vrs_nm_perms --description "_verify_runtime_session sub: NetworkManager system-connections perms (0600 root:root)"
