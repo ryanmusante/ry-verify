@@ -3,40 +3,26 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.220.0
--------
+7.217.0 - 7.223.0
+-----------------
 
-  - env: expect SDL_GAMECONTROLLER_IGNORE_DEVICES for the Keychron K2 HE and
-    Link receiver
-  - packages: expect pipewire-jack installed and jack2 removed
-  - verify: the WirePlumber soft-mixer rule (a new managed user file) is
-    checked in place and live through pactl
-  - verify: the NetworkManager Wi-Fi P2P section is checked in the drop-in,
-    and p2p-dev-<iface> must read unmanaged
-
-
-7.219.0
--------
-
-  - verify: the nftables input-policy and IPv4-ping checks match their own
-    rules, not the forward chain or the ICMPv6 line
-  - verify: an expected unit whose state systemctl cannot read warns, as the
-    MASK checks do, instead of failing on ERR_NO_DATA
-
-
-7.218.0
--------
-
-  - checks: a sysctl or environment.d generator failure names the
+  - kernel: 7.217.0 drop ttm.pages_limit=20971520
+  - perf: 7.217.0 governor performance -> powersave, EPP performance kept
+  - env: 7.217.0 RADV_PERFTEST=nggc -> nggc,nircache
+  - env: 7.223.0 expect SDL_GAMECONTROLLER_IGNORE_DEVICES
+  - packages: 7.223.0 expect pipewire-jack installed
+  - verify: 7.219.0 the nftables input-policy and IPv4-ping checks match their
+    own rules, not the forward chain or the ICMPv6 line
+  - verify: 7.219.0 an expected unit whose state systemctl cannot read warns,
+    as the MASK checks do, instead of failing on ERR_NO_DATA
+  - verify: 7.223.0 the WirePlumber soft-mixer rule is checked in place and
+    live through pactl
+  - verify: 7.223.0 the NetworkManager Wi-Fi P2P section is checked in the
+    drop-in, and p2p-dev-<iface> must read unmanaged
+  - verify: 7.223.0 kernel parameter acceptance also catches invalid-value and
+    loaded-module rejections
+  - checks: 7.218.0 a sysctl or environment.d generator failure names the
     malformed entries
-
-
-7.217.0
--------
-
-  - kernel: drop ttm.pages_limit=20971520
-  - perf: governor performance -> powersave, EPP performance kept
-  - env: RADV_PERFTEST=nggc -> nggc,nircache
 
 
 7.190.0 - 7.216.0
@@ -64,8 +50,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.198.0 read back every managed token
   - verify: 7.200.0 assert connectivity disabled
   - verify: 7.202.0 fail a symlinked destination in the checksum phase
-  - verify: 7.207.0 fail a symlinked destination once, its perms row INFO
   - verify: 7.206.0 bluetooth keys in emission order
+  - verify: 7.207.0 fail a symlinked destination once, its perms row INFO
   - verify: 7.207.0 a sudo bail closes its VERIFICATION section
   - verify: 7.203.0 - 7.208.0 labels read Wi-Fi and kernel.watchdog
   - verify: 7.211.0 the powerdevil crash hint matches coredumps by executable

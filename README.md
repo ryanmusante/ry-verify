@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.220.0** · [Changelog](CHANGELOG.md)
+**Version 7.223.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -103,7 +103,7 @@ Profile-change states are graded as the ledger grades the same finding: `match`,
 ## Embedded Values
 
 > [!CAUTION]
-> `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship at the same version. Clone both repos at the same version. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
+> `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship in lockstep; clone both repos at the same version. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
 
 Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below are verify-side alone. Edit both repos in lockstep.
 

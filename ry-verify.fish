@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.220.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.223.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.220.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.223.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -398,7 +398,7 @@ set -g SYSCTL_VALUES "kernel.nmi_watchdog=0" "net.core.default_qdisc=fq" "net.ip
 set -g PKGS_ADD \
     nvme-cli cachyos-gaming-meta cachyos-gaming-applications cachyos-benchmarker lib32-mesa mkinitcpio-firmware fd sd dust procs \
     bottom htop lm_sensors rtkit realtime-privileges pipewire-jack nftables pacman-contrib # pacman-contrib: pactree + paccache
-set -g PKGS_DEL plymouth cachyos-plymouth-bootanimation cachyos-plymouth-theme breeze-plymouth plymouth-kcm micro cachyos-micro-settings cachy-update kdeconnect jack2
+set -g PKGS_DEL plymouth cachyos-plymouth-bootanimation cachyos-plymouth-theme breeze-plymouth plymouth-kcm micro cachyos-micro-settings cachy-update kdeconnect
 set -g EXPECTED_VULKAN_PKGS vulkan-radeon lib32-vulkan-radeon # chwd Vulkan drivers
 
 # ── EMBEDDED DATA: UNITS (MASK / EXPECTED) ──
@@ -449,7 +449,7 @@ function _ir_validate_counts --description "Refuse to run when array counts drif
         ENV_VARS:12 \
         SYSCTL_VALUES:9 \
         PKGS_ADD:18 \
-        PKGS_DEL:10 \
+        PKGS_DEL:9 \
         MASK:11 \
         EXPECTED_VULKAN_PKGS:2 \
         EXPECTED_SERVICES:5 \
@@ -1817,7 +1817,7 @@ function _vrk_param_rejects --description "_verify_runtime_kparams sub: Kernel p
         _warn "  kernel ring buffer unreadable (journalctl and dmesg both empty) — token acceptance unverified"; _log "KPARAM_REJECT_SCAN_SKIP: ring buffer unreadable"
         return 0
     end
-    set -l _susp (printf '%s\n' $_krn | command grep -iE -- 'unknown (option|parameter|kernel command line)|malformed early option|invalid (option|parameter)' 2>/dev/null)
+    set -l _susp (printf '%s\n' $_krn | command grep -iE -- 'unknown (option|parameter|kernel command line)|malformed early option|invalid (option|parameter)|(invalid|too large) for parameter' 2>/dev/null)
     if test -z "$_susp"; _ok "  no kernel parser rejections this boot ("(count $KERNEL_PARAMS)" tokens)"; return 0; end
     set -l _hit; set -l _maybe
     for _line in $_susp
@@ -1826,7 +1826,9 @@ function _vrk_param_rejects --description "_verify_runtime_kparams sub: Kernel p
             set -l _parts (string split -m1 '=' -- "$_p"); set -l _key $_parts[1]; set -l _val ""
             test (count $_parts) -gt 1; and set _val $_parts[2]
             set -l _kre (string escape --style=regex -- "$_key") # dots and dashes count as token chars
-            if string match -qr -- '(^|[^A-Za-z0-9_.-])'$_kre'([^A-Za-z0-9_.-]|$)' "$_line"
+            set -l _mre; set -l _kp (string split -m1 . -- "$_key") # a loaded module prints mod: ... 'param'
+            test (count $_kp) -eq 2; and set _mre '(^|[^A-Za-z0-9_.-])'(string escape --style=regex -- $_kp[1])': .*[`\'"]'(string escape --style=regex -- $_kp[2])'[`\'"]'
+            if string match -qr -- '(^|[^A-Za-z0-9_.-])'$_kre'([^A-Za-z0-9_.-]|$)' "$_line"; or begin; test -n "$_mre"; and string match -qr -- "$_mre" "$_line"; end
                 contains -- "$_p" $_hit; or set -a _hit "$_p"
             else if test -n "$_val"; and begin; string match -q -- "*'$_val'*" "$_line"; or string match -q -- "*\"$_val\"*" "$_line"; end
                 contains -- "$_p" $_maybe; or set -a _maybe "$_p" # message quotes the value, not the key
