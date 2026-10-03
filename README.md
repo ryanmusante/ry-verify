@@ -88,13 +88,13 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Verification ledger | a per-group chart, then every logged row, groups with a `FAIL` first, then groups with a `WARN` |
 | Appendix | every structured log event, each generated file body with its SHA-256, and the method |
 
-System facts are read without sudo; installed system files are read with `sudo -n` for the byte compare. A report that cannot be written prints `[ERR] Report not written`, logs `REPORT_WRITE_FAIL`, and turns an otherwise clean exit into `1`.
+A report that cannot be written prints `[ERR] Report not written`, logs `REPORT_WRITE_FAIL`, and turns an otherwise clean exit into `1`.
 
 Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not installed`, `not set`, `knob absent`, `unreadable`, `still installed`, `no user bus`, `no root UUID`, and a unit running but not enabled warn; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. The unit table grades the unit file; whether an enabled unit is running is the ledger's `Runtime: services` group. The coverage chart counts passing rows only.
 
 ## Safety and Reliability
 
-**Read-only** — no mode takes a lock or writes outside its log tree; the report is written there too.
+**Read-only** — no mode takes a lock or writes outside its log tree.
 
 **Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, and any `sdboot-manage.conf.d` drop-in.
 
@@ -120,7 +120,7 @@ Firmware is not checked — the assumed ceiling and the per-setting walkthrough 
 
 **Masked unit not in `MASK` reported** — `sudo systemctl unmask <unit>` if an earlier `MASK` masked it; leave distro and hand-made masks alone.
 
-**Report not written** — `~/ry-install/logs/YYYY-MM-DD/` must accept a new file: check free space and the directory mode (`0700`). The JSONL log records `REPORT_WRITE_FAIL` with the reason; the checks themselves are unaffected.
+**Report not written** — `~/ry-install/logs/YYYY-MM-DD/` must accept a new file: check free space and the directory mode (`0700`). The JSONL log records `REPORT_WRITE_FAIL` with the reason.
 
 ## Contributing
 
