@@ -3,13 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.225.0
+7.226.0
 -------
 
-  - changelog: lockstep bump with ry-install 7.225.0; checks unchanged
+  - changelog: lockstep bump with ry-install 7.226.0; older blocks trimmed
 
 
-7.217.0 - 7.224.0
+7.217.0 - 7.225.0
 -----------------
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
@@ -19,12 +19,9 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - packages: 7.224.0 expect pipewire-jack installed
   - verify: 7.219.0 the nftables input-policy and IPv4-ping checks match their
     own rules; an unreadable expected unit warns instead of failing
-  - verify: 7.224.0 the WirePlumber soft-mixer rule is checked in place and
-    live through pactl; P2P section and p2p-dev-<iface> must read unmanaged
-  - verify: 7.224.0 kernel parameter acceptance also catches invalid-value and
-    loaded-module rejections; the live fstab check compares with fstab options
-  - checks: 7.218.0 a sysctl or environment.d generator failure names the
-    malformed entries
+  - verify: 7.224.0 WirePlumber rule checked in file and via pactl, P2P device
+    unmanaged, more parser rejections caught, live fstab vs fstab options
+  - checks: 7.218.0 a sysctl or environment.d generator failure names entries
 
 
 7.190.0 - 7.216.0
@@ -39,35 +36,26 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     RADV_PERFTEST=nggc and MANGOHUD_DLSYM=1
   - configuration: 7.195.0 expect MangoHud cpu_stats enabled; 7.203.0 the
     managed-file header on every file but /etc/kernel/cmdline
-  - configuration: 7.205.0 cpupower-service.conf header names EnvironmentFile=
-  - configuration: 7.211.0 expect udev comments with the set EPP and GPU
-    levels and a resolved header without its mDNS/LLMNR claim
+  - configuration: 7.205.0 cpupower header names EnvironmentFile=; 7.211.0
+    udev comments carry EPP and GPU levels; resolved drops mDNS/LLMNR claim
   - sysctl: 7.195.0 expect vm.watermark_scale_factor=125
-  - verify: 7.195.1 module-parameter expectations derive from KERNEL_PARAMS;
-    7.197.0 exact integer compare; 7.198.0 read back every managed token
-  - verify: 7.200.0 assert connectivity disabled; 7.202.0 fail a symlinked
-    destination in the checksum phase
-  - verify: 7.206.0 bluetooth keys in emission order; 7.207.0 fail a symlinked
-    destination once, its perms row INFO
-  - verify: 7.207.0 a sudo bail closes its VERIFICATION section; 7.203.0 -
-    7.208.0 labels read Wi-Fi and kernel.watchdog
+  - verify: 7.195.1 module params derive from KERNEL_PARAMS; 7.197.0 exact
+    integer compare; 7.198.0 read back every token; 7.200.0 connectivity off
+  - verify: 7.202.0 - 7.207.0 a symlinked destination fails once at checksum,
+    its perms row INFO; 7.206.0 bluetooth keys in emission order
+  - verify: 7.207.0 a sudo bail closes its section; 7.203.0 - 7.208.0 labels
+    read Wi-Fi and kernel.watchdog; 7.211.0 unset ENV_VARS name daemon-reload
   - verify: 7.211.0 the powerdevil crash hint matches coredumps by executable
     path; active but not-enabled units warn
-  - verify: 7.211.0 unset ENV_VARS name systemctl --user daemon-reload
   - check: 7.195.1 - 7.195.2 silence every bootstrap gate; 7.200.1 log
     CHECK_*_DRIFT with the cause; 7.202.0 record CHECK_SYMLINK_DRIFT
   - report: 7.214.0 --report runs --verify, then writes a self-contained HTML
     report (0600) beside the JSONL log; a failed write turns exit 0 into 1
-  - report: 7.215.0 profile states grade as the ledger does: not installed,
-    running but not enabled, and still installed warn; the rest fail
-  - report: 7.215.0 a masked unit still active, a deployed parameter not yet
-    live, an unreadable managed file, and a sudo lapse fail
-  - report: 7.215.0 a --report run logs to report-*.jsonl beside its HTML;
-    a zero maximum clock no longer divides by zero
-  - report: 7.215.0 GPU IDs stay aligned when a sysfs node is unreadable;
-    a plain /boot directory no longer repeats the / storage meter
-  - preflight: 7.211.0 a missing root UUID names the findmnt exit code or an
-    empty result
+  - report: 7.215.0 states grade as the ledger: not installed, running but not
+    enabled, and still installed warn; the rest, a sudo lapse included, fail
+  - report: 7.215.0 logs to report-*.jsonl; zero maximum clock, GPU IDs on an
+    unreadable node, and a plain /boot repeating the / meter fixed
+  - preflight: 7.211.0 a missing root UUID names findmnt's rc or empty output
   - cli: 7.211.0 glued short flags take only h and v; -Vh and -hV fail like
     -V; 7.215.0 --help names the report-not-written meaning of exit 1
   - logging: 7.211.0 a caught signal logs before its stderr line
