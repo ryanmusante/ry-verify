@@ -3,13 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.226.0
+7.227.0
 -------
 
-  - changelog: lockstep bump with ry-install 7.226.0; older blocks trimmed
+  - changelog: lockstep bump with ry-install 7.227.0; tags normalized
 
 
-7.217.0 - 7.225.0
+7.217.0 - 7.226.0
 -----------------
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
@@ -17,11 +17,11 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - env: 7.217.0 RADV_PERFTEST=nggc -> nggc,nircache; 7.224.0 expect
     SDL_GAMECONTROLLER_IGNORE_DEVICES
   - packages: 7.224.0 expect pipewire-jack installed
+  - verify: 7.218.0 a sysctl or environment.d generator failure names entries
   - verify: 7.219.0 the nftables input-policy and IPv4-ping checks match their
     own rules; an unreadable expected unit warns instead of failing
   - verify: 7.224.0 WirePlumber rule checked in file and via pactl, P2P device
     unmanaged, more parser rejections caught, live fstab vs fstab options
-  - checks: 7.218.0 a sysctl or environment.d generator failure names entries
 
 
 7.190.0 - 7.216.0
@@ -104,8 +104,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 7.123.0 - 7.129.0
 -----------------
 
-  - dns: pin upstreams in resolved and the NM global-dns section
   - kernel: add mt7925e.disable_aspm=1 and kernel.nmi_watchdog=0
+  - dns: pin upstreams in resolved and the NM global-dns section
   - env: FSR4_UPGRADE -> PROTON_FSR4_UPGRADE; drop VKD3D_CONFIG
 
 
