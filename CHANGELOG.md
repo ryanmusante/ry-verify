@@ -3,13 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.227.0
+7.228.0
 -------
 
-  - changelog: lockstep bump with ry-install 7.227.0; tags normalized
+  - changelog: GSK_RENDERER history corrected; lockstep with ry-install
 
 
-7.217.0 - 7.226.0
+7.217.0 - 7.227.0
 -----------------
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
@@ -32,8 +32,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     7.204.0 expect nowatchdog, read back through kernel.watchdog
   - perf: 7.204.0 expect governor powersave with EPP performance; 7.211.0
     expect governor performance again
-  - env: 7.195.0 drop PROTON_FSR4_INDICATOR=1; 7.212.1 expect
-    RADV_PERFTEST=nggc and MANGOHUD_DLSYM=1
+  - env: 7.195.0 GSK_RENDERER ngl -> gl, drop PROTON_FSR4_INDICATOR=1; 7.212.1
+    expect RADV_PERFTEST=nggc and MANGOHUD_DLSYM=1
   - configuration: 7.195.0 expect MangoHud cpu_stats enabled; 7.203.0 the
     managed-file header on every file but /etc/kernel/cmdline
   - configuration: 7.205.0 cpupower header names EnvironmentFile=; 7.211.0
@@ -70,7 +70,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - dns: drop pinned upstreams, DNSOverTLS= and DNSSEC=; link DNS wins
   - network: autoconnect-retries-default=0
   - env: PROTON_FSR4_UPGRADE -> FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1;
-    GSK_RENDERER ngl then gl
+    expect GSK_RENDERER=ngl
   - configuration: assert the nftables ICMPv6 base accept
   - packages: 7.173.0 add cachyos-benchmarker
   - sysctl: drop both net.core.netdev_budget keys and vm.swappiness=150

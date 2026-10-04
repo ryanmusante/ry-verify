@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.227.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.228.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.227.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.228.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -147,7 +147,7 @@ set --erase _fish_ver _fish_parts _fish_minor _fish_ok
 
 # ── TMP ROOT (PINNED /tmp) + COREUTILS PROBES ──
 set -q TMPDIR; and set --erase TMPDIR # pin tmp to /tmp; children must not honor inherited TMPDIR
-if not test -w /tmp; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] tmp dir not writable: /tmp" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not test -w /tmp; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Cannot write to /tmp" >&2; _ry_exit $EXIT_PREFLIGHT; end
 if not command -q find; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] GNU findutils find(1) required (tmpfile sweeps + boot-entry enumeration)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 if not command find /dev/null -maxdepth 0 -printf '' 2>/dev/null; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] find(1) lacks -maxdepth/-printf (need GNU findutils; busybox/uutils not supported)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set -l _ry_mv_a (command mktemp 2>/dev/null); set -l _ry_mv_b (command mktemp 2>/dev/null)
@@ -1216,7 +1216,7 @@ function _vsb_sdboot_dropins --description "_verify_static_boot sub: sdboot-mana
         set -a _found (command find "$_dir" -maxdepth 1 -type f -name '*.conf' 2>/dev/null)
     end
     if test (count $_found) -eq 0
-        _ok "  no sdboot-manage drop-ins present"; return 0
+        _ok "  No sdboot-manage drop-ins present"; return 0
     end
     _warn "  "(count $_found)" sdboot-manage drop-in(s) sourced after /etc/sdboot-manage.conf — they override LINUX_OPTIONS: $_found"
     _log "SDBOOT_DROPIN_PRESENT: "(string join ',' -- $_found)
@@ -1603,7 +1603,7 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
         test -s "$_cand"; or set -a _empty "$_cand"
     end
     if test "$_present" -eq 0
-        _info "  no $_RY_BACKUP_SUFFIX copies (no run has rewritten a boot file or fstab, or they were removed by hand)"
+        _info "  No $_RY_BACKUP_SUFFIX copies (no run has rewritten a boot file or fstab, or they were removed by hand)"
     else if test (count $_empty) -gt 0
         _fail "  $_RY_BACKUP_SUFFIX: "(count $_empty)" of $_present empty — unusable for recovery: $_empty"
     else
@@ -1614,13 +1614,13 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
     for _dst in $_RY_BACKUP_TARGETS /etc/fstab
         _as true test -f "$_dst$_RY_BACKUP_SUFFIX" 2>/dev/null; and set -a _legacy "$_dst$_RY_BACKUP_SUFFIX"
     end
-    test (count $_legacy) -gt 0; and _info "  legacy sibling .ry.bak at the old location (left in place): $_legacy"
+    test (count $_legacy) -gt 0; and _info "  Legacy sibling .ry.bak at the old location (left in place): $_legacy"
     set -l _stray
     for _dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS /etc/fstab
         set -l _su false; _is_system_dst "$_dst"; and set _su true
         _as $_su test -f "$_dst.ry.orig" 2>/dev/null; and set -a _stray "$_dst.ry.orig"
     end
-    test (count $_stray) -gt 0; and _info "  stray .ry.orig from older releases (mechanism removed; left in place): $_stray"
+    test (count $_stray) -gt 0; and _info "  Stray .ry.orig from older releases (mechanism removed; left in place): $_stray"
     return 0
 end
 function _verify_static_checksum --description "Verify installed bytes match the generator output (SHA256 of both logged on mismatch)"
@@ -1817,11 +1817,11 @@ function _vrk_param_rejects --description "_verify_runtime_kparams sub: Kernel p
     command -q journalctl; and set _krn (command journalctl -k -b 0 --no-pager -o cat 2>/dev/null)
     if test -z "$_krn"; and command -q dmesg; set _krn (_as true dmesg 2>/dev/null); end
     if test -z "$_krn"
-        _warn "  kernel ring buffer unreadable (journalctl and dmesg both empty) — token acceptance unverified"; _log "KPARAM_REJECT_SCAN_SKIP: ring buffer unreadable"
+        _warn "  Kernel ring buffer unreadable (journalctl and dmesg both empty) — token acceptance unverified"; _log "KPARAM_REJECT_SCAN_SKIP: ring buffer unreadable"
         return 0
     end
     set -l _susp (printf '%s\n' $_krn | command grep -iE -- 'unknown (option|parameter|kernel command line)|malformed early option|invalid (option|parameter)|(invalid|too large) for parameter' 2>/dev/null)
-    if test -z "$_susp"; _ok "  no kernel parser rejections this boot ("(count $KERNEL_PARAMS)" tokens)"; return 0; end
+    if test -z "$_susp"; _ok "  No kernel parser rejections this boot ("(count $KERNEL_PARAMS)" tokens)"; return 0; end
     set -l _hit; set -l _maybe
     for _line in $_susp
         _log "KPARAM_REJECT_LINE: $_line"
@@ -1839,10 +1839,10 @@ function _vrk_param_rejects --description "_verify_runtime_kparams sub: Kernel p
         end
     end
     if test (count $_hit) -gt 0
-        _fail "  kernel REJECTED managed token(s): "(string join ',' -- $_hit)" — inert, drop or correct them"; _log "KPARAM_REJECTED: tokens="(string join ',' -- $_hit)
+        _fail "  Kernel REJECTED managed token(s): "(string join ',' -- $_hit)" — inert, drop or correct them"; _log "KPARAM_REJECTED: tokens="(string join ',' -- $_hit)
     end
     if test (count $_maybe) -gt 0
-        _warn "  parser complaint quotes the value of: "(string join ',' -- $_maybe)" — read the log lines and confirm"
+        _warn "  Parser complaint quotes the value of: "(string join ',' -- $_maybe)" — read the log lines and confirm"
         _log "KPARAM_REJECT_VALUE_MATCH: tokens="(string join ',' -- $_maybe)
     end
     if test (count $_hit) -eq 0; and test (count $_maybe) -eq 0
@@ -2173,7 +2173,7 @@ function _vrsv_wifi --description "_verify_runtime_services sub: Wi-Fi + NM back
             set _nft unknown
         end
     end
-    _info "  firewall posture: ufw=$_ufw nft_rules=$_nft"
+    _info "  Firewall posture: ufw=$_ufw nft_rules=$_nft"
 end
 function _vrsv_masked_inactive --description "_verify_runtime_services sub: MASK units must be inactive"
     _echo "── Masked units (runtime) ──"
@@ -2193,7 +2193,7 @@ end
 
 # ── VERIFY-RUNTIME: USER-SCOPE UNIT COLLECTOR ──
 function _vrsv_user_units --description "_verify_runtime_services sub: Managed user-scope units not failed"
-    if not _has_user_bus_active; _info "  user units: skipped (no active user-bus — log in graphically or enable-linger to verify)"; return 0; end
+    if not _has_user_bus_active; _info "  User units: skipped (no active user-bus — log in graphically or enable-linger to verify)"; return 0; end
     if test (command systemctl --user list-unit-files --no-legend plasma-powerdevil.service 2>/dev/null | count) -eq 0
         _info "  plasma-powerdevil.service: unit not present — skipping user-unit health check"; return 0
     end
@@ -2247,7 +2247,7 @@ end
 function _vre_fstab --description "_verify_runtime_env sub: fstab ext4 entries have noatime,lazytime,commit=10"
     _echo "── fstab mount options ──"
     set -l _rootfs (command findmnt -n -o FSTYPE / 2>/dev/null | string trim --)
-    test -n "$_rootfs"; and _info "  root filesystem: $_rootfs"
+    test -n "$_rootfs"; and _info "  Root filesystem: $_rootfs"
     set -l _fstab_ext4; set -l _fstab_malformed
     if test -r /etc/fstab
         set _fstab_ext4 (command awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null)
@@ -2278,7 +2278,7 @@ function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mount
     _echo "── fstab options applied live ──"
     if not command -q findmnt; _warn "  findmnt unavailable — live mount options unverified"; return 0; end
     set -l _rows (command findmnt -rn -t ext4 -o TARGET,OPTIONS 2>/dev/null)
-    if test (count $_rows) -eq 0; _info "  no ext4 filesystem mounted"; return 0; end
+    if test (count $_rows) -eq 0; _info "  No ext4 filesystem mounted"; return 0; end
     set -l _fstab_mps
     if test -r /etc/fstab
         set _fstab_mps (command awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 " " $4 }')
@@ -2303,11 +2303,11 @@ function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mount
     end
     test "$_skipped" -gt 0; and _info "  $_skipped mounted ext4 filesystem(s) absent from /etc/fstab — unmanaged, not checked"
     if test "$_checked" -eq 0
-        _info "  no fstab-listed ext4 filesystem is mounted"
+        _info "  No fstab-listed ext4 filesystem is mounted"
     else if test (count $_pending) -eq 0
         _ok "  ext4 mounts ($_checked): fstab options live"
     else
-        _warn "  written to fstab but not live: $_pending — sudo mount -o remount <target>, or reboot"; _log "FSTAB_REMOUNT_PENDING: "(string join ',' -- $_pending)
+        _warn "  Written to fstab but not live: $_pending — sudo mount -o remount <target>, or reboot"; _log "FSTAB_REMOUNT_PENDING: "(string join ',' -- $_pending)
     end
 end
 function _vre_ntsync --description "_verify_runtime_env sub: ntsync state via _ntsync_state dispatch"
@@ -2344,7 +2344,7 @@ function _vre_regdom --description "_verify_runtime_env sub: Wireless regulatory
 end
 function _vre_softmixer --description "_verify_runtime_env sub: POROSVOC soft mixer via pactl (WirePlumber rule)"
     _echo "── WirePlumber soft mixer ──"
-    if not command -q pactl; _info "  soft mixer: pactl(1) absent — cannot query (expected api.alsa.soft-mixer=true)"; return 0; end
+    if not command -q pactl; _info "  Soft mixer: pactl(1) absent — cannot query (expected api.alsa.soft-mixer=true)"; return 0; end
     if not _has_user_bus_active; _info "  Skipping soft-mixer check (no active user-bus — log in graphically or enable-linger to verify)"; return 0; end
     set -l _card (command pactl list short cards 2>/dev/null | string match -rg -- '^\d+\t(alsa_card\.usb-POROSVOC\S*)')[1]
     if test -z "$_card"; _info "  POROSVOC card not present — soft-mixer check skipped"; return 0; end
