@@ -1,11 +1,11 @@
 #!/usr/bin/env fish
-# ry-verify v7.224.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.225.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.224.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.225.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
-set -g EXIT_AS_MISUSE 250 # internal sentinel, never a process exit
+set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
 set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro — Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 18
 set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check,report h/help v/version verify check report # single option-spec source (root guard + main argparse)
@@ -137,13 +137,13 @@ set --erase _ry_root_silent_check _rsc_other_mode
 set -g _RY_NO_COLOR false
 test "$TERM" = dumb; and set -g _RY_NO_COLOR true
 set -q NO_COLOR; and test -n "$NO_COLOR"; and set -g _RY_NO_COLOR true # no-color.org: non-empty value disables color
-set -l fish_ver $FISH_VERSION; set -l parts (string split '.' -- "$fish_ver"); set -l _fish_minor (string replace -r '[^0-9].*' '' -- "$parts[2]"); test -z "$_fish_minor"; and set _fish_minor 0
-if not string match -qr '^\d+$' -- "$parts[1]"; or not string match -qr '^\d+$' -- "$_fish_minor"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish version unparseable: '$fish_ver'" >&2; _ry_exit $EXIT_PREFLIGHT; end
+set -l _fish_ver $FISH_VERSION; set -l _fish_parts (string split '.' -- "$_fish_ver"); set -l _fish_minor (string replace -r '[^0-9].*' '' -- "$_fish_parts[2]"); test -z "$_fish_minor"; and set _fish_minor 0
+if not string match -qr '^\d+$' -- "$_fish_parts[1]"; or not string match -qr '^\d+$' -- "$_fish_minor"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish version unparseable: '$_fish_ver'" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set -l _fish_ok 0
-test "$parts[1]" -gt 3; and set _fish_ok 1
-test "$parts[1]" -eq 3; and test "$_fish_minor" -ge 6; and set _fish_ok 1
-if test "$_fish_ok" -eq 0; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish 3.6+ required (found: $fish_ver)" >&2; _ry_exit $EXIT_PREFLIGHT; end
-set --erase fish_ver parts _fish_minor _fish_ok
+test "$_fish_parts[1]" -gt 3; and set _fish_ok 1
+test "$_fish_parts[1]" -eq 3; and test "$_fish_minor" -ge 6; and set _fish_ok 1
+if test "$_fish_ok" -eq 0; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish 3.6+ required (found: $_fish_ver)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+set --erase _fish_ver _fish_parts _fish_minor _fish_ok
 
 # ── TMP ROOT (PINNED /tmp) + COREUTILS PROBES ──
 set -q TMPDIR; and set --erase TMPDIR # pin tmp to /tmp; children must not honor inherited TMPDIR
@@ -932,7 +932,10 @@ function _warn_loud --description "Override-path warn: stderr regardless of QUIE
     test "$MODE" = check; and return 0
     _msg_print --force WARN $argv
 end
-function _echo --description "Print a plain message without level prefix"; set -q argv[1]; and _log "ECHO: $argv"; if test "$QUIET" = false; and not set -q _RY_OUTPUT_BROKEN; printf '%s\n' (string join ' ' -- $argv) >&2; end; end
+function _echo --description "Print a plain message without level prefix"
+    set -q argv[1]; and _log "ECHO: $argv"
+    if test "$QUIET" = false; and not set -q _RY_OUTPUT_BROKEN; printf '%s\n' (string join ' ' -- $argv) >&2; end
+end
 
 # ── VERIFY SUMMARY ──
 function _verify_summary --description "Print verification pass/fail/warn summary"

@@ -3,6 +3,12 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.225.0
+-------
+
+  - changelog: lockstep bump with ry-install 7.225.0; checks unchanged
+
+
 7.217.0 - 7.224.0
 -----------------
 
