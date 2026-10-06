@@ -3,13 +3,18 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.228.0
+7.229.0
 -------
 
-  - changelog: GSK_RENDERER history corrected; lockstep with ry-install
+  - configuration: expect 17 managed files; the WirePlumber soft-mixer rule
+    (POROSVOC mic) is gone
+  - configuration: MangoHud expects no_small_font and alpha=0.8, not
+    text_outline
+  - verify: drop the pactl soft-mixer check; stray files beside managed files
+    report as INFO, package-owned ones under their owner
 
 
-7.217.0 - 7.227.0
+7.217.0 - 7.228.0
 -----------------
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
