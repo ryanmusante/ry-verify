@@ -3,15 +3,20 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.230.0
+-------
+
+  - verify: stray-sibling match drops the ? wildcard
+  - verify: the stray OK row prints only after a full sweep
+
+
 7.229.0
 -------
 
-  - configuration: expect 17 managed files; the WirePlumber soft-mixer rule
-    (POROSVOC mic) is gone
   - configuration: MangoHud expects no_small_font and alpha=0.8, not
     text_outline
-  - verify: drop the pactl soft-mixer check; stray files beside managed files
-    report as INFO, package-owned ones under their owner
+  - verify: drop the WirePlumber soft-mixer checks (rule file and pactl)
+  - verify: list stray files beside managed files, package files by owner
 
 
 7.217.0 - 7.228.0

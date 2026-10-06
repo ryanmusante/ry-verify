@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.229.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.230.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.229.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.230.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -1205,7 +1205,7 @@ function _vsb_sdboot_dropins --description "_verify_static_boot sub: sdboot-mana
     set -l _found
     for _dir in /usr/lib/sdboot-manage.conf.d /etc/sdboot-manage.conf.d
         test -d "$_dir"; or continue
-        set -a _found (command find "$_dir" -maxdepth 1 -type f -name '*.conf' 2>/dev/null)
+        set -a _found (command find "$_dir" -maxdepth 1 -type f -name '*.conf' 2>/dev/null | path sort)
     end
     if test (count $_found) -eq 0
         _ok "  No sdboot-manage drop-ins present"; return 0
@@ -1295,6 +1295,7 @@ function _vsb_entries --description "_verify_static_boot sub: \$BOOT entries enu
     if sudo -n test -d "$_boot/loader/entries" 2>/dev/null
         set _entries_dir_probed true
         set _entries (sudo -n find "$_boot/loader/entries" -maxdepth 1 -type f -name "*.conf" -print0 2>/dev/null | string split0); set -l _ps $pipestatus
+        test (count $_entries) -gt 1; and set _entries (path sort -- $_entries)
         test "$_ps[1]" -eq 0; or set _entries_pipe_ok false
         set entry_count (count $_entries)
     else if not sudo -n true 2>/dev/null
@@ -1611,12 +1612,12 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
 end
 function _vsc_strays --description "_verify_static_checksum sub: Unmanaged files beside the managed destinations"
     _echo "── stray files ──"
-    set -l _all $SYSTEM_DESTINATIONS $USER_DESTINATIONS; set -l _dirs; set -l _stray
+    set -l _all $SYSTEM_DESTINATIONS $USER_DESTINATIONS; set -l _dirs; set -l _stray; set -l _skip 0
     for _dst in $_all; set -l _d (string replace -r -- '/[^/]+$' '' "$_dst"); contains -- "$_d" $_dirs; or set -a _dirs "$_d"; end
     for _d in $_dirs
         set -l _su false; _is_system_dst "$_d/"; and set _su true
-        if not _as $_su test -d "$_d" 2>/dev/null; test "$_su" = true; and not sudo -n true 2>/dev/null; and _warn "  $_d: sudo cache lapsed — stray sweep skipped"; continue; end
-        set -l _names (_as $_su find "$_d" -mindepth 1 -maxdepth 1 '(' -type f -o -type l ')' -printf '%f\n' 2>/dev/null); or begin; _warn "  $_d: cannot list (sudo lapse or read error) — stray sweep skipped"; continue; end
+        if not _as $_su test -d "$_d" 2>/dev/null; test "$_su" = true; and not sudo -n true 2>/dev/null; and _warn "  $_d: sudo cache lapsed — stray sweep skipped"; and set _skip (math $_skip + 1); continue; end
+        set -l _names (_as $_su find "$_d" -mindepth 1 -maxdepth 1 '(' -type f -o -type l ')' -printf '%f\n' 2>/dev/null); or begin; _warn "  $_d: cannot list (sudo lapse or read error) — stray sweep skipped"; set _skip (math $_skip + 1); continue; end
         set -l _own (for _x in $_all; test (string replace -r -- '/[^/]+$' '' "$_x") = "$_d"; and string replace -r -- '^.*/' '' "$_x"; end)
         set -l _shared false; test "$_su" = true; and not string match -q -- '*.d' "$_d"; and set _shared true # /etc, /boot/loader: siblings only
         for _n in $_names
@@ -1624,21 +1625,22 @@ function _vsc_strays --description "_verify_static_checksum sub: Unmanaged files
             string match -q -- '*.ry.orig' "$_n"; or string match -q -- "*$_RY_BACKUP_SUFFIX" "$_n"; and continue # _vsc_backups reports these
             test "$_d" = /etc/modprobe.d; and string match -q -- '60-ry-*.conf' "$_n"; and continue # _vss_modprobe reports these
             if test "$_shared" = true
-                set -l _sib false; for _o in $_own; string match -q -- "$_o?*" "$_n"; and set _sib true; end
+                set -l _sib false; for _o in $_own; string match -q -- "$_o*" "$_n"; and set _sib true; end
                 test "$_sib" = true; or continue
             end
             set -a _stray "$_d/$_n"
         end
     end
+    test (count $_stray) -gt 1; and set _stray (path sort -- $_stray)
     set -l _owners; test (count $_stray) -gt 0; and set _owners (command pacman -Qo -- $_stray 2>/dev/null) # one query; unowned paths go to stderr
     set -l _n 0
     for _s in $_stray
         set -l _pkg; set -q _owners[1]; and set _pkg (string match -rg -- '^'(string escape --style=regex -- "$_s")' is owned by (\S+)' $_owners)[1]
-        if test -n "$_pkg"; _info "  Package file: $_s (owned by $_pkg) — not managed by the profile"; continue; end
-        set _n (math $_n + 1); _info "  Stray: $_s — not deployed by the profile"
+        if test -n "$_pkg"; _info "  Package file: $_s (owned by $_pkg)"; continue; end
+        set _n (math $_n + 1); _info "  Stray: $_s"
     end
-    test "$_n" -eq 0; and _ok "  No stray files beside "(count $_all)" managed files"
-    _log "STRAY_SWEEP: dirs="(count $_dirs)" strays=$_n package_files="(math (count $_stray) - $_n)
+    test "$_n" -eq 0; and test "$_skip" -eq 0; and _ok "  No stray files beside "(count $_all)" managed files"
+    _log "STRAY_SWEEP: dirs="(count $_dirs)" strays=$_n package_files="(math (count $_stray) - $_n)" skipped=$_skip"
     return 0
 end
 function _verify_static_checksum --description "Verify installed bytes match the generator output (SHA256 of both logged on mismatch)"
@@ -1739,7 +1741,7 @@ function _implicit_confd_units --description "Units implied by managed conf.d dr
     return 0
 end
 function _ry_stale_ry_dropins --description "Unmanaged 60-ry-* modprobe drop-ins (shared: --check + static verify)"
-    command find /etc/modprobe.d -maxdepth 1 -name '60-ry-*.conf' ! -name '60-ry-modules.conf' -printf '%f\n' 2>/dev/null
+    command find /etc/modprobe.d -maxdepth 1 -name '60-ry-*.conf' ! -name '60-ry-modules.conf' -printf '%f\n' 2>/dev/null | path sort
     return 0 # pre-7.99 leftovers: profile never wrote them, never removes them
 end
 function _ry_orphan_masked_units --description "Masked units absent from MASK (shared: --check + static verify)"
@@ -2019,7 +2021,7 @@ function _vrk_module_state --description "_verify_runtime_kparams sub: Module pa
     _vrkm_module_params
     _vrkm_amdgpu
     _echo "── I/O scheduler (NVMe) ──"
-    set -l _nvme_bdevs (command find /sys/block -mindepth 1 -maxdepth 1 -name 'nvme*n*' 2>/dev/null)
+    set -l _nvme_bdevs (command find /sys/block -mindepth 1 -maxdepth 1 -name 'nvme*n*' 2>/dev/null | path sort)
     if test (count $_nvme_bdevs) -eq 0; _info "  No NVMe block device present"; end
     for _bdev in $_nvme_bdevs
         _chk_sysfs_match "$_bdev/queue/scheduler" '\[none\]' "io-sched "(command basename -- "$_bdev")
@@ -2370,6 +2372,7 @@ function _vrs_nm_perms --description "_verify_runtime_session sub: NetworkManage
     set -l nm_conn_dir /etc/NetworkManager/system-connections
     if not test -d "$nm_conn_dir"; _info "  NetworkManager connections: directory not found"; return 0; end
     set -l conn_files (sudo -n find "$nm_conn_dir" -maxdepth 1 -name '*.nmconnection' -type f -print0 2>/dev/null | string split0); set -l _conn_ps $pipestatus
+    test (count $conn_files) -gt 1; and set conn_files (path sort -- $conn_files)
     if test "$_conn_ps[1]" -ne 0; _warn "  NetworkManager connections: cannot enumerate (sudo lapse or read error)"; return 0; end
     if test (count $conn_files) -gt 0
         set -l bad_perms 0
@@ -3098,10 +3101,10 @@ if test -f "$old_log"; and test "$old_log" != "$new_log"
     if not command mv -T -- "$old_log" "$new_log" 2>/dev/null
         if command cp -pT -- "$old_log" "$new_log" 2>/dev/null
             command rm -f -- "$old_log" 2>/dev/null
-            test "$MODE" != check; and echo "[WARN] Log rename via mv failed; recovered via cp+rm: $old_log -> $new_log" >&2
+            test "$MODE" != check; and echo "[WARN] Log rename via mv failed; recovered via cp+rm: $old_log → $new_log" >&2
         else
             set _log_rename_ok false # old path stays writable: keep logging there
-            test "$MODE" != check; and echo "[WARN] Log rename failed (mv and cp both): $old_log -> $new_log (keeping old path)" >&2
+            test "$MODE" != check; and echo "[WARN] Log rename failed (mv and cp both): $old_log → $new_log (keeping old path)" >&2
         end
     end
 end
