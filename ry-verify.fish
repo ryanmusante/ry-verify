@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.230.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.231.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if contains -- (status filename) - 'Standard input'; or string match -qr -- '^(/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; echo "[ERR] ry-verify: must be executed as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.230.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.231.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -1202,13 +1202,16 @@ end
 # ── VERIFY-STATIC: BOOT (SDBOOT DROP-INS + CMDLINE) ──
 function _vsb_sdboot_dropins --description "_verify_static_boot sub: sdboot-manage drop-ins that outrank the managed conf"
     _echo "── sdboot-manage drop-ins ──"
-    set -l _found
+    set -l _found; set -l _unlistable false
     for _dir in /usr/lib/sdboot-manage.conf.d /etc/sdboot-manage.conf.d
         test -d "$_dir"; or continue
-        set -a _found (command find "$_dir" -maxdepth 1 -type f -name '*.conf' 2>/dev/null | path sort)
+        set -l _hits (command find "$_dir" -maxdepth 1 -type f -name '*.conf' 2>/dev/null | path sort); set -l _ps $pipestatus
+        if test "$_ps[1]" -ne 0; _warn "  $_dir: cannot list — sdboot-manage drop-in check skipped"; set _unlistable true; continue; end
+        set -a _found $_hits
     end
     if test (count $_found) -eq 0
-        _ok "  No sdboot-manage drop-ins present"; return 0
+        test "$_unlistable" = false; and _ok "  No sdboot-manage drop-ins present"
+        return 0
     end
     _warn "  "(count $_found)" sdboot-manage drop-in(s) sourced after /etc/sdboot-manage.conf — they override LINUX_OPTIONS: $_found"
     _log "SDBOOT_DROPIN_PRESENT: "(string join ',' -- $_found)

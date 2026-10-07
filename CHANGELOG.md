@@ -3,35 +3,34 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.230.0
+7.231.0
 -------
 
-  - verify: stray-sibling match drops the ? wildcard
-  - verify: the stray OK row prints only after a full sweep
+  - verify: an unreadable sdboot-manage conf.d directory warns instead of
+    reporting OK
 
 
-7.229.0
--------
-
-  - configuration: MangoHud expects no_small_font and alpha=0.8, not
-    text_outline
-  - verify: drop the WirePlumber soft-mixer checks (rule file and pactl)
-  - verify: list stray files beside managed files, package files by owner
-
-
-7.217.0 - 7.228.0
+7.217.0 - 7.230.0
 -----------------
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
   - perf: 7.217.0 governor performance -> powersave, EPP performance kept
   - env: 7.217.0 RADV_PERFTEST=nggc -> nggc,nircache; 7.224.0 expect
     SDL_GAMECONTROLLER_IGNORE_DEVICES
+  - configuration: 7.229.0 MangoHud expects no_small_font and alpha=0.8, not
+    text_outline
   - packages: 7.224.0 expect pipewire-jack installed
   - verify: 7.218.0 a sysctl or environment.d generator failure names entries
   - verify: 7.219.0 the nftables input-policy and IPv4-ping checks match their
     own rules; an unreadable expected unit warns instead of failing
   - verify: 7.224.0 WirePlumber rule checked in file and via pactl, P2P device
     unmanaged, more parser rejections caught, live fstab vs fstab options
+  - verify: 7.229.0 drop the WirePlumber soft-mixer checks (rule file and
+    pactl)
+  - verify: 7.229.0 list stray files beside managed files, package files by
+    owner
+  - verify: 7.230.0 stray-sibling match drops the ? wildcard; the stray OK row
+    prints only after a full sweep
 
 
 7.190.0 - 7.216.0
