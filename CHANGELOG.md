@@ -3,14 +3,58 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.231.0
+7.233.0
 -------
 
-  - verify: an unreadable sdboot-manage conf.d directory warns instead of
-    reporting OK
+  - verify: startup WARNs (CPU mismatch, unreadable model, root UUID,
+    override) count in the Combined line, the JSONL footer and the report
+    verdict
+  - verify: the sdboot-manage drop-in check matches what sdboot-manage
+    sources as root: a symlinked *.conf counts, a dotfile does not, and a
+    link only root can resolve warns when sudo has lapsed
+  - verify: KEY=value rows match the whole line;
+    RADV_PERFTEST=nggc,nircache,sam no longer reads present
+  - verify: a managed file with bytes after a NUL reads MISMATCH and --check
+    reports drift
+  - verify: a duplicate mkinitcpio HOOKS= line warns once per run
+  - verify: pacman -Qo and nmcli output is read under LC_ALL=C, so package
+    files are not listed as Stray under a translated locale
+  - verify: the live IPv4-ping check needs an IPv4 icmp echo-request accept
+    rule, not the ICMPv6 one; the policy-drop probe matches only the input
+    hook line
+  - verify: a CPU attribute no policy exposes reads as not exposed; uniform
+    rows count the policies read
+  - verify: a symlinked parent dir of a managed file is checked at its
+    target; loader.conf on an automounted ESP keeps its vfat perms skip
+  - verify: ESP autodetect reads the topmost non-autofs mount, so when
+    bootctl cannot resolve $BOOT an automounted ESP that is mounted is found
+    instead of falling back to /boot with a WARN
+  - verify: with no user bus, the skipped ENV_VARS and user-unit checks
+    warn, as the report grades them
+  - report: a MASK unit that is not installed is neutral and stays out of
+    the coverage bar; the ESP row shows the ESP when bootctl -x resolved
+    $BOOT
+  - read-only: no mode creates ~/ry-install/backups, re-modes an existing
+    ~/ry-install or writes to /tmp; a group- or world-writable ~/ry-install
+    exits 3
+  - preflight: a setgid $HOME or a symlinked ~/ry-install no longer fails
+    the log-dir mode check
+  - cli: --h, --he, --hel and --vers, --versi, --versio are honored before
+    the root guard; --help describes RY_INSTALL_SKIP_HARDWARE_CHECK
+    accurately
+  - check: a signal before argument parsing finishes no longer prints
+    'Caught SIGTERM' during --check
+  - readme: the CPU check, the TTY sudo prompt and the KERNEL_PARAMS:<n>
+    count check are documented
 
 
-7.217.0 - 7.230.0
+7.232.0
+-------
+
+  - configuration: MangoHud expects text_outline=0
+
+
+7.217.0 - 7.231.0
 -----------------
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
@@ -31,6 +75,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     owner
   - verify: 7.230.0 stray-sibling match drops the ? wildcard; the stray OK row
     prints only after a full sweep
+  - verify: 7.231.0 an unreadable sdboot-manage conf.d directory warns instead
+    of reporting OK
 
 
 7.190.0 - 7.216.0

@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.231.0** · [Changelog](CHANGELOG.md)
+**Version 7.233.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -17,7 +17,7 @@ sudo -v
 ./ry-verify.fish
 ```
 
-A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `WARN`, `FAIL`, and `GEN_FAIL`; `--report` then prints `[INFO] Report: <path>` — see [Exit Codes](#exit-codes).
+Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK`, `WARN`, `FAIL`, and `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totalling both — it reads `Combined (startup + static + runtime):` and also counts the startup warnings, such as a CPU mismatch or an undetected root UUID, when there are any; `--report` then prints `[INFO] Report: <path>` — see [Exit Codes](#exit-codes).
 
 ## Requirements
 
@@ -25,9 +25,9 @@ A run closes with `VERIFICATION SUMMARY` and a `Results:` line counting `OK`, `W
 |---|---|
 | OS | CachyOS (Arch-based), systemd-boot with BLS entries |
 | Shell | fish 3.6 or newer |
-| Hardware | CPU matching `Ryzen AI Max` — bypass via [Environment Overrides](#environment-overrides) |
+| Hardware | CPU matching `Ryzen AI Max` — on any other CPU `--verify` and `--report` warn and continue; `--check` exits `3` unless overridden via [Environment Overrides](#environment-overrides) |
 | BIOS | flat 85 W ceiling, `TjMax = 90 °C` — see [BIOS](#bios) |
-| Privileges | normal user with sudo rights; `sudo -v` cached before the run |
+| Privileges | normal user with sudo rights; `sudo -v` cached before the run — when it is not, `--verify` and `--report` prompt through `sudo -v` if stdin and stderr are both a TTY, and exit `3` otherwise or if the prompt fails; `--check` never prompts and exits `3` |
 | Tools | GNU coreutils, `findmnt`, `awk`, `grep`, `find`, `pacman`, `systemctl` |
 
 ## Usage
@@ -43,14 +43,14 @@ Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYY
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
 | `1` | a `--verify` or `--report` mismatch, or a report that could not be written |
 | `2` | bad arguments, root misuse |
-| `3` | missing dependency, uncached sudo, gate mismatch; `--check` stays silent |
+| `3` | missing dependency; uncached sudo — `--check` stops here at once, and so do `--verify` and `--report` unless stdin and stderr are both a TTY, in which case they prompt through `sudo -v` and stop here only if it fails; gate mismatch; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless [overridden](#environment-overrides); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
 ## Environment Overrides
 
 Skipping the hardware check is the risky override — a wrong-CPU run compares against an incorrect kernel cmdline and initramfs `MODULES`.
 
-- `RY_INSTALL_SKIP_HARDWARE_CHECK=1` — bypass the `EXPECTED_CPU_MATCH` hard-fail
+- `RY_INSTALL_SKIP_HARDWARE_CHECK=1` — let `--check` probe a CPU that does not match `EXPECTED_CPU_MATCH`, or whose model is unreadable, instead of exiting `3`; `--verify` and `--report` never stop on the CPU — override or not, they print one `WARN`, count it in the totals, and run every check
 - `NO_COLOR` — disable colored output when set to a non-empty value ([no-color.org](https://no-color.org))
 
 ## Managed Files
@@ -73,7 +73,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, NVMe I/O scheduler, blacklists |
 | Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, `MASK` units inactive, user-scope units, Wi-Fi, NM backend, unmanaged Wi-Fi P2P device |
 | Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain |
-| Runtime: session | NetworkManager system-connections perms, installed file modes, parent directories of managed files |
+| Runtime: session | NetworkManager system-connections perms, installed file modes, parent directories of managed files (a symlinked directory is checked at its target) |
 
 ## Report
 
@@ -90,11 +90,11 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 A report that cannot be written prints `[ERR] Report not written`, logs `REPORT_WRITE_FAIL`, and turns an otherwise clean exit into `1`.
 
-Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not installed`, `not set`, `knob absent`, `unreadable`, `still installed`, `no user bus`, `no root UUID`, and a unit running but not enabled warn; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. The unit table grades the unit file; whether an enabled unit is running is the ledger's `Runtime: services` group. The coverage chart counts passing rows only.
+Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled warn; a unit to mask that is `not installed` is neutral, as its `INFO` row is; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. With no user bus, the ledger warns once for each check it skips — session `ENV_VARS` and user units — and the report marks every `ENV_VARS` row. The unit table grades the unit file; whether an enabled unit is running is the ledger's `Runtime: services` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither.
 
 ## Safety and Reliability
 
-**Read-only** — no mode takes a lock or writes outside its log tree.
+**Read-only** — no mode takes a lock or writes outside its log tree, `~/ry-install/logs/`, kept `0700`; nothing lands in `/tmp`. A missing `~/ry-install` is created `0700` to hold it; an existing one is never re-moded — a group- or world-writable one stops the run, exit `3`.
 
 **Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, any `sdboot-manage.conf.d` drop-in, and stray files beside managed files.
 
@@ -102,6 +102,8 @@ Profile-change states are graded as the ledger grades the same finding: `match`,
 
 > [!CAUTION]
 > `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship in lockstep; clone both repos at the same version. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
+
+The length of each array among the shared tunables is a drift tripwire in `_ir_validate_counts` of both scripts — `KERNEL_PARAMS:15` among them; the verify-only `EXPECTED_VULKAN_PKGS` below is pinned, as `EXPECTED_VULKAN_PKGS:2`, in `ry-verify.fish` alone, and the accepted-value sets `_RY_DPM_LEVELS` and `_RY_EPP_LEVELS` carry no pin. Adding or dropping an element, such as a kernel token per [ry-install](https://github.com/ryanmusante/ry-install)'s Kernel Parameter Notes, also means updating that `NAME:<n>` in each script that pins it; otherwise that script refuses to run with `NAME count drift` and exits `3`.
 
 Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below exist only on the verify side.
 
