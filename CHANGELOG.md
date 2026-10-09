@@ -3,6 +3,37 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.234.0
+-------
+
+  - guard: a sourced or piped run is refused under any locale; a startup
+    signal exits 128+N silently, so an early Ctrl-C never reads as a clean
+    --check; QUIT is no longer registered
+  - cli: -h and -v exit 1 when stdout is closed or full; --check stays
+    silent on a non-numeric id -u; a writable /tmp is no longer required
+  - check: --check logs through an external writer, so fish's own log write
+    errors stay off stderr
+  - verify: a token present only in a mkinitcpio.conf comment no longer
+    reads as present; HOOKS presence uses the initcpio install dirs only;
+    repeated BLS options lines combine
+  - verify: an active nftables unit FAILs without a live input policy drop;
+    a failed nftables unit warns; firewall posture and user units get their
+    own subsections
+  - verify: sudo lapses read as WARN instead of FAIL (sdboot-manage.conf,
+    file perms); absent sysfs knobs are logged and unreadable ones warn; a
+    /boot symlink is refused on both paths
+  - verify: a digits-only fstab ext4 row warns once, as ry-install leaves
+    it; stray files exclude exactly the backup names already reported;
+    checksum rows say missing or unreadable; pacman -Qq failures log their
+    rc
+  - report: an INFO note no longer attaches to an unrelated FAIL as its
+    hint; no sudo grades WARN; a failed generator shows no size or hash; a
+    host without pacman renders cleanly
+  - consistency: function descriptions, banners, help alignment and the
+    CPU-gate override hint match the code; lines over 300 characters are
+    split (KERNEL_PARAMS stays on one line for hand edits)
+
+
 7.233.0
 -------
 

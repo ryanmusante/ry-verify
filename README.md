@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.233.0** · [Changelog](CHANGELOG.md)
+**Version 7.234.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -41,8 +41,8 @@ Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYY
 | Code | Meaning |
 |---|---|
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
-| `1` | a `--verify` or `--report` mismatch, or a report that could not be written |
-| `2` | bad arguments, root misuse |
+| `1` | a `--verify` or `--report` mismatch, a report that could not be written, or `-h`/`-v` output that could not be written (stdout closed or full) |
+| `2` | bad arguments, root misuse — except a valid `--check` run as root, which exits `3` silently |
 | `3` | missing dependency; uncached sudo — `--check` stops here at once, and so do `--verify` and `--report` unless stdin and stderr are both a TTY, in which case they prompt through `sudo -v` and stop here only if it fails; gate mismatch; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless [overridden](#environment-overrides); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
@@ -71,7 +71,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Static: syntax | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
 | Static: checksum | installed bytes compared with generator output, a symlinked destination rejected rather than followed, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty, stray files beside managed files |
 | Runtime: kernel | live `/proc/cmdline`, kernel parser rejections, GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER` and boost, module parameters, NVMe I/O scheduler, blacklists |
-| Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, `MASK` units inactive, user-scope units, Wi-Fi, NM backend, unmanaged Wi-Fi P2P device |
+| Runtime: services | `conf.d`-implied and `EXPECTED_SERVICES` units, live nftables input policy drop and IPv4 ping accept, `MASK` units inactive, user-scope units, firewall posture, Wi-Fi, NM backend, unmanaged Wi-Fi P2P device |
 | Runtime: environment | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain |
 | Runtime: session | NetworkManager system-connections perms, installed file modes, parent directories of managed files (a symlinked directory is checked at its target) |
 
@@ -90,7 +90,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 A report that cannot be written prints `[ERR] Report not written`, logs `REPORT_WRITE_FAIL`, and turns an otherwise clean exit into `1`.
 
-Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled warn; a unit to mask that is `not installed` is neutral, as its `INFO` row is; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. With no user bus, the ledger warns once for each check it skips — session `ENV_VARS` and user units — and the report marks every `ENV_VARS` row. The unit table grades the unit file; whether an enabled unit is running is the ledger's `Runtime: services` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither.
+Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `no sudo`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled warn; a unit to mask that is `not installed` is neutral, as its `INFO` row is; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. With no user bus, the ledger warns once for each check it skips — session `ENV_VARS` and user units — and the report marks every `ENV_VARS` row. The unit table grades the unit file; whether an enabled unit is running is the ledger's `Runtime: services` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither.
 
 ## Safety and Reliability
 
