@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.234.0** · [Changelog](CHANGELOG.md)
+**Version 7.240.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -17,7 +17,7 @@ sudo -v
 ./ry-verify.fish
 ```
 
-Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK`, `WARN`, `FAIL`, and `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totalling both — it reads `Combined (startup + static + runtime):` and also counts the startup warnings, such as a CPU mismatch or an undetected root UUID, when there are any; `--report` then prints `[INFO] Report: <path>` — see [Exit Codes](#exit-codes).
+Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK`, `WARN`, `FAIL`, and `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totalling both, or `Combined (startup + static + runtime):` when startup warnings count too; `--report` then prints `[INFO] Report: <path>` — see [Exit Codes](#exit-codes).
 
 ## Requirements
 
@@ -43,14 +43,14 @@ Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYY
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
 | `1` | a `--verify` or `--report` mismatch, a report that could not be written, or `-h`/`-v` output that could not be written (stdout closed or full) |
 | `2` | bad arguments, root misuse — except a valid `--check` run as root, which exits `3` silently |
-| `3` | missing dependency; uncached sudo — `--check` stops here at once, and so do `--verify` and `--report` unless stdin and stderr are both a TTY, in which case they prompt through `sudo -v` and stop here only if it fails; gate mismatch; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless [overridden](#environment-overrides); `--check` stays silent |
+| `3` | missing dependency; uncached sudo that no TTY prompt resolved; gate mismatch; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless [overridden](#environment-overrides); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
 ## Environment Overrides
 
 Skipping the hardware check is the risky override — a wrong-CPU run compares against an incorrect kernel cmdline and initramfs `MODULES`.
 
-- `RY_INSTALL_SKIP_HARDWARE_CHECK=1` — let `--check` probe a CPU that does not match `EXPECTED_CPU_MATCH`, or whose model is unreadable, instead of exiting `3`; `--verify` and `--report` never stop on the CPU — override or not, they print one `WARN`, count it in the totals, and run every check
+- `RY_INSTALL_SKIP_HARDWARE_CHECK=1` — let `--check` probe a CPU that does not match `EXPECTED_CPU_MATCH`, or whose model is unreadable, instead of exiting `3`
 - `NO_COLOR` — disable colored output when set to a non-empty value ([no-color.org](https://no-color.org))
 
 ## Managed Files
@@ -77,7 +77,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Report
 
-`--report` runs every `--verify` check, then renders the run into one self-contained HTML file beside its JSONL log — inline styles and SVG charts, no scripts, no network. Open it in any browser. Sections run from most to least urgent:
+`--report` runs every `--verify` check, then renders the run into one self-contained HTML file beside its JSONL log — inline styles and SVG charts, no scripts, no network. Sections run from most to least urgent:
 
 | Section | Content |
 |---|---|
@@ -90,7 +90,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 A report that cannot be written prints `[ERR] Report not written`, logs `REPORT_WRITE_FAIL`, and turns an otherwise clean exit into `1`.
 
-Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `no sudo`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled warn; a unit to mask that is `not installed` is neutral, as its `INFO` row is; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. With no user bus, the ledger warns once for each check it skips — session `ENV_VARS` and user units — and the report marks every `ENV_VARS` row. The unit table grades the unit file; whether an enabled unit is running is the ledger's `Runtime: services` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither.
+Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `no sudo`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled warn; a unit to mask that is `not installed` is neutral; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. With no user bus, the ledger warns once for each check it skips — session `ENV_VARS` and user units — and the report marks every `ENV_VARS` row. The unit table grades the unit file; whether an enabled unit is running is the ledger's `Runtime: services` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither.
 
 ## Safety and Reliability
 

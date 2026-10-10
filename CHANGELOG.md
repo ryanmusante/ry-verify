@@ -3,46 +3,56 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.240.0
+-------
+
+  - verify: an ext4 fstab row carrying nolazytime FAILs as a pending rewrite,
+    as ry-install now strips it
+  - preflight: iommu=off counts as no IOMMU for amdxdna, as in ry-install
+
+
+7.235.0
+-------
+
+  - verify: the missing Vulkan package hint reads pacman -Syu --needed instead
+    of a partial-upgrade -S
+
+
 7.234.0
 -------
 
   - guard: a sourced or piped run is refused under any locale; a startup
-    signal exits 128+N silently, so an early Ctrl-C never reads as a clean
-    --check; QUIT is no longer registered
+    signal exits 128+N silently; QUIT is no longer registered
   - cli: -h and -v exit 1 when stdout is closed or full; --check stays
     silent on a non-numeric id -u; a writable /tmp is no longer required
-  - check: --check logs through an external writer, so fish's own log write
-    errors stay off stderr
-  - verify: a token present only in a mkinitcpio.conf comment no longer
-    reads as present; HOOKS presence uses the initcpio install dirs only;
-    repeated BLS options lines combine
-  - verify: an active nftables unit FAILs without a live input policy drop;
-    a failed nftables unit warns; firewall posture and user units get their
-    own subsections
-  - verify: sudo lapses read as WARN instead of FAIL (sdboot-manage.conf,
-    file perms); absent sysfs knobs are logged and unreadable ones warn; a
-    /boot symlink is refused on both paths
-  - verify: a digits-only fstab ext4 row warns once, as ry-install leaves
-    it; stray files exclude exactly the backup names already reported;
-    checksum rows say missing or unreadable; pacman -Qq failures log their
-    rc
-  - report: an INFO note no longer attaches to an unrelated FAIL as its
-    hint; no sudo grades WARN; a failed generator shows no size or hash; a
-    host without pacman renders cleanly
+  - check: --check keeps fish's own log write errors off stderr
+  - verify: a token present only in a mkinitcpio.conf comment no longer reads
+    as present; repeated BLS options lines combine
+  - verify: HOOKS presence uses the initcpio install dirs only
+  - verify: an active nftables unit FAILs without a live input policy drop; a
+    failed nftables unit warns
+  - verify: sudo lapses read as WARN instead of FAIL (sdboot-manage.conf, file
+    perms); a /boot symlink is refused on both paths
+  - verify: absent sysfs knobs are logged and unreadable ones warn
+  - verify: a digits-only fstab ext4 row warns once; stray files exclude
+    exactly the backup names already reported
+  - verify: checksum rows say missing or unreadable; pacman -Qq failures log
+    their rc
+  - report: an INFO note no longer attaches to an unrelated FAIL as its hint;
+    no sudo grades WARN
+  - report: a failed generator shows no size or hash; a host without pacman
+    renders cleanly
   - consistency: function descriptions, banners, help alignment and the
-    CPU-gate override hint match the code; lines over 300 characters are
-    split (KERNEL_PARAMS stays on one line for hand edits)
+    CPU-gate override hint match the code; lines over 300 characters are split
 
 
 7.233.0
 -------
 
-  - verify: startup WARNs (CPU mismatch, unreadable model, root UUID,
-    override) count in the Combined line, the JSONL footer and the report
-    verdict
-  - verify: the sdboot-manage drop-in check matches what sdboot-manage
-    sources as root: a symlinked *.conf counts, a dotfile does not, and a
-    link only root can resolve warns when sudo has lapsed
+  - verify: startup WARNs count in the Combined line, the JSONL footer and the
+    report verdict
+  - verify: the sdboot-manage drop-in check counts a symlinked *.conf, not a
+    dotfile; a link only root can resolve warns when sudo has lapsed
   - verify: KEY=value rows match the whole line;
     RADV_PERFTEST=nggc,nircache,sam no longer reads present
   - verify: a managed file with bytes after a NUL reads MISMATCH and --check
@@ -51,32 +61,26 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: pacman -Qo and nmcli output is read under LC_ALL=C, so package
     files are not listed as Stray under a translated locale
   - verify: the live IPv4-ping check needs an IPv4 icmp echo-request accept
-    rule, not the ICMPv6 one; the policy-drop probe matches only the input
-    hook line
+    rule, not the ICMPv6 one
+  - verify: the policy-drop probe matches only the input hook line
   - verify: a CPU attribute no policy exposes reads as not exposed; uniform
     rows count the policies read
   - verify: a symlinked parent dir of a managed file is checked at its
     target; loader.conf on an automounted ESP keeps its vfat perms skip
-  - verify: ESP autodetect reads the topmost non-autofs mount, so when
-    bootctl cannot resolve $BOOT an automounted ESP that is mounted is found
-    instead of falling back to /boot with a WARN
-  - verify: with no user bus, the skipped ENV_VARS and user-unit checks
-    warn, as the report grades them
-  - report: a MASK unit that is not installed is neutral and stays out of
-    the coverage bar; the ESP row shows the ESP when bootctl -x resolved
-    $BOOT
+  - verify: ESP autodetect reads the topmost non-autofs mount
+  - verify: with no user bus, the skipped ENV_VARS and user-unit checks warn
+  - report: a MASK unit that is not installed is neutral; the ESP row shows
+    the ESP when bootctl -x resolved $BOOT
   - read-only: no mode creates ~/ry-install/backups, re-modes an existing
-    ~/ry-install or writes to /tmp; a group- or world-writable ~/ry-install
-    exits 3
+    ~/ry-install or writes to /tmp
+  - read-only: a group- or world-writable ~/ry-install exits 3
   - preflight: a setgid $HOME or a symlinked ~/ry-install no longer fails
     the log-dir mode check
-  - cli: --h, --he, --hel and --vers, --versi, --versio are honored before
-    the root guard; --help describes RY_INSTALL_SKIP_HARDWARE_CHECK
-    accurately
+  - cli: --h, --he, --hel and --vers, --versi, --versio are honored before the
+    root guard
+  - cli: --help describes RY_INSTALL_SKIP_HARDWARE_CHECK accurately
   - check: a signal before argument parsing finishes no longer prints
     'Caught SIGTERM' during --check
-  - readme: the CPU check, the TTY sudo prompt and the KERNEL_PARAMS:<n>
-    count check are documented
 
 
 7.232.0
