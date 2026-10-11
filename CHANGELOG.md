@@ -3,6 +3,17 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.241.0
+-------
+
+  - verify: the nftables policy-drop FAIL names systemctl restart; the unit
+    has no reload
+  - logging: a signal between the log create and its header no longer leaves
+    a footer-only JSONL; a child SIGKILL at cleanup is logged
+  - consistency: sdboot-manage.conf keys check in emission order; comments
+    and descriptions match their code; the KERNEL_PARAMS line is split
+
+
 7.240.0
 -------
 

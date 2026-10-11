@@ -1,10 +1,10 @@
 #!/usr/bin/env fish
-# ry-verify v7.240.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.241.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 # guard above: fish translates 'Standard input' and 'from sourcing file' (de: Standardeingabe, aus der Quelldatei); LC_ALL=C keeps the English texts
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.240.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.241.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -252,6 +252,9 @@ function _write_footer --argument-names exit_code extra_key --description "Appen
     set -q _FOOTER_WRITTEN; and return 0
     set -q LOG_FILE; or return 0
     test -n "$LOG_FILE"; and test -f "$LOG_FILE"; or return 0
+    if not set -q _RY_HEADER_WRITTEN; and not test -s "$LOG_FILE" # signal between the 0600 create and the header: drop the empty file
+        set -g _FOOTER_WRITTEN true; set -g _RY_LOG_SUPPRESS_CREATE true; command rm -f -- "$LOG_FILE" 2>/dev/null; return 0
+    end
     set -g _FOOTER_WRITTEN true; set -l _mode_esc (_json_str "$MODE"); set -l _ts (command date $_RY_TS_FMT); set -l _extra ""
     test -n "$extra_key"; and set _extra ",\""(_json_str "$extra_key")"\":true"
     set -l _gen_fail 0
@@ -301,13 +304,14 @@ function _dc_kill_children --description "_do_cleanup sub: Reap child PIDs (TERM
     test "$_have_kids" = no; and return 0
     command pkill -TERM -P "$fish_pid" 2>/dev/null
     set -l _grace 5 # 0.1s polls
-    test -f /var/lib/pacman/db.lck; and set _grace 100 # pkg txn: up to 10s grace; only -P $fish_pid descendants
+    test -f /var/lib/pacman/db.lck; and set _grace 100 # pkg txn: up to 10s grace; -P matches direct children only
     for _gi in (seq $_grace)
         command -q pgrep; or begin; command sleep 0.5 </dev/null 2>/dev/null; break; end
         test (count (command pgrep -P "$fish_pid" 2>/dev/null)) -eq 0; and break
         command sleep 0.1 </dev/null 2>/dev/null
     end
     command -q pgrep; and test (count (command pgrep -P "$fish_pid" 2>/dev/null)) -eq 0; and return 0 # no children: skip KILL
+    not set -q _FOOTER_WRITTEN; and functions -q _log; and _log "CLEANUP_CHILDREN_KILL: children of pid $fish_pid outlived the SIGTERM grace (or pgrep is absent) — sending SIGKILL"
     command pkill -KILL -P "$fish_pid" 2>/dev/null
 end
 
@@ -394,7 +398,8 @@ set --erase _ry_dst_count
 # ── EMBEDDED DATA: BOOTLOADER KEYS + KERNEL_PARAMS + MKINITCPIO ──
 set -g LOADER_DEFAULT "@saved"; set -g LOADER_TIMEOUT 0; set -g LOADER_CONSOLE_MODE keep; set -g LOADER_EDITOR no
 set -g SDBOOT_DEFAULT_ENTRY manual; set -g SDBOOT_OVERWRITE yes; set -g SDBOOT_REMOVE_EXISTING yes; set -g SDBOOT_REMOVE_OBSOLETE yes
-set -g KERNEL_PARAMS amd_pstate=active btusb.enable_autosuspend=n fsck.mode=force fsck.repair=yes iommu=pt ipv6.disable=1 mt7925e.disable_aspm=1 nowatchdog nvme_core.default_ps_max_latency_us=0 pcie_aspm.policy=performance processor.max_cstate=1 quiet split_lock_detect=off usbcore.autosuspend=-1 zswap.enabled=0
+set -g KERNEL_PARAMS amd_pstate=active btusb.enable_autosuspend=n fsck.mode=force fsck.repair=yes iommu=pt ipv6.disable=1 mt7925e.disable_aspm=1 nowatchdog \
+    nvme_core.default_ps_max_latency_us=0 pcie_aspm.policy=performance processor.max_cstate=1 quiet split_lock_detect=off usbcore.autosuspend=-1 zswap.enabled=0
 set -g MKINITCPIO_MODULES amdgpu
 set -g MKINITCPIO_HOOKS base systemd autodetect microcode modconf kms keyboard sd-vconsole block filesystems fsck
 set -g MKINITCPIO_COMPRESSION zstd; set -g MKINITCPIO_COMPRESSION_OPTIONS -3 # mkinitcpio prepends -T0 for zstd
@@ -1125,7 +1130,7 @@ function _chk_token_in --argument-names line token label --description "Verify a
 end
 
 # ── MKINITCPIO HOOK VALIDATORS ──
-function _mkinitcpio_hook_exists --argument-names hook --description "True iff hook has a build script in an initcpio install dir (where mkinitcpio resolves HOOKS)"
+function _mkinitcpio_hook_exists --argument-names hook --description "True iff a HOOKS entry has a build script in an initcpio install dir"
     test -z "$hook"; and return 1
     for _d in /etc/initcpio/install /usr/lib/initcpio/install; test -f "$_d/$hook"; and return 0; end # initcpio/hooks holds runtime scripts only
     return 1
@@ -1208,11 +1213,11 @@ function _vsb_sdboot --description "_verify_static_boot sub: sdboot-manage.conf 
         set -l opts (printf '%s\n' "$_opts_raw" | string replace -r -- '^LINUX_OPTIONS="([^"]*)".*$' '$1')
         for param in $KERNEL_PARAMS; set -l _param_re (string escape --style=regex -- "$param"); string match -qr -- "(^|\s)$_param_re(\s|\$)" "$opts"; _chk_present $status "$param"; end
     end
-    for _kv in "OVERWRITE_EXISTING:$SDBOOT_OVERWRITE" "REMOVE_EXISTING:$SDBOOT_REMOVE_EXISTING" "REMOVE_OBSOLETE:$SDBOOT_REMOVE_OBSOLETE" "DEFAULT_ENTRY:$SDBOOT_DEFAULT_ENTRY"
+    _chk_grep /etc/sdboot-manage.conf 'LINUX_FALLBACK_OPTIONS="quiet"' "LINUX_FALLBACK_OPTIONS=quiet" line
+    for _kv in "DEFAULT_ENTRY:$SDBOOT_DEFAULT_ENTRY" "REMOVE_EXISTING:$SDBOOT_REMOVE_EXISTING" "OVERWRITE_EXISTING:$SDBOOT_OVERWRITE" "REMOVE_OBSOLETE:$SDBOOT_REMOVE_OBSOLETE" # emission order
         set -l _p (string split -m1 ':' -- $_kv)
         _chk_grep /etc/sdboot-manage.conf "$_p[1]=\"$_p[2]\"" "$_p[1]=$_p[2]" line
     end
-    _chk_grep /etc/sdboot-manage.conf 'LINUX_FALLBACK_OPTIONS="quiet"' "LINUX_FALLBACK_OPTIONS=quiet" line
 end
 
 # ── VERIFY-STATIC: BOOT (SDBOOT DROP-INS + CMDLINE) ──
@@ -2108,7 +2113,7 @@ function _vrsv_chk_nftables --argument-names label rec_str --description "_vrsv_
         if _nft_input_drop_live # live ruleset asserted on both unit-state paths
             _vrsv_nft_assert_ping
         else
-            _fail "  $label: active but no live inet/filter/input chain with policy drop (flushed or replaced — sudo systemctl reload $label)"
+            _fail "  $label: active but no live inet/filter/input chain with policy drop (flushed or replaced — sudo systemctl restart $label)"
         end
         return 0
     end
@@ -2445,7 +2450,7 @@ function _resolve_boot_fstype --description "Emit \$BOOT partition fstype"
     set -l _boot_resolved (_resolve_boot_path); test -z "$_boot_resolved"; and set _boot_resolved /boot
     set -l _fs (command findmnt -n -o FSTYPE "$_boot_resolved" 2>/dev/null | string trim -- | string match -v -- autofs)[-1]; test -n "$_fs"; and printf '%s\n' "$_fs"
 end
-function _vrs_note --argument-names key msg --description "_vrs_installed_file_perms and _vrs_parent_dirs sub: console INFO, logged as a KEY event"; _msg_print INFO "$msg"; _log "$key: "(string trim -- "$msg"); end
+function _vrs_note --argument-names key msg --description "_vrs_installed_file_perms and _vrs_parent_dirs sub: Console INFO, logged as a KEY event"; _msg_print INFO "$msg"; _log "$key: "(string trim -- "$msg"); end
 function _vrs_installed_file_perms --description "_verify_runtime_session sub: Installed system/service/user file perms"
     _echo "── Installed files ──"
     set -l perm_bad 0; set -l perm_checked 0; set -l perm_vfat_skipped 0; set -l _boot_fstype (_resolve_boot_fstype)
@@ -3087,7 +3092,9 @@ function _dir_group_or_world_writable --argument-names mode --description "True 
 end
 function _has_user_bus_active --description "True iff user systemd manager is reachable"
     set -q XDG_RUNTIME_DIR; and test -S "$XDG_RUNTIME_DIR/bus"; and return 0
-    set -l _user_state (command systemctl --user is-system-running 2>/dev/null | string trim --); test -n "$_user_state"; and test "$_user_state" != offline; and return 0; return 1
+    set -l _user_state (command systemctl --user is-system-running 2>/dev/null | string trim --)
+    test -n "$_user_state"; and test "$_user_state" != offline; and return 0
+    return 1
 end
 
 # ── FIREWALL PROBE: LIVE NFTABLES INPUT POLICY ──
