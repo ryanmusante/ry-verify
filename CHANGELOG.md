@@ -3,104 +3,7 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.241.0
--------
-
-  - verify: the nftables policy-drop FAIL names systemctl restart; the unit
-    has no reload
-  - logging: a signal between the log create and its header no longer leaves
-    a footer-only JSONL; a child SIGKILL at cleanup is logged
-  - consistency: sdboot-manage.conf keys check in emission order; comments
-    and descriptions match their code; the KERNEL_PARAMS line is split
-
-
-7.240.0
--------
-
-  - verify: an ext4 fstab row carrying nolazytime FAILs as a pending rewrite,
-    as ry-install now strips it
-  - preflight: iommu=off counts as no IOMMU for amdxdna, as in ry-install
-
-
-7.235.0
--------
-
-  - verify: the missing Vulkan package hint reads pacman -Syu --needed instead
-    of a partial-upgrade -S
-
-
-7.234.0
--------
-
-  - guard: a sourced or piped run is refused under any locale; a startup
-    signal exits 128+N silently; QUIT is no longer registered
-  - cli: -h and -v exit 1 when stdout is closed or full; --check stays
-    silent on a non-numeric id -u; a writable /tmp is no longer required
-  - check: --check keeps fish's own log write errors off stderr
-  - verify: a token present only in a mkinitcpio.conf comment no longer reads
-    as present; repeated BLS options lines combine
-  - verify: HOOKS presence uses the initcpio install dirs only
-  - verify: an active nftables unit FAILs without a live input policy drop; a
-    failed nftables unit warns
-  - verify: sudo lapses read as WARN instead of FAIL (sdboot-manage.conf, file
-    perms); a /boot symlink is refused on both paths
-  - verify: absent sysfs knobs are logged and unreadable ones warn
-  - verify: a digits-only fstab ext4 row warns once; stray files exclude
-    exactly the backup names already reported
-  - verify: checksum rows say missing or unreadable; pacman -Qq failures log
-    their rc
-  - report: an INFO note no longer attaches to an unrelated FAIL as its hint;
-    no sudo grades WARN
-  - report: a failed generator shows no size or hash; a host without pacman
-    renders cleanly
-  - consistency: function descriptions, banners, help alignment and the
-    CPU-gate override hint match the code; lines over 300 characters are split
-
-
-7.233.0
--------
-
-  - verify: startup WARNs count in the Combined line, the JSONL footer and the
-    report verdict
-  - verify: the sdboot-manage drop-in check counts a symlinked *.conf, not a
-    dotfile; a link only root can resolve warns when sudo has lapsed
-  - verify: KEY=value rows match the whole line;
-    RADV_PERFTEST=nggc,nircache,sam no longer reads present
-  - verify: a managed file with bytes after a NUL reads MISMATCH and --check
-    reports drift
-  - verify: a duplicate mkinitcpio HOOKS= line warns once per run
-  - verify: pacman -Qo and nmcli output is read under LC_ALL=C, so package
-    files are not listed as Stray under a translated locale
-  - verify: the live IPv4-ping check needs an IPv4 icmp echo-request accept
-    rule, not the ICMPv6 one
-  - verify: the policy-drop probe matches only the input hook line
-  - verify: a CPU attribute no policy exposes reads as not exposed; uniform
-    rows count the policies read
-  - verify: a symlinked parent dir of a managed file is checked at its
-    target; loader.conf on an automounted ESP keeps its vfat perms skip
-  - verify: ESP autodetect reads the topmost non-autofs mount
-  - verify: with no user bus, the skipped ENV_VARS and user-unit checks warn
-  - report: a MASK unit that is not installed is neutral; the ESP row shows
-    the ESP when bootctl -x resolved $BOOT
-  - read-only: no mode creates ~/ry-install/backups, re-modes an existing
-    ~/ry-install or writes to /tmp
-  - read-only: a group- or world-writable ~/ry-install exits 3
-  - preflight: a setgid $HOME or a symlinked ~/ry-install no longer fails
-    the log-dir mode check
-  - cli: --h, --he, --hel and --vers, --versi, --versio are honored before the
-    root guard
-  - cli: --help describes RY_INSTALL_SKIP_HARDWARE_CHECK accurately
-  - check: a signal before argument parsing finishes no longer prints
-    'Caught SIGTERM' during --check
-
-
-7.232.0
--------
-
-  - configuration: MangoHud expects text_outline=0
-
-
-7.217.0 - 7.231.0
+7.217.0 - 7.241.0
 -----------------
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
@@ -108,7 +11,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - env: 7.217.0 RADV_PERFTEST=nggc -> nggc,nircache; 7.224.0 expect
     SDL_GAMECONTROLLER_IGNORE_DEVICES
   - configuration: 7.229.0 MangoHud expects no_small_font and alpha=0.8, not
-    text_outline
+    text_outline; 7.232.0 expects text_outline=0
   - packages: 7.224.0 expect pipewire-jack installed
   - verify: 7.218.0 a sysctl or environment.d generator failure names entries
   - verify: 7.219.0 the nftables input-policy and IPv4-ping checks match their
@@ -123,6 +26,73 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     prints only after a full sweep
   - verify: 7.231.0 an unreadable sdboot-manage conf.d directory warns instead
     of reporting OK
+  - verify: 7.233.0 startup WARNs count in the Combined line, the JSONL footer
+    and the report verdict
+  - verify: 7.233.0 the sdboot-manage drop-in check counts a symlinked *.conf,
+    not a dotfile; a link only root can resolve warns when sudo has lapsed
+  - verify: 7.233.0 KEY=value rows match the whole line;
+    RADV_PERFTEST=nggc,nircache,sam no longer reads present
+  - verify: 7.233.0 a managed file with bytes after a NUL reads MISMATCH and
+    --check reports drift; a duplicate HOOKS= line warns once per run
+  - verify: 7.233.0 pacman -Qo and nmcli output is read under LC_ALL=C, so
+    package files are not listed as Stray under a translated locale
+  - verify: 7.233.0 the live IPv4-ping check needs an IPv4 icmp echo-request
+    accept rule, not the ICMPv6 one
+  - verify: 7.233.0 a CPU attribute no policy exposes reads as not exposed;
+    uniform rows count the policies read
+  - verify: 7.233.0 a symlinked parent dir of a managed file is checked at its
+    target; loader.conf on an automounted ESP keeps its vfat perms skip
+  - verify: 7.233.0 the policy-drop probe matches only the input hook line;
+    ESP autodetect reads the topmost non-autofs mount
+  - verify: 7.233.0 with no user bus, the skipped ENV_VARS and user-unit
+    checks warn
+  - verify: 7.234.0 a token present only in a mkinitcpio.conf comment no
+    longer reads as present; repeated BLS options lines combine
+  - verify: 7.234.0 HOOKS presence uses the initcpio install dirs only; absent
+    sysfs knobs are logged and unreadable ones warn
+  - verify: 7.234.0 an active nftables unit FAILs without a live input policy
+    drop; a failed nftables unit warns
+  - verify: 7.234.0 sudo lapses read as WARN instead of FAIL
+    (sdboot-manage.conf, file perms); a /boot symlink is refused on both paths
+  - verify: 7.234.0 a digits-only fstab ext4 row warns once; stray files
+    exclude exactly the backup names already reported
+  - verify: 7.234.0 checksum rows say missing or unreadable; pacman -Qq
+    failures log their rc
+  - verify: 7.235.0 the missing Vulkan package hint reads pacman -Syu --needed
+    instead of a partial-upgrade -S
+  - verify: 7.240.0 an ext4 fstab row carrying nolazytime FAILs as a pending
+    rewrite, as ry-install now strips it
+  - verify: 7.241.0 the nftables policy-drop FAIL names systemctl restart; the
+    unit has no reload
+  - check: 7.233.0 a signal before argument parsing finishes no longer prints
+    'Caught SIGTERM' during --check
+  - check: 7.234.0 --check keeps fish's own log write errors off stderr
+  - report: 7.233.0 a MASK unit that is not installed is neutral; the ESP row
+    shows the ESP when bootctl -x resolved $BOOT
+  - report: 7.234.0 an INFO note no longer attaches to an unrelated FAIL as
+    its hint; no sudo grades WARN
+  - report: 7.234.0 a failed generator shows no size or hash; a host without
+    pacman renders cleanly
+  - read-only: 7.233.0 no mode creates ~/ry-install/backups, re-modes an
+    existing ~/ry-install or writes to /tmp
+  - read-only: 7.233.0 a group- or world-writable ~/ry-install exits 3
+  - preflight: 7.233.0 a setgid $HOME or a symlinked ~/ry-install no longer
+    fails the log-dir mode check
+  - preflight: 7.240.0 iommu=off counts as no IOMMU for amdxdna, as in
+    ry-install
+  - guard: 7.234.0 a sourced or piped run is refused under any locale; a
+    startup signal exits 128+N silently; QUIT is no longer registered
+  - cli: 7.233.0 --h, --he, --hel and --vers, --versi, --versio are honored
+    before the root guard
+  - cli: 7.233.0 --help describes RY_INSTALL_SKIP_HARDWARE_CHECK accurately
+  - cli: 7.234.0 -h and -v exit 1 when stdout is closed or full; --check stays
+    silent on a non-numeric id -u; a writable /tmp is no longer required
+  - logging: 7.241.0 a signal between the log create and its header no longer
+    leaves a footer-only JSONL; a child SIGKILL at cleanup is logged
+  - consistency: 7.234.0 descriptions, banners, help alignment and the
+    CPU-gate override hint match the code; lines over 300 characters are split
+  - consistency: 7.241.0 the KERNEL_PARAMS line is split; sdboot-manage.conf
+    keys check in emission order; comments and descriptions match their code
 
 
 7.190.0 - 7.216.0
