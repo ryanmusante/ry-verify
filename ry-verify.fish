@@ -1,10 +1,10 @@
 #!/usr/bin/env fish
-# ry-verify v7.241.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.242.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 # guard above: fish translates 'Standard input' and 'from sourcing file' (de: Standardeingabe, aus der Quelldatei); LC_ALL=C keeps the English texts
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.241.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.242.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -81,7 +81,7 @@ set --erase _ry_path_new _ry_p
 command -q id; or begin; echo "[ERR] GNU coreutils id(1) required (resolves UID before privilege checks)" >&2; exit $EXIT_PREFLIGHT; end # first external command
 set -g _MY_UID (command id -u)
 
-# ── BAIL PRIMITIVES: _RY_EXIT + _SET_EXIT + HANDLER ERASE ──
+# ── BAIL PRIMITIVES: _RY_EXIT + _SET_EXIT + HANDLER ERASE + ROOT USAGE ──
 function _ry_erase_handlers --description "Erase signal/exit handler functions"; functions -e _cleanup_startup _cleanup _cleanup_pipe _cleanup_on_exit 2>/dev/null; end
 function _ry_exit --argument-names code --description "Set bail sentinel and exit"
     test -z "$code"; and set code 0
@@ -148,7 +148,7 @@ set -g _RY_NO_COLOR false
 test "$TERM" = dumb; and set -g _RY_NO_COLOR true
 set -q NO_COLOR; and test -n "$NO_COLOR"; and set -g _RY_NO_COLOR true # no-color.org: non-empty value disables color
 set -l _fish_ver $FISH_VERSION; set -l _fish_parts (string split '.' -- "$_fish_ver"); set -l _fish_minor (string replace -r '[^0-9].*' '' -- "$_fish_parts[2]"); test -z "$_fish_minor"; and set _fish_minor 0
-if not string match -qr '^\d+$' -- "$_fish_parts[1]"; or not string match -qr '^\d+$' -- "$_fish_minor"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish version unparseable: '$_fish_ver'" >&2; _ry_exit $EXIT_PREFLIGHT; end
+if not string match -qr '^\d+$' -- "$_fish_parts[1]"; or not string match -qr '^\d+$' -- "$_fish_minor"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish version unparsable: '$_fish_ver'" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set -l _fish_ok 0
 test "$_fish_parts[1]" -gt 3; and set _fish_ok 1
 test "$_fish_parts[1]" -eq 3; and test "$_fish_minor" -ge 6; and set _fish_ok 1
@@ -264,7 +264,7 @@ function _write_footer --argument-names exit_code extra_key --description "Appen
 end
 set -g _CLEANUP_DONE false
 
-# ── CLEANUP ORCHESTRATION: CHILDREN → TMPFILES → GLOBALS ──
+# ── CLEANUP ORCHESTRATION: CHILDREN → TMPFILES → FS SWEEP → GLOBALS ──
 function _dc_sweep_tmpfiles --description "_do_cleanup sub: Remove tracked tmpfiles/dirs"
     set -l _stuck_tmpfiles
     for _tf in $_TRACKED_TMPFILES
@@ -315,8 +315,8 @@ function _dc_kill_children --description "_do_cleanup sub: Reap child PIDs (TERM
     command pkill -KILL -P "$fish_pid" 2>/dev/null
 end
 
-# ── CLEANUP: MASTER ORCHESTRATOR (_do_cleanup) ──
-function _do_cleanup --description "Master cleanup: reap children → tmpfiles → filesystem sweep → globals"
+# ── CLEANUP: TOP-LEVEL ORCHESTRATOR (_do_cleanup) ──
+function _do_cleanup --description "Top-level cleanup: reap children → tmpfiles → fs sweep → globals"
     _dc_kill_children # quiesce children first: sweeps must not race live children
     _dc_sweep_tmpfiles
     _dc_sweep_filesystem
@@ -610,7 +610,7 @@ function _content__etc_mkinitcpio.conf --description "Generate content for /etc/
     if set -q MKINITCPIO_COMPRESSION_OPTIONS; and test (count $MKINITCPIO_COMPRESSION_OPTIONS) -gt 0; printf '%s\n' "COMPRESSION_OPTIONS=("(string join -- " " $MKINITCPIO_COMPRESSION_OPTIONS)")"; end
 end
 
-# ── CONTENT GENERATORS: SYSTEM (resolved, logind, NM, bluetooth, nft, sysctl, udev) ──
+# ── CONTENT GENERATORS: SYSTEM (resolved → modprobe, deploy order) ──
 function _content__etc_systemd_resolved.conf.d_99-cachyos-resolved.conf --description "Generate content for systemd-resolved drop-in"
     printf '%s\n' "# ry-install: systemd-resolved drop-in, link DNS from DHCP (managed file, do not edit by hand)" "[Resolve]" "MulticastDNS=$RESOLVED_MDNS" "LLMNR=$RESOLVED_LLMNR"
 end
@@ -833,7 +833,7 @@ function _mktemp_or_null --description "Wrapper for mktemp; emits path on stdout
 end
 function _tmp_dir --description "Tmp root (pinned /tmp)"; printf '%s' /tmp; end
 
-# ── FILESYSTEM PROBES (symlink, system-dst, byte read) ──
+# ── FILESYSTEM PROBES (symlink, system-dst, byte read, byte count) ──
 function _is_symlink --argument-names path use_sudo --description "Sudo-aware test -L (rc 0/1/2 = symlink/not/sudo-lapse)"
     if test "$use_sudo" = true
         sudo -n true 2>/dev/null; or return 2
@@ -954,7 +954,7 @@ function _info --description "Emit INFO-level message (no counter)"; _msg INFO $
 function _warn --description "Emit WARN-level message and increment VERIFY_WARN"; _msg WARN $argv; return 0; end
 function _err --description "Emit ERR-level message and increment VERIFY_FAIL"; _msg ERR $argv; return 0; end
 
-# ── MESSAGING: LOUD EMITTERS (_err_loud, _warn_loud; bypass QUIET) ──
+# ── MESSAGING: LOUD EMITTERS (bypass QUIET) + PLAIN ECHO ──
 function _err_loud --description "Fatal-preflight err: stderr regardless of QUIET, except MODE=check (silent-probe contract)"
     set -l msg (string join -- " " $argv)
     _log "ERR: $msg"
@@ -999,7 +999,7 @@ function _verify_summary --description "Print verification pass/fail/warn summar
     end
 end
 
-# ── GENERIC CHECK HELPERS (file, perms, sysfs) ──
+# ── GENERIC CHECK HELPERS (compare, sysfs, perms, presence, file, access) ──
 function _chk_eq --argument-names label actual expected --description "Compare actual vs expected; emit _ok or _fail"
     if test "$actual" = "$expected"
         _ok "  $label: $actual"
@@ -1342,7 +1342,7 @@ function _vsb_entries --description "_verify_static_boot sub: \$BOOT entries enu
 end
 function _verify_static_boot --description "Verify loader.conf, sdboot-manage, kernel cmdline, mkinitcpio, boot entries"; _echo "BOOT CONFIGURATION"; _vsb_loader; _vsb_sdboot; _vsb_sdboot_dropins; _vsb_cmdline; _vsb_mkinitcpio; _vsb_entries; end
 
-# ── VERIFY-STATIC: SYSTEM + USER (drop-ins, env.d) ──
+# ── VERIFY-STATIC: SYSTEM + USER (drop-ins, regdom, BT, cpupower, nft; env.d, MangoHud) ──
 function _vss_logind --description "_verify_static_system sub: logind.conf.d keys"
     _echo "── logind.conf ──"
     _chk_file /etc/systemd/logind.conf.d/99-cachyos-logind.conf; or return 0
@@ -1553,7 +1553,7 @@ function _verify_static_syntax --description "Validate live mkinitcpio HOOKS pre
     end
 end
 
-# ── VERIFY-STATIC: CHECKSUM + DRIVER (byte compare + _ry_verify_static) ──
+# ── VERIFY-STATIC: CHECKSUM + BACKUPS + STRAYS + DRIVER (byte compare + _ry_verify_static) ──
 function _vsc_check_one --argument-names dst --description "_verify_static_checksum sub: Compare one destination's expected vs installed bytes"
     set -l _sl false; _is_system_dst "$dst"; and set _sl true
     if _is_symlink "$dst" $_sl; _fail "  $dst: symlink — a managed destination must be a regular file"; _log "VERIFY_STATIC_SYMLINK: dst=$dst"; return 0; end
@@ -1973,7 +1973,7 @@ function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor
     _chk_sysfs_eq /sys/devices/system/cpu/cpufreq/boost 1 "CPU boost"
 end
 
-# ── VERIFY-RUNTIME: MODULE-STATE SUBS (_vrkm_*; feed _vrk_module_state) ──
+# ── VERIFY-RUNTIME: MODULE STATE (_vrk_module_state + its _vrkm_* subs) ──
 function _vrkm_kp_value --argument-names key --description "_vrkm_module_params sub: Value of the KERNEL_PARAMS token named key; nothing when absent"
     set -l _kre (string escape --style=regex -- "$key"); set -l _v (string match -rg -- "^$_kre=(.*)\$" $KERNEL_PARAMS)
     test -n "$_v"; and printf '%s\n' "$_v[1]"
@@ -2587,7 +2587,7 @@ function _ry_verify_all --description "Verify both: static configs + runtime sta
     return $_rc_s
 end
 
-# ── REPORT: LOG PARSE (the run's own JSONL feeds sections 1, 2, 5, 6) ──
+# ── REPORT: LOG PARSE + HTML ESCAPE (the run's own JSONL feeds sections 1, 2, 5, 6) ──
 function _rpt_jhtml --argument-names s --description "Decode a JSON-escaped log string straight to HTML-safe text; control escapes become U+FFFD"
     set -l h (string replace -a -- '&' '&amp;' "$s" | string replace -a -- '<' '&lt;' | string replace -a -- '>' '&gt;' | string replace -a -- '\\\\' \x1e)
     set h (string replace -a -- '\\"' '&quot;' "$h" | string replace -a -- '\\n' '&#10;' | string replace -a -- '\\t' '&#9;')
@@ -2648,7 +2648,7 @@ function _rpt_tally --description "_rpt_render sub: Count each group's ledger ro
     end
 end
 
-# ── REPORT: HTML PRIMITIVES (reads, sizes, cells, meters, charts) ──
+# ── REPORT: HTML PRIMITIVES (reads, sizes, digests, cells, meters, charts) ──
 function _rpt_rd --argument-names path --description "First line of a readable file, trimmed; nothing when unreadable"; test -r "$path"; or return 1; command head -n 1 -- "$path" 2>/dev/null | string trim --; end
 function _rpt_h --argument-names b --description "Byte count in binary units, GiB or MiB"
     string match -qr -- '^\d+$' "$b"; or return 1
@@ -2792,7 +2792,7 @@ function _rpt_sec_actions --description "_rpt_render sub: Section 2, every FAIL 
     printf '</section>\n'
 end
 
-# ── REPORT: SECTION 3 (system facts from /proc, /sys, os-release, pacman) ──
+# ── REPORT: SECTION 3 (system facts from /proc, /sys, os-release and system tools) ──
 function _rpt_gpu_dir --description "First amdgpu device directory that exposes a DPM level node"
     for f in /sys/class/drm/card*/device/power_dpm_force_performance_level; test -f "$f"; and command dirname -- "$f"; and return 0; end
     return 1
@@ -3058,7 +3058,7 @@ function _rpt_sec_appendix --description "_rpt_render sub: Section 6, logged evi
     _rpt_method; printf '</section>\n'
 end
 
-# ── REPORT: ORCHESTRATOR (_rpt_write; tmpfile, then mv -T into the log tree) ──
+# ── REPORT: ORCHESTRATOR (_rpt_write: _rpt_render → _rpt_erase; _rpt_fail on error) ──
 function _rpt_fail --argument-names why --description "_rpt_render sub: Loud ERR plus REPORT_WRITE_FAIL; a clean exit becomes 1"; _msg_nocount ERR "Report not written: $why"; _log "REPORT_WRITE_FAIL: $why"; test "$_RY_EXIT_CODE" -eq 0; and _set_exit $EXIT_FAIL; return 0; end
 function _rpt_render --description "_rpt_write sub: Parse the run log, render every section to a tmpfile, move it into place"
     set -g _RPT_ARGV (string join ' ' -- (status filename) $argv); set -l dst "$LOG_DIR/report-$TIMESTAMP.html"; set -l now (command date $_RY_TS_FMT)
@@ -3082,7 +3082,7 @@ function _rpt_write --description "Write the --report HTML beside this run's JSO
 
 # ── MISC HELPERS: PERM CHECK, USER-BUS ──
 function _dir_group_or_world_writable --argument-names mode --description "True when octal mode has group or world write bit"
-    not string match -qr '^[0-7]+$' -- "$mode"; and return 0 # unparseable mode -> writable (fail-closed)
+    not string match -qr '^[0-7]+$' -- "$mode"; and return 0 # unparsable mode -> writable (fail-closed)
     test (string length -- "$mode") -gt 3; and set mode (string sub -s -3 -- "$mode") # drop special-bits digit
     while test (string length -- "$mode") -lt 3; set mode "0$mode"; end # stat %a strips leading zeros
     set -l group_w (string sub -s 2 -l 1 -- "$mode"); set -l other_w (string sub -s 3 -l 1 -- "$mode"); set -l group_has_w (math "floor($group_w / 2) % 2"); set -l other_has_w (math "floor($other_w / 2) % 2")
