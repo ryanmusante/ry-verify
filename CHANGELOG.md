@@ -3,28 +3,110 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.242.0
+7.245.0
 -------
 
-  - consistency: banners name the code under them; 'top-level' and
-    'unparsable' replace 'master' and 'unparseable'
+  - guard: findmnt is checked at startup; a missing one exits 3 instead of
+    printing fish errors
+  - signals: a signal during the startup mv -T probe no longer leaves its temp
+    files in the log tree
+  - signals: no PIPE handler: fish ignores SIGPIPE, so only a kill -PIPE ran
+    it, and it silenced a live terminal
+  - preflight: a sudo -n -v that passes yet leaves sudo -n unusable exits 3,
+    as an interactive sudo -v does
+  - verify: sysctl keys and values are trimmed as the generator writes them;
+    the ICMPv6 check matches the whole rule
+  - verify: a symlinked loader/entries directory is listed; each missing
+    Vulkan package gets its own install hint
+  - verify: a sudo lapse skips the HOOKS syntax check with one warning instead
+    of a parse failure
+  - verify: a package file under a symlinked managed directory is matched by
+    its resolved path, not listed as stray
+  - verify: a mismatch under the root-UUID fallback logs both SHA256s; the
+    orphan-mask readlink test stays silent
+  - verify: the IPv4 ping WARN names systemctl restart; no unused
+    canonical-path cache is built
+  - report: a failed show-environment marks the ENV_VARS rows unreadable and
+    draws no coverage bar for them
+  - report: a 0600 /etc/kernel/cmdline is read with sudo -n, as the ledger
+    reads it
+  - report: a size probe blocked by a sudo lapse grades no sudo, not differs,
+    as the ledger warns
+  - report: the System source list names /usr/lib/modules, which supplies the
+    kernel package
+  - logging: a failed stderr write logs STDERR_WRITE_FAIL once and the run
+    continues in the JSONL
+  - logging: tmpfile and child-reap records precede the footer again; a signal
+    while the footer is built still writes it
+  - logging: a log rename that falls back to cp, or fails, is logged; the
+    log-write warning allows a removed JSONL
+  - consistency: banners, comments and descriptions match their code; the
+    --check root guard reads one flag
 
 
-7.235.0 - 7.241.0
+7.235.0 - 7.243.0
 -----------------
 
+  - guard: 7.243.0 an inherited LOG_FILE or LOG_DIR is not deleted when the
+    run exits before creating its own log
+  - guard: 7.243.0 TMPDIR is pinned to /tmp
+  - check: 7.243.0 --check stays silent when id(1) is missing; on a full disk
+    it keeps fish's write errors off stderr
+  - check: 7.243.0 a sudo lapse while sizing a file or probing nftables exits
+    3 instead of reporting drift
+  - preflight: 7.240.0 iommu=off counts as no IOMMU for amdxdna, as in
+    ry-install
+  - preflight: 7.243.0 a sudo -v that caches nothing (timestamp_timeout=0)
+    exits 3 instead of failing later checks
+  - preflight: 7.243.0 the dual-stack warning sends IPv6 rules to the nftables
+    generator in both scripts, not to /etc/nftables.conf
   - verify: 7.235.0 the missing Vulkan package hint reads pacman -Syu --needed
     instead of a partial-upgrade -S
   - verify: 7.240.0 an ext4 fstab row carrying nolazytime FAILs as a pending
     rewrite, as ry-install now strips it
   - verify: 7.241.0 the nftables policy-drop FAIL names systemctl restart; the
     unit has no reload
-  - preflight: 7.240.0 iommu=off counts as no IOMMU for amdxdna, as in
-    ry-install
+  - verify: 7.243.0 mkinitcpio.conf.d drop-ins, dotfiles included as
+    mkinitcpio reads them, warn as overriding HOOKS and MODULES
+  - verify: 7.243.0 a sudo lapse on mkinitcpio.conf warns once instead of
+    failing every token; an unreadable loader entry is named unreadable
+  - verify: 7.243.0 a failing NetworkManager --print-config (rc 7: a config NM
+    cannot parse) FAILs; under a sudo lapse it warns
+  - verify: 7.243.0 an ext4 fstab row with more than one commit= FAILs as a
+    pending rewrite
+  - verify: 7.243.0 ENV_VARS values systemctl prints $'...'-quoted are
+    decoded; a failed show-environment warns
+  - verify: 7.243.0 an active nftables unit whose live ruleset cannot be read
+    warns; the IPv4 ping check matches the whole line
+  - verify: 7.243.0 a sudo lapse during a checksum read or size probe warns
+    instead of failing; the UUID fallback names its skip
+  - verify: 7.243.0 a killed run's .ry-install.* temp file is listed as stray;
+    stray and NM connection sweeps follow symlinked dirs
+  - verify: 7.243.0 the failed user-unit count leaves out
+    plasma-powerdevil.service, which has its own row
+  - verify: 7.243.0 permission OK rows no longer print after a sudo lapse
+    skipped files; the rule count reads unknown when nft did not run
+  - verify: 7.243.0 a stop at the runtime gate keeps the gate rows in the
+    totals
+  - report: 7.243.0 an action item carries only the marked hint row logged
+    after it
+  - report: 7.243.0 section 4 checks a symlink first and grades a file needing
+    the unresolved root UUID as the ledger does
+  - report: 7.243.0 a not-enabled nftables.service whose ruleset is live
+    grades WARN, as a running unit does
+  - report: 7.243.0 unit and key names are HTML-escaped; the report is written
+    via tee, so a full disk reads as not written
   - logging: 7.241.0 a signal between the log create and its header no longer
     leaves a footer-only JSONL; a child SIGKILL at cleanup is logged
+  - logging: 7.243.0 a JSONL string ending in a newline keeps it; a run whose
+    stderr write fails stops writing to the terminal
+  - logging: 7.243.0 a log-path symlink removed at startup is recorded in the
+    log; no TMPFILE_STUCK line follows the footer
   - consistency: 7.241.0 the KERNEL_PARAMS line is split; sdboot-manage.conf
     keys check in emission order; comments and descriptions match their code
+  - consistency: 7.242.0 banners name the code under them; 'Top-level' and
+    'unparsable' replace 'Master' and 'unparseable'
+  - consistency: 7.243.0 banners, comments and descriptions match their code
 
 
 7.234.0
