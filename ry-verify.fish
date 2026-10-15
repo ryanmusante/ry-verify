@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.245.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.247.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.245.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.247.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -16,7 +16,7 @@ function _cleanup_startup --on-signal INT --on-signal TERM --on-signal HUP --on-
     functions -e _cleanup_startup; set -l _n (string replace -r '^SIG' '' -- "$argv[1]"); set -l _x 130
     for _sm in HUP:129 INT:130 TERM:143 ABRT:134; string match -q "$_n:*" -- $_sm; and set _x (string split ':' -- $_sm)[2]; end
     test -n "$_RY_MVPROBE_DIR"; and for _p in $_RY_MVPROBE_DIR/.ry-mvprobe.$fish_pid.*; command rm -f -- $_p 2>/dev/null; end # a signal can beat the probe's rm
-    string match -qr '^[A-Z]+$' -- "$_n"; and exec /bin/sh -c "kill -$_n \$\$ 2>/dev/null; exit $_x" # silent: --check is not yet known here
+    string match -qr '^[A-Z]+$' -- "$_n"; and exec /bin/sh -c "kill -$_n \$\$ 2>/dev/null; exit $_x" # silent in every mode: --check must stay quiet
     exit $_x # fallback: fish exits with the interrupted job's status, not N
 end
 
@@ -247,7 +247,7 @@ function _unit_state_padded --argument-names unit --description "Return LoadStat
     end
 end
 
-# ── JSONL LINE WRITER + FOOTER ──
+# ── JSONL LINE WRITER + FOOTER + CLEANUP FLAGS ──
 function _jsonl_write --description "Append one JSONL line to LOG_FILE (tee in check mode: fish's own write errors stay off stderr)"
     if test "$MODE" = check
         printf '%s\n' "$argv[1]" | command tee -a -- "$LOG_FILE" >/dev/null 2>/dev/null; test "$pipestatus[2]" -eq 0
@@ -439,7 +439,7 @@ set -g PKGS_ADD \
 set -g PKGS_DEL plymouth cachyos-plymouth-bootanimation cachyos-plymouth-theme breeze-plymouth plymouth-kcm micro cachyos-micro-settings cachy-update kdeconnect
 set -g EXPECTED_VULKAN_PKGS vulkan-radeon lib32-vulkan-radeon # chwd Vulkan drivers
 
-# ── EMBEDDED DATA: UNITS (MASK / EXPECTED) ──
+# ── EMBEDDED DATA: UNITS (MASK / EXPECTED) + CPU MATCH ──
 set -g MASK ananicy-cpp.service power-profiles-daemon.service NetworkManager-wait-online.service avahi-daemon.service avahi-daemon.socket ufw.service \
     sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target # avahi+resolved: mDNS off by design; ufw: nft owns the ruleset
 set -g EXPECTED_SERVICES fstrim.timer NetworkManager.service cpupower.service nftables.service bluetooth.service # enabled in Phase 4
@@ -531,6 +531,9 @@ function _ir_validate_keys --description "Refuse to run on out-of-domain embedde
     end
     for _kp in $KERNEL_PARAMS # spliced into boot configs; charset excludes shell metachars
         if not string match -qr -- '^[A-Za-z0-9._,=-]+$' "$_kp"; _err_loud "KERNEL_PARAMS token invalid: '$_kp' — refuse to run (spliced into a shell-sourced boot config and the kernel cmdline)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    end
+    for _mt in $MKINITCPIO_MODULES $MKINITCPIO_HOOKS # plain names (no ? marker): presence checks take them literally
+        if not string match -qr -- '^[A-Za-z0-9_-]+$' "$_mt"; _err_loud "MKINITCPIO_MODULES/HOOKS token invalid: '$_mt' — refuse to run (plain names only; spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
 end
 function _ir_validate_sets --description "Refuse to run when add and remove sets contradict each other"
@@ -1069,13 +1072,16 @@ function _chk_present --argument-names rc label fail_suffix ok_word --descriptio
         _fail "  $label: $fail_suffix"
     end
 end
-function _chk_file --argument-names filepath --description "Verify file exists; sudo fallback for /boot"
+function _chk_file --argument-names filepath --description "Verify file exists; sudo fallback for /boot and other system paths"
     _log "CHECK_FILE: $filepath"
     if string match -q '/boot/*' -- "$filepath"; and test -L "$filepath"; _fail "File is a symlink (refused for /boot path): $filepath"; _log "CHECK_FILE_SYMLINK_REJECT: $filepath"; return 1; end # same verdict as the sudo probe below
     test -f "$filepath"; and _ok "File exists: $filepath"; and return 0
     if string match -q '/boot/*' -- "$filepath"
         if not command -q sudo; _fail "File check requires sudo: $filepath"; return 1; end
         if sudo -n test -L "$filepath" 2>/dev/null; _fail "File is a symlink (refused for /boot path): $filepath"; _log "CHECK_FILE_SYMLINK_REJECT: $filepath"; return 1; end
+        sudo -n test -f "$filepath" 2>/dev/null; and _ok "File exists: $filepath"; and return 0
+        if not sudo -n true 2>/dev/null; _warn "$filepath: sudo cache lapsed — cannot determine presence"; _log "CHECK_FILE_SUDO_LAPSE: $filepath"; return 1; end
+    else if _is_system_dst "$filepath"; and command -q sudo # a parent this user cannot traverse (perms drift) hides it
         sudo -n test -f "$filepath" 2>/dev/null; and _ok "File exists: $filepath"; and return 0
         if not sudo -n true 2>/dev/null; _warn "$filepath: sudo cache lapsed — cannot determine presence"; _log "CHECK_FILE_SUDO_LAPSE: $filepath"; return 1; end
     end
@@ -1086,7 +1092,7 @@ function _cg_access_ok --argument-names file label use_sudo --description "Pre-f
     if test "$use_sudo" = false
         test -r "$file"; and return 0
         if test -f "$file"
-            _fail "  $label: PERMISSION DENIED (need sudo?)"
+            _fail "  $label: PERMISSION DENIED (check its owner and mode)"
         else
             _fail "  $label: FILE NOT FOUND"
         end
@@ -1283,7 +1289,7 @@ function _vsb_cmdline --description "_verify_static_boot sub: cmdline KERNEL_PAR
 end
 
 # ── VERIFY-STATIC: BOOT (MKINITCPIO + DROP-INS + ENTRIES + ORCHESTRATOR) ──
-function _vsb_mkinitcpio --description "_verify_static_boot sub: /etc/mkinitcpio.conf MODULES/HOOKS/COMPRESSION checks"
+function _vsb_mkinitcpio --description "_verify_static_boot sub: /etc/mkinitcpio.conf MODULES/BINARIES/FILES/HOOKS/COMPRESSION checks"
     _echo "── mkinitcpio.conf ──"
     _chk_file /etc/mkinitcpio.conf; or return 0
     if not test -r /etc/mkinitcpio.conf; and not sudo -n true 2>/dev/null; _warn "  /etc/mkinitcpio.conf: unreadable (sudo cache lapsed) — array checks skipped"; return 0; end # an empty read would FAIL every token
@@ -1319,10 +1325,12 @@ function _vsb_mkinitcpio_dropins --description "_verify_static_boot sub: mkinitc
     _echo "── mkinitcpio drop-ins ──"
     _vsb_dropins mkinitcpio /etc/mkinitcpio.conf true "HOOKS and MODULES" MKINITCPIO_DROPIN_PRESENT /etc/mkinitcpio.conf.d # upstream find -xtype f: dotfiles count too
 end
-function _vsb_entry_options --description "_vsb_entries sub: Assert each non-fallback loader entry carries every KERNEL_PARAMS token"
+function _vsb_entry_options --description "_vsb_entries sub: Assert each non-fallback linux entry carries every KERNEL_PARAMS token"
     for _e in $argv
         set -l _n (command basename -- "$_e")
         string match -qr -- '-fallback\.conf$' "$_n"; and continue # sdboot-manage names them *-fallback.conf
+        set -l _lx (_as true awk '/^[ \t]*linux[ \t]/ { print "y"; exit }' "$_e" 2>/dev/null); set -l _lps $pipestatus
+        test "$_lps[1]" -eq 0; and test -z "$_lx"; and continue # no linux key: efi or chainload entry, as ry-install's sanity check
         set -l _opts (_as true awk '/^[ \t]*options[ \t]/ { sub(/^[ \t]*options[ \t]+/, ""); o = o " " $0 } END { print o }' "$_e" 2>/dev/null | string trim --); set -l _ps $pipestatus # BLS: options may repeat; lines combine in order
         if test -z "$_opts"; set -l _why "no options line"; test "$_ps[1]" -ne 0; and set _why "unreadable (sudo lapse or read error)"; _warn "  $_n: $_why — cannot compare against KERNEL_PARAMS"; continue; end
         set -l _missing
@@ -1539,13 +1547,8 @@ function _vssv_orphan_masks --description "_verify_static_services sub: Masked u
 end
 function _verify_static_services --description "Verify masked services state"
     _echo "SERVICES"; _echo "── Masked services ──"
-    set -l _check_mask $MASK; set -l _mask_parsed
-    for _u in $_check_mask
-        set -l _v (_unit_state_padded $_u)
-        set -a _mask_parsed "$_v[1]:$_v[2]:$_v[3]"
-    end
-    for _mask_idx in (seq 1 (count $_check_mask))
-        set -l _svc $_check_mask[$_mask_idx]; set -l _rec (string split ':' -- "$_mask_parsed[$_mask_idx]")
+    for _svc in $MASK
+        set -l _rec (_unit_state_padded $_svc)
         if test "$_rec[3]" = ERR_NO_DATA
             _warn "  $_svc: systemctl state unavailable (absent or no running manager) — cannot verify mask state"
         else if test "$_rec[1]" = not-found
@@ -1696,7 +1699,7 @@ function _vsc_strays --description "_verify_static_checksum sub: Unmanaged files
     set -l _owners; test (count $_stray) -gt 0; and set _owners (command env LC_ALL=C pacman -Qo -- $_stray 2>/dev/null) # one query; unowned paths go to stderr; C pins 'is owned by' text
     set -l _n 0
     for _s in $_stray
-        set -l _rs (command realpath -- (path dirname -- "$_s") 2>/dev/null)/(path basename -- "$_s"); set -q _rs[1]; or set _rs $_s # pacman -Qo prints the dir-resolved path
+        set -l _rs; command -q realpath; and set _rs (command realpath -- (path dirname -- "$_s") 2>/dev/null)/(path basename -- "$_s"); set -q _rs[1]; or set _rs $_s # pacman -Qo prints the dir-resolved path
         set -l _pkg; set -q _owners[1]; and set _pkg (string match -rg -- '^'(string escape --style=regex -- "$_rs")' is owned by (\S+)' $_owners)[1]
         if test -n "$_pkg"; _info "  Package file: $_s (owned by $_pkg)"; continue; end
         set _n (math $_n + 1); _info "  Stray: $_s"
@@ -1809,7 +1812,7 @@ function _implicit_confd_units --description "Units implied by managed conf.d dr
     return 0
 end
 function _ry_stale_ry_dropins --description "Unmanaged 60-ry-* modprobe drop-ins (shared: --check + static verify)"
-    command find /etc/modprobe.d -maxdepth 1 -name '60-ry-*.conf' ! -name '60-ry-modules.conf' -printf '%f\n' 2>/dev/null | path sort
+    command find -H /etc/modprobe.d -maxdepth 1 -name '60-ry-*.conf' ! -name '60-ry-modules.conf' -printf '%f\n' 2>/dev/null | path sort
     return 0 # pre-7.99 leftovers: this profile neither writes nor removes them
 end
 function _ry_orphan_masked_units --description "Masked units absent from MASK (shared: --check + static verify)"
@@ -1853,6 +1856,7 @@ function _check_phase_units --description "Check-mode phase: EXPECTED_SERVICES +
         if test "$_v[1]" = ERR_NO_DATA; _log "CHECK_PREFLIGHT: cannot determine state for $unit (systemctl error)"; return $EXIT_PREFLIGHT; end
         test "$_v[1]" = not-found; and continue
         test "$_v[3]" = masked; or _check_drift CHECK_UNIT_DRIFT "unit=$unit ufs=$_v[3] expected=masked"
+        test "$_v[2]" = active; and _check_drift CHECK_UNIT_DRIFT "unit=$unit active=active expected=inactive" # ry-install's next mask --now stops it
     end
     for unit in $_implicit_svcs
         set -l _v (_unit_state_padded $unit)
@@ -2164,7 +2168,7 @@ function _vrsv_chk_nftables --argument-names label rec_str --description "_vrsv_
         _warn "  $label: $rec[2] — sudo cache lapsed, live ruleset unverifiable"; return 0
     end
     if not _nft_input_drop_live
-        _fail "  $label: $rec[2] and no live inet/filter/input chain with policy drop"; return 0
+        _fail "  $label: $rec[2] and no live inet/filter/input chain with policy drop (sudo systemctl restart $label)"; return 0
     end
     if test "$rec[2]" != inactive # the live ruleset predates a start that did not finish cleanly
         _warn "  $label: ruleset live, input policy drop, but unit $rec[2] ($rec[3]) — last start did not finish cleanly (systemctl status $label)"
@@ -2298,6 +2302,8 @@ function _vrsv_masked_inactive --description "_verify_runtime_services sub: MASK
             _warn "  $_u: systemctl state unavailable (absent or no running manager) — cannot verify"
         else if test "$_v[1]" = not-found
             _info "  $_u: not installed"
+        else if test "$_v[2]" = active; and test "$_v[3]" != masked
+            _fail "  $_u: ACTIVE and not masked ($_v[3]) — re-run ry-install"
         else if test "$_v[2]" = active
             _fail "  $_u: ACTIVE (masked but still running — stop or reboot)"
         else
@@ -2733,13 +2739,13 @@ function _rpt_stack --argument-names label max ok wa fa inf --description "One l
     printf '</span><span class="mv">%s</span></div>\n' (math $ok + $wa + $fa + $inf)
 end
 function _rpt_donut --description "OK, WARN, FAIL, and GEN_FAIL counts as an SVG ring of circumference 100"
-    set -l t (math $argv[1] + $argv[2] + $argv[3] + $argv[4]); set -l d $t; test "$d" -gt 0; or set d 1; set -l off 25; set -l col 46b784 e3aa3d e8645c b58be0
+    set -l t (math $argv[1] + $argv[2] + $argv[3] + $argv[4]); set -l d $t; test "$d" -gt 0; or set d 1; set -l off 25; set -l col ok warn fail gen
     printf '<svg class="donut" viewBox="0 0 42 42" role="img" aria-label="%s OK, %s WARN, %s FAIL, %s GEN_FAIL">' $argv[1..4]
-    printf '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#8795a4" stroke-opacity=".35" stroke-width="5"/>'
+    printf '<circle cx="21" cy="21" r="15.9155" fill="none" style="stroke:var(--note)" stroke-opacity=".35" stroke-width="5"/>'
     for i in 1 2 3 4
         test "$argv[$i]" -gt 0; or continue
         set -l p (math -s3 "100 * $argv[$i] / $d"); set -l q (math -s3 "100 - $p")
-        printf '<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#%s" stroke-width="5" stroke-dasharray="%s %s" stroke-dashoffset="%s"/>' $col[$i] $p $q $off; set off (math -s3 "$off - $p")
+        printf '<circle cx="21" cy="21" r="15.9155" fill="none" style="stroke:var(--%s)" stroke-width="5" stroke-dasharray="%s %s" stroke-dashoffset="%s"/>' $col[$i] $p $q $off; set off (math -s3 "$off - $p")
     end
     printf '<text x="21" y="23.8" fill="currentColor" text-anchor="middle" font-size="8" font-weight="650">%s</text></svg>\n' $t
 end
@@ -2836,7 +2842,13 @@ function _rpt_sec_actions --description "_rpt_render sub: Section 2, every FAIL 
             printf '<tr class="r-%s"><td>%s</td><td>%s</td><td>%s%s</td></tr>\n' $l (_rpt_st $_RPT_LVL[$i]) "$a" "$_RPT_MSG[$i]" "$h"
         end
     end
-    test "$n" -gt 0; and printf '</tbody></table></div>\n'; or printf '<p class="lede">No FAIL or WARN rows in this run; nothing needs action.</p>\n'
+    if test "$n" -gt 0
+        printf '</tbody></table></div>\n'
+    else if test (math $VERIFY_FAIL + $VERIFY_WARN + $VERIFY_GEN_FAIL) -gt 0 # the counters saw rows a failed log write lost
+        printf '<p class="lede">No FAIL or WARN rows reached the log, though the verdict counts some.</p>\n'
+    else
+        printf '<p class="lede">No FAIL or WARN rows in this run; nothing needs action.</p>\n'
+    end
     printf '</section>\n'
 end
 
@@ -2959,7 +2971,8 @@ end
 function _rpt_uuid_state --argument-names dst sl --description "_rpt_file_state sub: State under the root UUID the installed copy carries (ledger parity)"
     set -l act (_installed_bytes "$dst" | string collect --no-trim-newlines --allow-empty); set -l irc $pipestatus[1]
     test "$irc" -eq 2; and printf 'no sudo'; and return 0
-    set -l u (string match -rg -- 'root=UUID=(\S+)' "$act"); test "$irc" -eq 0; and test -n "$u"; or begin; printf 'no root UUID'; return 0; end
+    if test "$irc" -ne 0; printf unreadable; return 0; end # as the ledger: WARN, whether missing or unreadable
+    set -l u (string match -rg -- 'root=UUID=(\S+)' "$act"); test -n "$u"; or begin; printf 'no root UUID'; return 0; end
     set -l had false; set -q _ROOT_UUID; and set had true # generators read the global, not a caller local
     set -g _ROOT_UUID "$u"; set -l exp (_ry_content_bytes "$dst" | string collect --no-trim-newlines --allow-empty); set -l grc $pipestatus[1]
     if test "$had" = true; set -g _ROOT_UUID ""; else; set --erase _ROOT_UUID; end
@@ -3020,7 +3033,7 @@ function _rpt_prof_sysctl --description "_rpt_sec_profile sub: SYSCTL_VALUES aga
         if test "$lv" = "$want"; set st match; set ok (math $ok + 1); else if not test -e "$pp"; set st 'knob absent'; else if test -z "$lv"; set st unreadable; end
         set -l k (_rpt_esc "$kv[1]"); set -l a (_rpt_esc "$kv[2]"); set -l b (_rpt_esc "$lv"); _rpt_tr "<code>$k</code>" "<code>$a</code>" "<code>$b</code>" (_rpt_state_html $st)
     end
-    printf '</tbody></table></div>\n'; _rpt_cov 'sysctl values' $ok (count $SYSCTL_VALUES)
+    printf '</tbody></table></div>\n'; _rpt_cov 'Kernel tunables' $ok (count $SYSCTL_VALUES)
 end
 function _rpt_prof_env --description "_rpt_sec_profile sub: ENV_VARS against the user manager environment"
     set -l bus true; _has_user_bus_active; or set bus false; set -l ue; test "$bus" = true; and begin; set ue (command systemctl --user show-environment 2>/dev/null); or set bus failed; end; set -l ok 0
@@ -3287,7 +3300,8 @@ for _r in $_argv_in; set -a _argv_parts '"'(_json_str "$_r" | string collect --a
 set --erase _r
 set -l _argv_json '['(string join -- ',' $_argv_parts)']'; set -l _verbose_json false
 test "$QUIET" = false; and set _verbose_json true
-_jsonl_write (printf '{"ts":"%s","event":"header","version":"%s","profile":"%s","mode":"%s","verbose":%s,"argv":%s}' (command date $_RY_TS_FMT) "$VERSION" "$PROFILE_NAME" "$MODE" "$_verbose_json" "$_argv_json")
+set -l _hdr_ts (command date $_RY_TS_FMT) # quoted below: an empty date must not shift the fields
+_jsonl_write (printf '{"ts":"%s","event":"header","version":"%s","profile":"%s","mode":"%s","verbose":%s,"argv":%s}' "$_hdr_ts" "$VERSION" "$PROFILE_NAME" "$MODE" "$_verbose_json" "$_argv_json")
 if test "$status" -eq 0
     set -g _RY_HEADER_WRITTEN true
 else
