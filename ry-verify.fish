@@ -1,11 +1,15 @@
 #!/usr/bin/env fish
-# ry-verify v7.249.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.250.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.249.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.250.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
+status job-control none; set -g IFS \n\ \t # config.fish job control or IFS would steer this run
+set -l _ry_irx '^_(?:(?:RY|PROG|RPT|KCONFIG)_[A-Z0-9_]*|flag_[A-Za-z0-9_]+|CLEANUP_DONE|FOOTER_WRITTEN|INTENDED_EXIT_CODE|TRACKED_TMPFILES|SYS_TMP_DIRS|USR_TMP_DIRS|ROOT_UUID|MY_UID|ORIG_ARGV)$' # internal names, argparse _flag_* included
+for _iv in (set -g -n | string match -r -- $_ry_irx); set --erase -g $_iv; end; set --erase _iv # inherited internal state never steers a run
+set -g QUIET true; set -g MODE bootstrap; set -gu LOG_FILE ""; set -gu LOG_DIR ""; set -gu _RY_HOME_NEW false; set -gu _RY_LOGROOT_NEW false; set -gu _RY_LOGDIR_NEW false # pinned pre-argparse (signal footers); inherited paths never ours
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
 set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro — Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 17
 set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check,report h/help v/version verify check report # single option-spec source (root guard + main argparse)
@@ -13,11 +17,13 @@ set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check,report h/help v/version ver
 # ── STARTUP SIGNAL STUB (until _cleanup is defined) ──
 set -gu _RY_MVPROBE_DIR "" # mv -T probe dir; pinned empty: inherited values are never swept
 function _cleanup_startup --on-signal INT --on-signal TERM --on-signal HUP --on-signal ABRT --description "Startup signal stub until _cleanup is defined: re-raise 128+N, silent" # no handler: fish ends on a SIGINT between commands with exit 0
-    functions -e _cleanup_startup; set -l _n (string replace -r '^SIG' '' -- "$argv[1]"); set -l _x 130
+    set -l _n (string replace -r '^SIG' '' -- "$argv[1]"); set -l _x 130 # stays defined: an unobserved signal cuts it short
     for _sm in HUP:129 INT:130 TERM:143 ABRT:134; string match -q "$_n:*" -- $_sm; and set _x (string split ':' -- $_sm)[2]; end
-    test -n "$_RY_MVPROBE_DIR"; and for _p in $_RY_MVPROBE_DIR/.ry-mvprobe.$fish_pid.*; command rm -f -- $_p 2>/dev/null; end # a signal can beat the probe's rm
+    test -n "$_RY_MVPROBE_DIR"; and for _try in 1 2 3 4 5; set -l _ps $_RY_MVPROBE_DIR/.ry-mvprobe.$fish_pid.*; set -q _ps[1]; or break; command rm -f -- $_ps 2>/dev/null; end # a signal can beat the probe's rm; a killed rm is redone
+    test -n "$LOG_DIR"; and functions -q _ry_rm_log; and _ry_rm_log # the claimed, still-empty log
+    test -n "$LOG_DIR"; and functions -q _ry_rm_new_dirs; and _ry_rm_new_dirs # startup logs nothing: only its empty dirs go
     string match -qr '^[A-Z]+$' -- "$_n"; and exec /bin/sh -c "kill -$_n \$\$ 2>/dev/null; exit $_x" # silent in every mode: --check must stay quiet
-    exit $_x # fallback: fish exits with the interrupted job's status, not N
+    functions -e _cleanup_startup; exit $_x # fallback: fish exits with the interrupted job's status, not N
 end
 
 # ── HELP TEXT ──
@@ -69,7 +75,6 @@ for _early_arg in $argv
     end
 end
 set -q _early_arg; and set --erase _early_arg
-set -q _early_ch; and set --erase _early_ch
 set -l _ry_root_silent_check false; set -l _rsc_other_mode false; set -l _rsc_after_dd false # --check stays silent from the first external probe on
 for _rsc_a in $argv
     if test "$_rsc_after_dd" = true; set _rsc_other_mode true; break; end # positional after --: exit-2 parity
@@ -102,29 +107,40 @@ set -g _MY_UID (command id -u)
 
 # ── BAIL PRIMITIVES: _RY_EXIT + _SET_EXIT + HANDLER ERASE + ROOT USAGE ──
 function _ry_erase_handlers --description "Erase signal/exit handler functions"; functions -e _cleanup_startup _cleanup _cleanup_on_exit 2>/dev/null; end
+function _ry_rm_new_dirs --description "Remove the empty log dirs and ~/ry-install this run created"
+    set -l _d # deepest first: rmdir takes its operands in order
+    test "$_RY_LOGDIR_NEW" = true; and set -a _d "$LOG_DIR"
+    test "$_RY_LOGROOT_NEW" = true; and set -a _d "$_RY_HOME_DIR/logs" # backups/ is ry-install's: never created or removed here
+    test "$_RY_HOME_NEW" = true; and set -a _d "$_RY_HOME_DIR"
+    set -q _d[1]; or return 0
+    for _try in 1 2 3 4 5; command rmdir -- $_d 2>/dev/null; test $status -lt 128; and break; end # a non-empty dir stays; a signal-killed try is redone
+end
+function _ry_rm_log --description "Remove this run's empty JSONL logs under any name, redone when a signal killed the rm"
+    test -n "$LOG_DIR"; and test -n "$TIMESTAMP"; or return 0
+    for _try in 1 2 3 4 5
+        set -l _e; for _f in $LOG_DIR/*-$TIMESTAMP.jsonl; test -s "$_f"; or set -a _e "$_f"; end # PID-scoped: a rename leaves two names
+        set -q _e[1]; or break; command rm -f -- $_e 2>/dev/null # a storm can kill an rm
+    end
+end
 function _ry_exit --argument-names code --description "Set bail sentinel and exit"
     test -z "$code"; and set code 0
     string match -qr '^\d+$' -- "$code"; or set code $EXIT_FAIL # non-numeric breaks footer printf %d
     if set -q _RY_INSTALL_BAILING; and test "$_RY_INSTALL_BAILING" = true; set -g _RY_INSTALL_LAST_EXIT $code; exit $code; end
     set -g _CLEANUP_DONE true; set -g _RY_INSTALL_LAST_EXIT $code; set -g _RY_INSTALL_BAILING true
     if not set -q _RY_HEADER_WRITTEN; and not set -q _RY_LOG_WRITTEN
-        test -n "$LOG_FILE"; and command rm -f -- "$LOG_FILE" 2>/dev/null
-        test -n "$LOG_DIR"; and command rmdir -- "$LOG_DIR" 2>/dev/null # backups/ is ry-install's: never created or removed here
-        test -n "$LOG_DIR"; and command rmdir -- (command dirname -- "$LOG_DIR") 2>/dev/null
-        test "$_RY_HOME_NEW" = true; and command rmdir -- "$_RY_HOME_DIR" 2>/dev/null # only a ~/ry-install this run created
+        _ry_rm_log # nothing was written to it
+        _ry_rm_new_dirs # only the empty dirs this run created
     else
         functions -q _dc_settle; and _dc_settle # its records precede the footer
         functions -q _write_footer; and _write_footer "$code" bail
     end
-    functions -q _do_cleanup; and _do_cleanup
-    _ry_erase_handlers
-    exit $code
+    set -q -g _RY_DO_CLEANUP_OURS; and _do_cleanup # ours only: a probe would autoload a user's
+    exit $code # handlers kept: a signal here keeps the exit code
 end
 function _set_exit --argument-names _code --description "Set both _RY_EXIT_CODE and _INTENDED_EXIT_CODE atomically"; set -g _RY_EXIT_CODE $_code; set -g _INTENDED_EXIT_CODE $_code; end
 function _ry_root_usage --description "Root-guard usage error: print msg + help to stderr, exit EXIT_USAGE"; echo "[ERR] $argv" >&2; _ry_show_help >&2; _ry_exit $EXIT_USAGE; end
 
 # ── ROOT GUARD + COLOR/TTY + FISH VERSION CHECK ──
-set -g QUIET true; set -g MODE bootstrap; set -gu LOG_FILE ""; set -gu LOG_DIR ""; set -gu _RY_HOME_NEW false # pinned pre-argparse (signal footers); inherited paths never ours
 if not string match -qr '^\d+$' -- "$_MY_UID"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] id -u returned non-numeric value: '$_MY_UID' — cannot determine user identity" >&2; _ry_exit $EXIT_PREFLIGHT; end
 if test "$_MY_UID" -eq 0
     if test "$_RY_ARGV_CHECK_ONLY" = true; _ry_exit $EXIT_PREFLIGHT; end # --check + valid mode: silent, 3 = cannot probe
@@ -153,6 +169,10 @@ test "$_fish_parts[1]" -gt 3; and set _fish_ok 1
 test "$_fish_parts[1]" -eq 3; and test "$_fish_minor" -ge 6; and set _fish_ok 1
 if test "$_fish_ok" -eq 0; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish 3.6+ required (found: $_fish_ver)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set --erase _fish_ver _fish_parts _fish_minor _fish_ok
+if not status test-feature regex-easyesc; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish feature regex-easyesc is off — JSONL escaping needs it (drop no-regex-easyesc from fish_features)" >&2; _ry_exit $EXIT_PREFLIGHT; end
+set -l _ry_iu (set -U -n | string match -r -- $_ry_irx); set --erase _ry_irx # set -q sees a universal: refuse it
+if set -q _ry_iu[1]; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] fish universal variable(s) named like internal state: $_ry_iu — clear with: set -eU $_ry_iu" >&2; _ry_exit $EXIT_PREFLIGHT; end
+set --erase _ry_iu
 
 # ── TMP ROOT (PINNED /tmp) + COREUTILS + FINDMNT PROBES ──
 set -gx TMPDIR /tmp # pin tmp to /tmp; shadows an inherited or universal TMPDIR
@@ -179,6 +199,7 @@ if test -d "$_RY_HOME_DIR" # pre-existing ~/ry-install is not ours to chmod
 else
     set -p _ld_paths "$_RY_HOME_DIR"; set -g _RY_HOME_NEW true # created by this run: ours to chmod, and to rmdir on bail
 end
+test -d "$_RY_HOME_DIR/logs"; or set -g _RY_LOGROOT_NEW true; test -d "$LOG_DIR"; or set -g _RY_LOGDIR_NEW true # created by this run: ours to rmdir on bail
 set -l _prev_mkdir_umask 022; set -q umask; and set _prev_mkdir_umask $umask # umask var directly; autoloaded umask(1) leaks to stderr
 set -g umask 0077
 command mkdir -p -- "$LOG_DIR" 2>/dev/null; or begin
@@ -187,6 +208,7 @@ command mkdir -p -- "$LOG_DIR" 2>/dev/null; or begin
     _ry_exit $EXIT_PREFLIGHT
 end
 set -g umask $_prev_mkdir_umask
+set -g LOG_FILE "$LOG_DIR/preflight-$TIMESTAMP.jsonl"; command install -m 0600 -- /dev/null "$LOG_FILE" 2>/dev/null # claimed now: a peer's bail cannot rmdir new dirs
 for _ld_path in $_ld_paths
     set -l _pre (command stat -L -c '%a' -- "$_ld_path" 2>/dev/null) # -L: chmod follows a symlinked dir, so read the mode it set
     command chmod -- 00700 "$_ld_path" 2>/dev/null # 5 digits: GNU chmod keeps a dir's setgid on '700'
@@ -202,12 +224,10 @@ if test -z "$_ry_mv_a"; or test -z "$_ry_mv_b"
 end
 if not command mv -T -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; command rm -f -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] mv(1) lacks -T no-target-directory (need GNU coreutils ≥ 8.x; busybox not supported)" >&2; _ry_exit $EXIT_PREFLIGHT; end
 command rm -f -- "$_ry_mv_a" "$_ry_mv_b" 2>/dev/null; set --erase _ry_mv_a _ry_mv_b; set -g _RY_MVPROBE_DIR "" # probe done: nothing to sweep
-set -g LOG_FILE "$LOG_DIR/preflight-$TIMESTAMP.jsonl"
 
 # ── GLOBAL STATE: TRACKED RESOURCES + AWK FILTERS ──
 set -g _RY_BOOT_CRITICAL_DSTS "/boot/loader/loader.conf" "/etc/kernel/cmdline" "/etc/sdboot-manage.conf" "/etc/mkinitcpio.conf"
 set -g _RY_BACKUP_TARGETS $_RY_BOOT_CRITICAL_DSTS; set -g _RY_BACKUP_SUFFIX .ry.bak
-set -g _RY_TMPDIR_GLOBS # none: the mv probe runs in the log tree, so nothing lands in /tmp
 set -g _TRACKED_TMPFILES
 set -g _RY_PROFILE_USES_WIFI_BACKEND false
 set -g _RY_AWK_EXT4_FILTER '!/^[ \t]*#/ && NF >= 4 && $3 == "ext4" { print $0 }'
@@ -215,7 +235,7 @@ set -g _RY_AWK_EXT4_MALFORMED_FILTER '!/^[ \t]*#/ && NF < 4 && $0 ~ /(^|[ \t,])e
 
 # ── KERNEL / SYSTEMD STATE PROBES ──
 function _kconfig_cache --description "Load /proc/config.gz into _KCONFIG_DATA (lazy; empty when unavailable)"
-    if not set -q _KCONFIG_LOADED
+    if not set -q -g _KCONFIG_LOADED
         if test -f /proc/config.gz; and command -q zcat
             set -g _KCONFIG_DATA (command zcat /proc/config.gz 2>/dev/null)
         else
@@ -259,7 +279,7 @@ function _write_footer --argument-names exit_code extra_key --description "Appen
     set -q _FOOTER_WRITTEN; and return 0
     test -n "$LOG_FILE"; and test -f "$LOG_FILE"; or return 0
     if not set -q _RY_HEADER_WRITTEN; and not test -s "$LOG_FILE" # signal between the 0600 create and the header: drop the empty file
-        set -g _FOOTER_WRITTEN true; set -g _RY_LOG_SUPPRESS_CREATE true; command rm -f -- "$LOG_FILE" 2>/dev/null; return 0
+        set -g _FOOTER_WRITTEN true; set -g _RY_LOG_SUPPRESS_CREATE true; _ry_rm_log; return 0
     end
     set -l _mode_esc (_json_str "$MODE"); set -l _ts (command date $_RY_TS_FMT); set -l _extra ""
     test -n "$extra_key"; and set _extra ",\""(_json_str "$extra_key")"\":true"
@@ -284,7 +304,7 @@ function _dc_sweep_tmpfiles --description "_dc_settle sub: Remove tracked tmpfil
     for _tf in $_stuck_tmpfiles # tracked paths are user-owned tmp files: nothing to escalate
         not set -q _FOOTER_WRITTEN; and functions -q _log; and _log "TMPFILE_STUCK: $_tf"
     end
-    set --erase _TRACKED_TMPFILES
+    set -g _TRACKED_TMPFILES # reset, not erased: no universal surfaces
 end
 function _dc_erase_globals --description "_do_cleanup sub: Erase cached globals"
     set --erase _KCONFIG_DATA _KCONFIG_LOADED _RY_ESP_PATH _RY_BOOT_PATH
@@ -323,6 +343,7 @@ function _do_cleanup --description "Top-level cleanup: reap children → tmpfile
     _dc_settle # no-op when the footer path settled first
     _dc_erase_globals
 end
+set -g _RY_DO_CLEANUP_OURS true # _ry_exit runs _do_cleanup only once it is this one
 
 # ── VERIFY COUNTERS + TEARDOWN + SIGNAL/EXIT HANDLERS ──
 set -g VERIFY_OK 0; set -g VERIFY_FAIL 0; set -g VERIFY_WARN 0; set -g VERIFY_GEN_FAIL 0
@@ -366,9 +387,9 @@ function _cleanup --on-signal INT --on-signal TERM --on-signal HUP --on-signal A
         set _sig_exit 130
     end
     _teardown signal $_sig_exit
-    _ry_erase_handlers # fish swallows handler exit status; exec sh re-raises 128+N
-    string match -qr '^[A-Z]+$' -- "$_sig_name"; and exec /bin/sh -c "kill -$_sig_name \$\$ 2>/dev/null; exit $_sig_exit"
-    exit $_sig_exit # fallback: fish exits with the interrupted job's status, not N
+    set -q _RY_HEADER_WRITTEN; or set -q _RY_LOG_WRITTEN; or begin; _ry_rm_log; _ry_rm_new_dirs; end # nothing logged: its empty log and dirs go
+    string match -qr '^[A-Z]+$' -- "$_sig_name"; and exec /bin/sh -c "kill -$_sig_name \$\$ 2>/dev/null; exit $_sig_exit" # fish swallows handler exit status: sh re-raises 128+N
+    _ry_erase_handlers; exit $_sig_exit # fallback: fish exits with the interrupted job's status, not N
 end
 functions -e _cleanup_startup # _cleanup now owns INT/TERM/HUP/ABRT
 function _cleanup_on_exit --on-event fish_exit --description "Exit handler: ensure cleanup runs on fish_exit"
@@ -479,7 +500,6 @@ function _ir_validate_counts --description "Refuse to run when array counts drif
         _RY_ARGPARSE_SPEC:6 \
         _RY_BOOT_CRITICAL_DSTS:4 \
         _RY_BACKUP_TARGETS:4 \
-        _RY_TMPDIR_GLOBS:0 \
         SYSTEM_DESTINATIONS:15 \
         USER_DESTINATIONS:2 \
         MKINITCPIO_COMPRESSION_OPTIONS:1 # drift tripwires; sync arrays + docs on change
@@ -792,11 +812,7 @@ function _ry_bak_path --argument-names dst --description "Slash-encoded .ry.bak 
 function _untrack_tmpfile --argument-names path --description "Remove a single literal path from _TRACKED_TMPFILES"
     set -l _new
     for _tf in $_TRACKED_TMPFILES; test "$_tf" = "$path"; and continue; set -a _new "$_tf"; end
-    if test (count $_new) -gt 0
-        set -g _TRACKED_TMPFILES $_new
-    else
-        set --erase _TRACKED_TMPFILES
-    end
+    set -g _TRACKED_TMPFILES $_new # reset, not erased: no universal surfaces
 end
 function _rm_tmp --argument-names path use_sudo --description "Sudo-aware tmpfile/dir delete + untrack"
     test -n "$path"; or return 0
@@ -1124,7 +1140,7 @@ function _chk_grep --argument-names file pattern label match --description "Veri
             _ok "  $label: present"
             return 0
         case 1
-            _fail "  $label: MISSING"
+            set -l _x ""; test "$label" != "$pattern"; and set _x " (expected: $pattern)"; _fail "  $label: MISSING$_x"
             return 1
         case '*'
             _warn "  $label: grep error rc=$_grep_rc (binary/IO/regex) — cannot determine presence"
@@ -1143,7 +1159,7 @@ end
 # ── MKINITCPIO HOOK VALIDATORS ──
 function _mkinitcpio_hook_exists --argument-names hook --description "True iff a HOOKS entry has a build script in an initcpio install dir"
     test -z "$hook"; and return 1
-    for _d in /etc/initcpio/install /usr/lib/initcpio/install; test -f "$_d/$hook"; and return 0; end # initcpio/hooks holds runtime scripts only
+    for _d in /etc/initcpio/install /usr/lib/initcpio/install; test -f "$_d/$hook"; or sudo -n test -f "$_d/$hook" 2>/dev/null; and return 0; end # mkinitcpio reads them as root
     return 1
 end
 function _vmh_existence_only --description "_ry_validate_mkinitcpio_hooks sub: Existence-only path: emit _ok/_fail per hook"
@@ -1189,7 +1205,7 @@ function _ry_content_bytes --argument-names dst --description "Raw bytes of embe
 end
 function _ry_mode_drift --argument-names dst use_sudo perms --description "Emit the current mode when it differs from the managed contract, else nothing"
     string match -q '/boot/*' -- "$dst"; and return 1 # vfat synthesizes modes from mount options
-    test -L "$dst"; and return 1 # a symlink's own mode is meaningless; chmod follows it
+    _is_symlink "$dst" $use_sudo; test $status -ne 1; and return 1 # a link (or a lapsed probe): its own mode is moot
     set -l _cur (_as $use_sudo stat -c '%a' -- "$dst" 2>/dev/null | string trim --); test -z "$_cur"; and return 1
     test "$_cur" = (string replace -r '^0+(?=.)' '' -- "$perms"); and return 1
     printf '%s' "$_cur"
@@ -1232,11 +1248,12 @@ function _vsb_sdboot --description "_verify_static_boot sub: sdboot-manage.conf 
 end
 
 # ── VERIFY-STATIC: BOOT (DROP-IN SWEEP + SDBOOT DROP-INS + CMDLINE) ──
-function _vsb_dropins --argument-names name conf dots keys logkey --description "_vsb_sdboot_dropins and _vsb_mkinitcpio_dropins sub: Drop-ins sourced after a managed conf"
+function _vsb_dropins --argument-names name conf dots follow keys logkey --description "_vsb_sdboot_dropins and _vsb_mkinitcpio_dropins sub: Drop-ins sourced after a managed conf"
     set -l _found; set -l _unlistable false; set -l _nodot '!' -name '.*'; test "$dots" = true; and set _nodot # dots=true: the tool's own find counts dotfiles
-    for _dir in $argv[6..-1]
+    set -l _fl -H; test "$follow" = true; or set _fl # follow=false: the tool's find never enters a linked dir
+    for _dir in $argv[7..-1]
         test -d "$_dir"; or test -L "$_dir"; or continue # a link this user cannot resolve reaches find, which fails
-        set -l _hits (command find -H "$_dir" -maxdepth 1 -name '*.conf' $_nodot '(' -type f -o -type l ')' 2>/dev/null | path sort); set -l _ps $pipestatus
+        set -l _hits (command find $_fl "$_dir" -maxdepth 1 -name '*.conf' $_nodot '(' -type f -o -type l ')' 2>/dev/null | path sort); set -l _ps $pipestatus
         if test "$_ps[1]" -ne 0; _warn "  $_dir: cannot list — $name drop-in check skipped"; set _unlistable true; continue; end
         for _h in $_hits # the tool reads them as root: a regular file or a link to one
             if test -f "$_h"; or sudo -n test -f "$_h" 2>/dev/null; set -a _found "$_h"; continue; end
@@ -1253,7 +1270,7 @@ function _vsb_dropins --argument-names name conf dots keys logkey --description 
 end
 function _vsb_sdboot_dropins --description "_verify_static_boot sub: sdboot-manage drop-ins that outrank the managed conf"
     _echo "── sdboot-manage drop-ins ──"
-    _vsb_dropins sdboot-manage /etc/sdboot-manage.conf false LINUX_OPTIONS SDBOOT_DROPIN_PRESENT /usr/lib/sdboot-manage.conf.d /etc/sdboot-manage.conf.d # upstream bash glob: *.conf skips dotfiles
+    _vsb_dropins sdboot-manage /etc/sdboot-manage.conf false true LINUX_OPTIONS SDBOOT_DROPIN_PRESENT /usr/lib/sdboot-manage.conf.d /etc/sdboot-manage.conf.d # upstream bash glob: skips dotfiles, enters a linked dir
 end
 function _vsb_cmdline --description "_verify_static_boot sub: cmdline KERNEL_PARAMS + root=UUID + rw"
     _echo "── kernel cmdline ──"
@@ -1315,7 +1332,11 @@ function _vsb_mkinitcpio --description "_verify_static_boot sub: /etc/mkinitcpio
 end
 function _vsb_mkinitcpio_dropins --description "_verify_static_boot sub: mkinitcpio.conf.d drop-ins that outrank the managed conf"
     _echo "── mkinitcpio drop-ins ──"
-    _vsb_dropins mkinitcpio /etc/mkinitcpio.conf true "HOOKS and MODULES" MKINITCPIO_DROPIN_PRESENT /etc/mkinitcpio.conf.d # upstream find -xtype f: dotfiles count too
+    _vsb_dropins mkinitcpio /etc/mkinitcpio.conf true false "HOOKS and MODULES" MKINITCPIO_DROPIN_PRESENT /etc/mkinitcpio.conf.d # upstream find -xtype f: dotfiles count; a linked dir is skipped
+    set -l _pf /etc/mkinitcpio.d/*.preset; set -l _pc; set -q _pf[1]; and set _pc (command grep -hoE '^[[:space:]]*[A-Za-z_]+_config=.*' -- $_pf 2>/dev/null | string replace -r '^[^=]*=' '' | string trim | string trim -c '"\'')
+    set -l _po (string match -v -- /etc/mkinitcpio.conf $_pc) # a preset _config makes mkinitcpio -P pass -c
+    set -q _po[1]; and _warn "  a mkinitcpio preset builds from $_po, not /etc/mkinitcpio.conf, and skips mkinitcpio.conf.d"
+    set -q _pc[1]; and not set -q _po[1]; and _info "  a mkinitcpio preset sets _config=/etc/mkinitcpio.conf: mkinitcpio -P passes -c, so mkinitcpio.conf.d is skipped"
 end
 function _vsb_entry_options --description "_vsb_entries sub: Assert each non-fallback linux entry carries every KERNEL_PARAMS token"
     for _e in $argv
@@ -1639,10 +1660,10 @@ function _vsc_mismatch --argument-names dst sl expected actual note --descriptio
 end
 function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recovery copies non-empty; live under _RY_BACKUP_DIR"
     _echo "── recovery copies ──"
-    set -l _present 0; set -l _empty
+    set -l _present 0; set -l _empty; set -l _odd
     for _dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS /etc/fstab
         set -l _cand (_ry_bak_path "$_dst")
-        test -f "$_cand"; or continue
+        if not test -f "$_cand"; test -d "$_cand"; and not test -L "$_cand"; and set -a _odd "$_cand"; continue; end # a real dir blocks the next copy
         set _present (math $_present + 1)
         test -s "$_cand"; or set -a _empty "$_cand"
     end
@@ -1653,7 +1674,8 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
     else
         _ok "  $_RY_BACKUP_SUFFIX: $_present present, all non-empty"
     end
-    _log "BACKUP_SWEEP: suffix=$_RY_BACKUP_SUFFIX present=$_present empty="(count $_empty)
+    set -q _odd[1]; and _warn "  $_RY_BACKUP_SUFFIX: a directory holds the name, so the next ry-install backup there fails: $_odd"
+    _log "BACKUP_SWEEP: suffix=$_RY_BACKUP_SUFFIX present=$_present empty="(count $_empty)" odd="(count $_odd)
     set -l _legacy
     for _dst in $_RY_BACKUP_TARGETS /etc/fstab
         _as true test -f "$_dst$_RY_BACKUP_SUFFIX" 2>/dev/null; and set -a _legacy "$_dst$_RY_BACKUP_SUFFIX"
@@ -1669,7 +1691,7 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
 end
 function _vsc_strays --description "_verify_static_checksum sub: Unmanaged files beside the managed destinations"
     _echo "── stray files ──"
-    set -l _all $SYSTEM_DESTINATIONS $USER_DESTINATIONS; set -l _dirs; set -l _stray; set -l _skip 0
+    set -l _all $SYSTEM_DESTINATIONS $USER_DESTINATIONS; set -l _dirs; set -l _stray; set -l _skip 0; set -l _stale_ry (_ry_stale_ry_dropins)
     for _dst in $_all; set -l _d (string replace -r -- '/[^/]+$' '' "$_dst"); contains -- "$_d" $_dirs; or set -a _dirs "$_d"; end
     for _d in $_dirs
         set -l _su false; _is_system_dst "$_d/"; and set _su true
@@ -1679,8 +1701,8 @@ function _vsc_strays --description "_verify_static_checksum sub: Unmanaged files
         set -l _shared false; test "$_su" = true; and not string match -q -- '*.d' "$_d"; and set _shared true # non-.d system dirs (/etc, /boot/loader…): siblings only
         for _n in $_names
             contains -- "$_n" $_own; and continue
-            contains -- "$_d/$_n" $_all.ry.orig /etc/fstab.ry.orig $_RY_BACKUP_TARGETS$_RY_BACKUP_SUFFIX /etc/fstab$_RY_BACKUP_SUFFIX; and continue # exactly the names _vsc_backups reports (its lists add /etc/fstab)
-            test "$_d" = /etc/modprobe.d; and string match -q -- '60-ry-*.conf' "$_n"; and continue # _vss_modprobe reports these
+            contains -- "$_d/$_n" $_all.ry.orig /etc/fstab.ry.orig $_RY_BACKUP_TARGETS$_RY_BACKUP_SUFFIX /etc/fstab$_RY_BACKUP_SUFFIX; and _as $_su test -f "$_d/$_n" 2>/dev/null; and continue # what _vsc_backups reports: those names, when they test -f
+            test "$_d" = /etc/modprobe.d; and contains -- "$_n" $_stale_ry; and continue # only the names _vss_modprobe reported
             if test "$_shared" = true
                 set -l _sib false; string match -q -- '.ry-install.*' "$_n"; and set _sib true; for _o in $_own; string match -q -- "$_o*" "$_n"; and set _sib true; end # .ry-install.*: a killed run's tmpfile
                 test "$_sib" = true; or continue
@@ -1784,9 +1806,9 @@ function _svc_chk_expected --description "Check EXPECTED_SERVICES units"
                     _nft_input_drop_live; or _check_drift CHECK_UNIT_DRIFT "unit=$unit reason=ruleset-not-live"
                 end
             else
-                test "$active" = active; or _check_drift CHECK_UNIT_DRIFT "unit=$unit active=$active" # RemainAfterExit oneshots read active
+                test "$active" = active; or _check_drift CHECK_UNIT_DRIFT "unit=$unit active=$active expected=active" # RemainAfterExit oneshots read active
             end
-            test "$ufs" = enabled; or _check_drift CHECK_UNIT_DRIFT "unit=$unit ufs=$ufs"
+            test "$ufs" = enabled; or _check_drift CHECK_UNIT_DRIFT "unit=$unit ufs=$ufs expected=enabled"
         end
     end
     return 0
@@ -1805,7 +1827,9 @@ function _implicit_confd_units --description "Units implied by managed conf.d dr
     return 0
 end
 function _ry_stale_ry_dropins --description "Unmanaged 60-ry-* modprobe drop-ins (shared: --check + static verify)"
-    command find -H /etc/modprobe.d -maxdepth 1 -name '60-ry-*.conf' ! -name '60-ry-modules.conf' -printf '%f\n' 2>/dev/null | path sort
+    set -l _q -H /etc/modprobe.d -maxdepth 1 -name '60-ry-*.conf' ! -name '60-ry-modules.conf' -xtype f -printf '%f\n' # kmod reads files and links to them
+    set -l _l (command find $_q 2>/dev/null); or set _l (sudo -n find $_q 2>/dev/null) # a 0700 modprobe.d hides them from this user
+    test (count $_l) -gt 0; and path sort -- $_l
     return 0 # pre-7.99 leftovers: this profile neither writes nor removes them
 end
 function _ry_orphan_masked_units --description "Masked units absent from MASK (shared: --check + static verify)"
@@ -1861,7 +1885,7 @@ function _check_phase_units --description "Check-mode phase: EXPECTED_SERVICES +
 end
 function _ry_do_check --description "Silent idempotency probe" # ERR_NO_DATA->preflight unless drift confirmed
     _log_section "CHECK START"
-    set -l _stale (_ry_stale_ry_dropins) # privilege-free: recorded before the sudo gate can bail
+    set -l _stale (_ry_stale_ry_dropins) # needs no sudo: recorded before the sudo gate can bail
     test (count $_stale) -gt 0; and _log "MODPROBE_STALE_DROPIN: count="(count $_stale)" files="(string join ',' -- $_stale)
     if not command -q sudo; or not sudo -n true 2>/dev/null; _log "CHECK_PREFLIGHT: sudo not cached"; _log_section "CHECK END"; return $EXIT_PREFLIGHT; end
     if not command -q systemctl; _log "CHECK_PREFLIGHT: systemctl not available"; _log_section "CHECK END"; return $EXIT_PREFLIGHT; end
@@ -1982,7 +2006,7 @@ function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor
             else if test (count $_bad) -eq 0
                 _ok "  $_a[1]: $_a[2], uniform across $_n of "(count $_cpu_dirs)" policies"
             else
-                _fail "  $_a[1]: "(count $_bad)" of "(count $_cpu_dirs)" policies diverge: $_bad"
+                _fail "  $_a[1]: "(count $_bad)" of "(count $_cpu_dirs)" policies diverge: $_bad (expected: $_a[2])"
             end
         end
     end
@@ -2161,7 +2185,10 @@ function _vrsv_chk_nftables --argument-names label rec_str --description "_vrsv_
 end
 function _vrsv_chk_resolved --argument-names rec_str --description "_vrsv_sys_units sub: Check systemd-resolved active + persistent state"
     set -l rec (string split ':' -- "$rec_str")
-    test -f /etc/systemd/resolved.conf.d/99-cachyos-resolved.conf; or return 0
+    if not test -f /etc/systemd/resolved.conf.d/99-cachyos-resolved.conf; and not sudo -n test -f /etc/systemd/resolved.conf.d/99-cachyos-resolved.conf 2>/dev/null # a 0700 conf.d hides it from this user
+        test -x /etc/systemd/resolved.conf.d; or sudo -n true 2>/dev/null; or _warn "  systemd-resolved: sudo cache lapsed — cannot verify"
+        return 0
+    end
     if test "$rec[1]" = not-found; _warn "  systemd-resolved: not installed"; return 0; end
     if test "$rec[1]" = ERR_NO_DATA; _warn "  systemd-resolved: systemctl state unavailable (absent or no running manager) — cannot verify"; return 0; end
     if test "$rec[2]" != active
@@ -2457,8 +2484,8 @@ function _verify_runtime_env --description "Verify ENV_VARS, sysctl, fstab, ntsy
 # ── VERIFY-RUNTIME: SESSION + PERMS ──
 function _vrs_nm_perms --description "_verify_runtime_session sub: NetworkManager system-connections perms (0600 root:root)"
     set -l nm_conn_dir /etc/NetworkManager/system-connections; set -l nm_dropin /etc/NetworkManager/conf.d/99-cachyos-nm.conf
-    if not test -d "$nm_conn_dir"; _info "  NetworkManager connections: directory not found"; return 0; end
-    set -l conn_files (sudo -n find -H "$nm_conn_dir" -maxdepth 1 -name '*.nmconnection' -type f -print0 2>/dev/null | string split0); set -l _conn_ps $pipestatus
+    if not test -d "$nm_conn_dir"; and not sudo -n test -d "$nm_conn_dir" 2>/dev/null; _info "  NetworkManager connections: directory not found"; return 0; end # a 0700 parent hides it
+    set -l conn_files (sudo -n find -H "$nm_conn_dir" -maxdepth 1 -type f -print0 2>/dev/null | string split0); set -l _conn_ps $pipestatus # keyfile reads every file there
     test (count $conn_files) -gt 1; and set conn_files (path sort -- $conn_files)
     if test "$_conn_ps[1]" -ne 0; _warn "  NetworkManager connections: cannot enumerate (sudo lapse or read error)"; return 0; end
     if test (count $conn_files) -gt 0
@@ -2466,9 +2493,9 @@ function _vrs_nm_perms --description "_verify_runtime_session sub: NetworkManage
         for conn_file in $conn_files; _chk_perms "$conn_file" 600 root:root true; or set bad_perms (math $bad_perms + 1); end
         if test "$bad_perms" -eq 0; set -l conn_count (count $conn_files); _ok "  NetworkManager connections: $conn_count file(s) with correct permissions"; end
     else if begin; command grep -q -- 'wifi.backend=' "$nm_dropin" 2>/dev/null; or begin; not test -r "$nm_dropin"; and sudo -n grep -q -- 'wifi.backend=' "$nm_dropin" 2>/dev/null; end; end # sudo fallback if drop-in is 0600
-        _warn "  NetworkManager connections: no .nmconnection files (Wi-Fi may not auto-connect)"
+        _warn "  NetworkManager connections: no connection files (Wi-Fi may not auto-connect)"
     else
-        _info "  NetworkManager connections: no .nmconnection files found"
+        _info "  NetworkManager connections: no connection files found"
     end
 end
 function _vrs_vfat_skip --argument-names path boot_fstype --description "_vrs_installed_file_perms and _vrs_parent_dirs sub: Return 0 on a vfat or unknown boot fstype"
@@ -2838,12 +2865,12 @@ function _rpt_gpu_dir --description "First amdgpu device directory that exposes 
 end
 function _rpt_mi --argument-names key --description "_rpt_sys_mem sub: One /proc/meminfo field in bytes"; set -l v (string match -rg -- "^$key:\s+(\d+) kB" (command cat -- /proc/meminfo 2>/dev/null))[1]; test -n "$v"; and math "$v * 1024"; end
 function _rpt_pkgver --argument-names p --description "Installed version of a package from one cached pacman -Q listing"
-    if not set -q _RPT_PQ; set -g _RPT_PQ; set -g _RPT_PQN; command -q pacman; and set -g _RPT_PQ (command pacman -Q 2>/dev/null); set -q _RPT_PQ[1]; and set -g _RPT_PQN (string replace -r -- ' .*$' '' $_RPT_PQ); end # no pacman: an empty cache, not an Unknown-command trace per call
+    if not set -q -g _RPT_PQ; set -g _RPT_PQ; set -g _RPT_PQN; command -q pacman; and set -g _RPT_PQ (command pacman -Q 2>/dev/null); set -q _RPT_PQ[1]; and set -g _RPT_PQN (string replace -r -- ' .*$' '' $_RPT_PQ); end # no pacman: an empty cache, not an Unknown-command trace per call
     set -l i (contains -i -- "$p" $_RPT_PQN); or return 1
     string replace -r -- '^\S+ ' '' $_RPT_PQ[$i]
 end
 function _rpt_esp --description "_rpt_sys_platform sub: ESP the run resolved, else bootctl -p or a vfat mount, without sudo"
-    if set -q _RY_ESP_TRIED; printf '%s' "$_RY_ESP_PATH"; return 0; end # _resolve_boot_path reaches _resolve_esp only when bootctl -x fails
+    if set -q -g _RY_ESP_TRIED; printf '%s' "$_RY_ESP_PATH"; return 0; end # _resolve_boot_path reaches _resolve_esp only when bootctl -x fails
     set -l p; command -q bootctl; and set p (command bootctl -p 2>/dev/null | string trim -- | string trim -r -c / --)
     test -n "$p"; and test -d "$p"; and printf '%s' "$p"; and return 0
     for c in /efi /boot/efi /boot/EFI /boot # _resolve_esp's candidates and autofs filter
@@ -2855,7 +2882,7 @@ function _rpt_sys_platform --description "_rpt_sec_system sub: Host, firmware, O
     set -l dmi /sys/class/dmi/id; set -l os (string match -rg -- '^PRETTY_NAME="?([^"]*)"?$' (command cat -- /etc/os-release 2>/dev/null))[1]
     set -l kr (command uname -r 2>/dev/null); set -l kp (_rpt_rd /usr/lib/modules/$kr/pkgbase); set -l up (string split ' ' -- (_rpt_rd /proc/uptime))[1]; set -l upt; set -l ru; set -l esp; set -l bp
     string match -qr -- '^\d+(\.\d+)?$' "$up"; and set upt (printf '%sd %sh %sm' (math -s0 "$up / 86400") (math -s0 "$up % 86400 / 3600") (math -s0 "$up % 3600 / 60"))
-    test -n "$_ROOT_UUID"; and set ru "UUID=$_ROOT_UUID"; set esp (_rpt_esp); set -q _RY_BOOT_TRIED; and set bp $_RY_BOOT_PATH
+    test -n "$_ROOT_UUID"; and set ru "UUID=$_ROOT_UUID"; set esp (_rpt_esp); set -q -g _RY_BOOT_TRIED; and set bp $_RY_BOOT_PATH
     printf '<div><h3>Platform</h3><table class="kv">\n'
     _rpt_kv Host (command uname -n 2>/dev/null); _rpt_kv Machine (string join ' ' -- (_rpt_rd $dmi/sys_vendor) (_rpt_rd $dmi/product_name))
     _rpt_kv Board (string join ' ' -- (_rpt_rd $dmi/board_vendor) (_rpt_rd $dmi/board_name))
@@ -2921,7 +2948,7 @@ function _rpt_sys_mem --description "_rpt_sec_system sub: VRAM, GTT, RAM, and sw
     test -n "$st"; and test -n "$sf"; and _rpt_use Swap (math "$st - $sf") $st
 end
 function _rpt_sys_disk --description "_rpt_sec_system sub: Filesystem usage meters for / and the boot partition"
-    printf '<h3>Storage</h3>\n'; set -l bp; set -q _RY_BOOT_TRIED; and set bp $_RY_BOOT_PATH
+    printf '<h3>Storage</h3>\n'; set -l bp; set -q -g _RY_BOOT_TRIED; and set bp $_RY_BOOT_PATH
     for m in / $bp
         set -l r (string split -n ' ' -- (command env LC_ALL=C df --output=size,used,target -B1 -- "$m" 2>/dev/null | command tail -n 1))
         test (count $r) -eq 3; or continue
@@ -3181,7 +3208,7 @@ function _bootctl_dir --argument-names flag logtag fallnote --description "Probe
     printf '%s' "$_p"
 end
 function _resolve_esp --description "Resolve EFI system partition path (cached; empty result also cached)"
-    if set -q _RY_ESP_TRIED; printf '%s' "$_RY_ESP_PATH"; return 0; end
+    if set -q -g _RY_ESP_TRIED; printf '%s' "$_RY_ESP_PATH"; return 0; end
     set -l _p (_bootctl_dir -p ESP_BOOTCTL_PIPE_FAIL "falling through to findmnt")
     if test -z "$_p"; or begin; not test -d "$_p"; and not sudo -n test -d "$_p" 2>/dev/null; end
         for _candidate in /efi /boot/efi /boot/EFI /boot # only independently-mounted vfat (plain dir: findmnt empty)
@@ -3207,7 +3234,7 @@ function _resolve_esp --description "Resolve EFI system partition path (cached; 
     printf '%s' "$_p"
 end
 function _resolve_boot_path --description "Resolve \$BOOT (XBOOTLDR if present, else ESP) per BLS (cached; empty result also cached)"
-    if set -q _RY_BOOT_TRIED; printf '%s' "$_RY_BOOT_PATH"; return 0; end
+    if set -q -g _RY_BOOT_TRIED; printf '%s' "$_RY_BOOT_PATH"; return 0; end
     set -l _p (_bootctl_dir -x BOOT_BOOTCTL_PIPE_FAIL "falling through to ESP")
     test -z "$_p"; or begin; not test -d "$_p"; and not sudo -n test -d "$_p" 2>/dev/null; end; and set _p (_resolve_esp)
     set -g _RY_BOOT_PATH "$_p"; set -g _RY_BOOT_TRIED true
@@ -3219,10 +3246,7 @@ function _pre_dispatch_log_cleanup --description "_pre_dispatch_exit sub: Remove
     set -l _preserve false
     set -q _RY_HEADER_WRITTEN; and test "$_RY_HEADER_WRITTEN" = true; and set _preserve true
     set -q _RY_LOG_WRITTEN; and test "$_RY_LOG_WRITTEN" = true; and set _preserve true
-    test "$_preserve" = false; and command rm -f -- "$LOG_FILE" 2>/dev/null
-    command rmdir -- "$LOG_DIR" 2>/dev/null
-    command rmdir -- (command dirname -- "$LOG_DIR") 2>/dev/null
-    test "$_RY_HOME_NEW" = true; and command rmdir -- "$_RY_HOME_DIR" 2>/dev/null # only a ~/ry-install this run created
+    if test "$_preserve" = false; _ry_rm_log; _ry_rm_new_dirs; end # a kept log keeps its dirs
     set -g _RY_LOG_SUPPRESS_CREATE true # suppress lazy-create
 end
 function _pre_dispatch_exit --argument-names code --description "Pre-dispatch teardown: log/dir cleanup, then exit"; _pre_dispatch_log_cleanup; _ry_exit $code; end
@@ -3309,6 +3333,6 @@ switch "$MODE"
 end
 _dc_settle # reap and tmpfile records precede the footer
 _write_footer "$_RY_EXIT_CODE" ""
-set -q _RY_LOG_WRITE_FAIL; and test "$_RY_LOG_WRITE_FAIL" = true; and test "$MODE" != check; and echo "[WARN] Log writes failed during this run — JSONL may be incomplete or removed (check disk space / file permissions under $LOG_DIR)" >&2
-test "$MODE" != check; and not set -q _RY_LOG_WRITE_FAIL; and echo "[INFO] Log file: $LOG_FILE" >&2
+set -q _RY_LOG_WRITE_FAIL; and test "$_RY_LOG_WRITE_FAIL" = true; and test "$MODE" != check; and not set -q _RY_OUTPUT_BROKEN; and echo "[WARN] Log writes failed during this run — JSONL may be incomplete or removed (check disk space / file permissions under $LOG_DIR)" >&2
+test "$MODE" != check; and not set -q _RY_LOG_WRITE_FAIL; and not set -q _RY_OUTPUT_BROKEN; and echo "[INFO] Log file: $LOG_FILE" >&2
 exit $_RY_EXIT_CODE

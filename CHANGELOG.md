@@ -3,16 +3,62 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.249.0
+7.250.0
 -------
 
-  - verify: CPU scaling driver, governor and EPP get one row each across all
-    policies, with the value; the cpu0 rows that repeated them are gone
-  - report: a run failed only by generators no longer opens its verdict with
-    '0 failed check(s)'
+  - guard: internal state inherited from the environment or config.fish (an
+    _RY_* flag, _FOOTER_WRITTEN, an argparse _flag_*) is erased at startup
+  - guard: a fish universal variable named like internal state stops the run
+    with exit 3, naming the set -eU that clears it (--check stays silent)
+  - guard: an early exit or a signal before the JSONL header removes only the
+    empty log and ~/ry-install dirs this run created
+  - guard: an early exit no longer loads or runs a user's fish function named
+    _do_cleanup (config.fish or the function path)
+  - guard: a config.fish job-control or IFS setting no longer steers a run
+    (command output read as one line)
+  - guard: fish with the regex-easyesc feature turned off exits 3 (--check
+    stays silent); the JSONL escaping depends on it
+  - guard: the tmpfile list is reset, never erased, so a fish universal of
+    that name set mid-run cannot steer the final sweep
+  - guard: the boot-path, kernel-config and package caches read only this
+    run's globals, never a fish universal set mid-run
+  - guard: a fish universal variable named _early_ch is no longer erased
+  - signals: a second signal while a startup signal is handled no longer ends
+    the run with exit 0 or 1, skipping the dir cleanup
+  - signals: a signal in the final step of an early exit keeps its exit code,
+    and one during a signal teardown no longer turns 128+N into 0
+  - check: CHECK_UNIT_DRIFT records for an inactive or not-enabled unit name
+    the expected state
+  - check: a managed file that is a symlink behind a directory this user
+    cannot traverse no longer records its link mode as drift
+  - verify: a failing CPU row names the expected value again
+  - verify: the systemd-resolved check runs when its drop-in sits behind a
+    directory this user cannot traverse
+  - verify: the systemd-resolved check warns, rather than skipping silently,
+    when a lapsed sudo hides its drop-in
+  - verify: a symlinked mkinitcpio.conf.d no longer warns about drop-ins
+    mkinitcpio never reads
+  - verify: a mkinitcpio preset _config is reported: a WARN when it names
+    another file, an INFO for mkinitcpio.conf (conf.d skipped)
+  - verify: a dangling link at a managed file's .ry.bak or .ry.orig name is
+    listed as a stray
+  - verify: a directory at a .ry.bak name in ~/ry-install/backups is warned
+    about; the next backup there would fail
+  - verify: a stale 60-ry-* drop-in behind a 0700 /etc/modprobe.d is reported,
+    and the stray sweep skips only reported ones
+  - verify: NetworkManager keyfile modes are checked behind a 0700
+    /etc/NetworkManager and for keyfiles without a .nmconnection suffix
+  - verify: a HOOKS build script behind a 0700 /etc/initcpio/install no longer
+    reads as missing
+  - verify: a MISSING row with a descriptive label names the expected line
+  - logging: the closing log-file lines are skipped once stderr is gone
+  - logging: the preflight log is created as soon as its dir exists, so a
+    concurrent run's early exit cannot remove that dir
+  - readme: exit 3 lists a fish universal named like internal state or
+    regex-easyesc off, Shell names it; Unowned state names drop-ins read
 
 
-7.246.0 - 7.248.0
+7.246.0 - 7.249.0
 -----------------
 
   - env: 7.248.0 expect 0x3434/0x0b00 (Keychron Q0 HE) in
@@ -30,11 +76,16 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     is checked with sudo; a dotfile read failure says to check owner and mode
   - verify: 7.247.0 a missing realpath no longer prints fish errors in the
     stray sweep; the MASK state check is one pass
+  - verify: 7.249.0 CPU scaling driver, governor and EPP get one row each
+    across all policies, value shown; the repeated cpu0 rows are gone
   - report: 7.247.0 an empty action list no longer claims a clean run the
     counts contradict; the UUID fallback calls an unreadable copy unreadable
   - report: 7.247.0 the counts ring follows the print palette; the sysctl
     coverage bar is named Kernel tunables
-  - logging: 7.247.0 the header timestamp survives a failed date
+  - report: 7.249.0 a run failed only by generators no longer opens its
+    verdict with '0 failed check(s)'
+  - logging: 7.247.0 a failed date leaves the header ts empty instead of
+    breaking its JSON
 
 
 7.245.0
@@ -64,8 +115,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     list names /usr/lib/modules
   - report: a size probe blocked by a sudo lapse grades no sudo, not differs
   - logging: a failed stderr write logs STDERR_WRITE_FAIL once
-  - logging: tmpfile and child-reap records precede the footer again; a signal
-    while the footer is built still writes it
+  - logging: tmpfile and child-reap records precede the footer; a signal while
+    the footer is built still writes it
   - logging: a log rename that falls back to cp, or fails, is logged; the
     log-write warning allows a removed JSONL
 
@@ -137,8 +188,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 
   - guard: a sourced or piped run is refused under any locale; a startup
     signal exits 128+N silently; QUIT is no longer registered
-  - cli: -h and -v exit 1 when stdout is closed or full; --check stays silent
-    on a non-numeric id -u; a writable /tmp is no longer required
+  - cli: -h and -v exit 1 when stdout is full (closed too, under fish 3);
+    --check stays silent on a non-numeric id -u; /tmp need not be writable
   - cli: help alignment and the CPU-gate override hint match the code
   - check: --check keeps fish's own log write errors off stderr
   - verify: a token present only in a mkinitcpio.conf comment no longer reads

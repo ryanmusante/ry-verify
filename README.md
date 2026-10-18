@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.249.0** · [Changelog](CHANGELOG.md)
+**Version 7.250.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -24,7 +24,7 @@ Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Resul
 | Requirement | Detail |
 |---|---|
 | OS | CachyOS (Arch-based), systemd-boot with BLS entries |
-| Shell | fish 3.6 or newer |
+| Shell | fish 3.6 or newer, with its default `regex-easyesc` feature on |
 | Hardware | CPU matching `Ryzen AI Max` — on any other CPU `--verify` and `--report` warn and continue; `--check` exits `3` unless overridden via [Environment Overrides](#environment-overrides) |
 | BIOS | flat 85 W ceiling, `TjMax = 90 °C` — see [BIOS](#bios) |
 | Privileges | normal user with sudo rights; `sudo -v` cached before the run — when it is not, `--verify` and `--report` prompt through `sudo -v` if stdin and stderr are both a TTY, and exit `3` otherwise, if the prompt fails, or if no credential ends up cached (`timestamp_timeout=0`); `--check` never prompts and exits `3` |
@@ -43,7 +43,7 @@ Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYY
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
 | `1` | a `--verify` or `--report` mismatch, a report that could not be written, or `-h`/`-v` output that could not be written (stdout full, or closed under fish 3) |
 | `2` | bad arguments, root misuse — except a valid `--check` run as root, which exits `3` silently |
-| `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides); `--check` stays silent |
+| `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
 ## Environment Overrides
@@ -99,7 +99,7 @@ Profile-change states are graded as the ledger grades the same finding: `match`,
 
 **Read-only** — no mode takes a lock or writes outside its log tree, `~/ry-install/logs/`, kept `0700`; nothing lands in `/tmp`. A missing `~/ry-install` is created `0700` to hold it; an existing one is never re-moded — a group- or world-writable one stops the run, exit `3`.
 
-**Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, any `sdboot-manage.conf.d` or `mkinitcpio.conf.d` drop-in, and stray files beside managed files.
+**Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins each tool reads, and stray files beside managed files.
 
 ## Embedded Values
 
