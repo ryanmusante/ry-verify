@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.248.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.249.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.248.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.249.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -271,7 +271,7 @@ function _write_footer --argument-names exit_code extra_key --description "Appen
 end
 set -g _CLEANUP_DONE false; set -g _RY_SETTLE_DONE false
 
-# ── CLEANUP ORCHESTRATION: CHILDREN → TMPFILES → FS SWEEP → GLOBALS ──
+# ── CLEANUP ORCHESTRATION: CHILDREN → TMPFILES → GLOBALS ──
 function _dc_sweep_tmpfiles --description "_dc_settle sub: Remove tracked tmpfiles/dirs"
     set -l _stuck_tmpfiles
     for _tf in $_TRACKED_TMPFILES
@@ -285,14 +285,6 @@ function _dc_sweep_tmpfiles --description "_dc_settle sub: Remove tracked tmpfil
         not set -q _FOOTER_WRITTEN; and functions -q _log; and _log "TMPFILE_STUCK: $_tf"
     end
     set --erase _TRACKED_TMPFILES
-end
-function _dc_sweep_filesystem --description "_do_cleanup sub: Sweep tmp root for leftover ry-* tmpfiles"
-    functions -q _tmp_dir; or return 0
-    set -l _tmpdir (_tmp_dir); set -l _tmp_globs $_RY_TMPDIR_GLOBS
-    test (count $_tmp_globs) -gt 0; or return 0
-    set -l _find_name_args
-    for _g in $_tmp_globs; test -n "$_find_name_args"; and set -a _find_name_args -o; set -a _find_name_args -name "$_g"; end
-    command find "$_tmpdir" -xdev -maxdepth 1 \( $_find_name_args \) -type f -uid "$_MY_UID" -delete 2>/dev/null
 end
 function _dc_erase_globals --description "_do_cleanup sub: Erase cached globals"
     set --erase _KCONFIG_DATA _KCONFIG_LOADED _RY_ESP_PATH _RY_BOOT_PATH
@@ -327,9 +319,8 @@ function _dc_settle --description "Reap children and sweep tmpfiles once, ahead 
     _dc_sweep_tmpfiles
     set -g _RY_SETTLE_DONE true # last: a signal mid-settle redoes both (each re-entry safe)
 end
-function _do_cleanup --description "Top-level cleanup: reap children → tmpfiles → fs sweep → globals"
+function _do_cleanup --description "Top-level cleanup: reap children → tmpfiles → globals"
     _dc_settle # no-op when the footer path settled first
-    _dc_sweep_filesystem
     _dc_erase_globals
 end
 
@@ -843,7 +834,6 @@ function _mktemp_or_null --description "Wrapper for mktemp; emits path on stdout
     echo "$_tf"
     return 0
 end
-function _tmp_dir --description "Tmp root (pinned /tmp)"; printf '%s' /tmp; end
 
 # ── FILESYSTEM PROBES (symlink, system-dst, byte read, byte count) ──
 function _is_symlink --argument-names path use_sudo --description "Sudo-aware test -L (rc 0/1/2 = symlink/not/sudo-lapse)"
@@ -1974,26 +1964,12 @@ function _vrk_gpu_state --description "_verify_runtime_kparams sub: GPU performa
 end
 function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor/EPP + amd_pstate + boost"
     _echo "── CPU performance ──"
-    set -l _cpu_path ""; set -l _cpu_dirs
+    set -l _cpu_dirs
     for cpu_dir in /sys/devices/system/cpu/cpu*/cpufreq; test -d "$cpu_dir"; and set -a _cpu_dirs "$cpu_dir"; end
-    test (count $_cpu_dirs) -gt 0; and set _cpu_path $_cpu_dirs[1]
-    if test -z "$_cpu_path"
+    if test (count $_cpu_dirs) -eq 0
         _warn "  No CPU frequency scaling found"
     else
-        set -l cpu_name (string replace -r '.*/cpu(\d+)/.*' 'cpu$1' -- "$_cpu_path")
-        _info "  Checking $cpu_name (representative)"
-        for check in "scaling_driver:$EXPECTED_SCALING_DRIVER:Scaling driver" \
-            "scaling_governor:$CPUPOWER_GOVERNOR:Governor" # profile-managed
-            set -l parts (string split ':' -- "$check"); set -l sysfs_val (command cat -- "$_cpu_path/$parts[1]" 2>/dev/null)
-            _chk_eq "$parts[3]" "$sysfs_val" "$parts[2]"
-        end
-        set -l _epp (command cat -- "$_cpu_path/energy_performance_preference" 2>/dev/null) # EPP pinned via 99-ry-perf.rules
-        if test -n "$_epp"
-            _chk_eq "EPP" "$_epp" "$EPP_PREFERENCE"
-        else
-            _info "  EPP: unreadable"
-        end
-        for _attr in scaling_driver:$EXPECTED_SCALING_DRIVER scaling_governor:$CPUPOWER_GOVERNOR energy_performance_preference:$EPP_PREFERENCE
+        for _attr in scaling_driver:$EXPECTED_SCALING_DRIVER scaling_governor:$CPUPOWER_GOVERNOR energy_performance_preference:$EPP_PREFERENCE # one row each, every policy
             set -l _a (string split -m1 ':' -- "$_attr"); set -l _bad; set -l _n 0 # _n = policies that expose the attr
             for _d in $_cpu_dirs
                 test -r "$_d/$_a[1]"; or continue
@@ -2004,7 +1980,7 @@ function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor
             if test "$_n" -eq 0
                 _info "  $_a[1]: not exposed by any of "(count $_cpu_dirs)" policies" # e.g. EPP under acpi-cpufreq: nothing to compare
             else if test (count $_bad) -eq 0
-                _ok "  $_a[1]: uniform across $_n of "(count $_cpu_dirs)" policies"
+                _ok "  $_a[1]: $_a[2], uniform across $_n of "(count $_cpu_dirs)" policies"
             else
                 _fail "  $_a[1]: "(count $_bad)" of "(count $_cpu_dirs)" policies diverge: $_bad"
             end
@@ -2819,7 +2795,7 @@ function _rpt_sec_verdict --argument-names dst now --description "_rpt_render su
     set -l w (_rpt_verdict_word); set -l vc (string replace -- PASS-WITH-WARNINGS WARN $w); set -l s 'Every check passed.'; set -l x
     test "$VERIFY_GEN_FAIL" -gt 0; and set -a x "$VERIFY_GEN_FAIL generator failure(s)"; test "$VERIFY_WARN" -gt 0; and set -a x "$VERIFY_WARN warning(s)"
     test "$w" = PASS-WITH-WARNINGS; and set s "No failed checks; $VERIFY_WARN warning(s) to review."
-    test "$w" = FAIL; and set s (string join ', ' -- "$VERIFY_FAIL failed check(s)" $x)'.'
+    set -l f; test "$VERIFY_FAIL" -gt 0; and set f "$VERIFY_FAIL failed check(s)"; test "$w" = FAIL; and set s (string join ', ' -- $f $x)'.'
     test "$w" = PREFLIGHT; and set s 'Verification stopped at a preflight gate; the action items name the cause.'
     test "$_RY_LOG_WRITE_FAIL" = true; and set s "$s Log writes failed, so the ledger may be incomplete."
     printf '<section id="verdict"><h2><b>1</b>Verdict</h2>\n<div class="verdict v-%s">' $vc
