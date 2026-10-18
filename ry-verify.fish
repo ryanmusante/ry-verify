@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.247.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.248.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.247.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.248.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
@@ -428,7 +428,7 @@ set -g BLACKLIST_AMDXDNA false # false + iommu=pt enables the NPU
 
 # ── EMBEDDED DATA: ENV_VARS + SYSCTL_VALUES ──
 set -g ENV_VARS "DXVK_LOG_LEVEL=none" "GSK_RENDERER=gl" "MANGOHUD=1" "MANGOHUD_DLSYM=1" "MESA_SHADER_CACHE_MAX_SIZE=16G" "POWERDEVIL_NO_DDCUTIL=1" "PROTON_LOCAL_SHADER_CACHE=1" \
-    "RADV_PERFTEST=nggc,nircache" "SDL_GAMECONTROLLER_IGNORE_DEVICES=0x3434/0x0e20,0x3434/0xd030" "VKD3D_DEBUG=none" "VKD3D_SHADER_DEBUG=none" "WINEDEBUG=-all"
+    "RADV_PERFTEST=nggc,nircache" "SDL_GAMECONTROLLER_IGNORE_DEVICES=0x3434/0x0e20,0x3434/0xd030,0x3434/0x0b00" "VKD3D_DEBUG=none" "VKD3D_SHADER_DEBUG=none" "WINEDEBUG=-all"
 set -g SYSCTL_VALUES "kernel.nmi_watchdog=0" "net.core.default_qdisc=fq" "net.ipv4.tcp_congestion_control=bbr" "net.ipv4.tcp_notsent_lowat=16384" "net.ipv4.tcp_slow_start_after_idle=0" \
     "vm.compaction_proactiveness=0" "vm.max_map_count=2147483642" "vm.watermark_boost_factor=0" "vm.watermark_scale_factor=125"
 
@@ -675,15 +675,17 @@ function _content__etc_sysctl.d_95-ry-overrides.conf --description "Generate con
     end
     if test "$_printed" -ne (count $SYSCTL_VALUES); functions -q _log; and _log "SYSCTL_COUNT_MISMATCH: printed=$_printed expected="(count $SYSCTL_VALUES); return $EXIT_GEN_SYSCTL; end
 end
-function _content__etc_udev_rules.d_99-ry-perf.rules --description "Generate content for combined udev perf rules"
+function _content__etc_udev_rules.d_99-ry-perf.rules --description "Generate content for combined udev perf and input rules"
     printf '%s\n' \
-        "# ry-install: udev performance rules (managed file, do not edit by hand)" \
+        "# ry-install: udev performance and input rules (managed file, do not edit by hand)" \
         "# NVMe scheduler none (lowest tail latency; diverges from CachyOS kyber default)" \
         'ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ENV{DEVTYPE}=="disk", ATTR{queue/scheduler}="none"' \
         "# AMD P-State EPP $EPP_PREFERENCE (CPPC hint)" \
         'ACTION=="add|change", SUBSYSTEM=="cpu", KERNEL=="cpu[0-9]*", ATTR{cpufreq/energy_performance_preference}="'$EPP_PREFERENCE'"' \
         "# GPU performance level $GPU_DPM_LEVEL (gfx1151)" \
-        'ACTION=="add", KERNEL=="card[0-9]*", SUBSYSTEM=="drm", ENV{DEVTYPE}=="drm_minor", DRIVERS=="amdgpu", ATTR{device/power_dpm_force_performance_level}="'$GPU_DPM_LEVEL'"'
+        'ACTION=="add", KERNEL=="card[0-9]*", SUBSYSTEM=="drm", ENV{DEVTYPE}=="drm_minor", DRIVERS=="amdgpu", ATTR{device/power_dpm_force_performance_level}="'$GPU_DPM_LEVEL'"' \
+        "# Xbox Wireless Controller ignored by libinput (games still read it directly)" \
+        'ACTION!="remove", SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="Xbox Wireless Controller", ENV{LIBINPUT_IGNORE_DEVICE}="1"'
 end
 function _content__etc_modprobe.d_60-ry-modules.conf --description "Generate content for /etc/modprobe.d/60-ry-modules.conf (optional amdxdna blacklist)"
     printf '%s\n' \
@@ -1409,13 +1411,14 @@ function _vss_bluetooth --description "_verify_static_system sub: BlueZ main.con
     _chk_grep /etc/bluetooth/main.conf "AutoEnable=$BT_AUTO_ENABLE" "" line
     _chk_grep /etc/bluetooth/main.conf "ReconnectAttempts=$BT_RECONNECT_ATTEMPTS" "" line
 end
-function _vss_udev --description "_verify_static_system sub: Combined udev perf rules (NVMe scheduler + EPP + GPU DPM level)"
-    _echo "── udev (perf: I/O scheduler + EPP + GPU DPM level) ──"
+function _vss_udev --description "_verify_static_system sub: Combined udev rules (NVMe scheduler, EPP, GPU DPM, Xbox controller)"
+    _echo "── udev (perf: I/O scheduler + EPP + GPU DPM level; input: Xbox controller) ──"
     _chk_file /etc/udev/rules.d/99-ry-perf.rules; or return 0
     _chk_grep /etc/udev/rules.d/99-ry-perf.rules 'queue/scheduler}="none"' "nvme scheduler=none"
     _chk_grep /etc/udev/rules.d/99-ry-perf.rules 'energy_performance_preference}="'$EPP_PREFERENCE'"' "EPP=$EPP_PREFERENCE"
     _chk_grep /etc/udev/rules.d/99-ry-perf.rules 'power_dpm_force_performance_level}="'$GPU_DPM_LEVEL'"' "GPU dpm=$GPU_DPM_LEVEL"
     _chk_grep /etc/udev/rules.d/99-ry-perf.rules 'KERNEL=="card[0-9]*"' "GPU rule card-scoped"
+    _chk_grep /etc/udev/rules.d/99-ry-perf.rules 'ACTION!="remove", SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="Xbox Wireless Controller", ENV{LIBINPUT_IGNORE_DEVICE}="1"' "Xbox controller libinput ignore" line
 end
 function _vss_nft --description "_verify_static_system sub: nftables default-deny-inbound + IPv4 ping and ICMPv6 base accept"
     _echo "── nftables ──"

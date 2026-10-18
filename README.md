@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.247.0** · [Changelog](CHANGELOG.md)
+**Version 7.248.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -32,7 +32,7 @@ Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Resul
 
 ## Usage
 
-The bare invocation equals `--verify`; `--report` runs `--verify` and writes the [Report](#report); `--check` is the silent idempotency probe (the three are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and is an unknown option here, exit `2`. Positional arguments exit `2`. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
+The bare invocation equals `--verify`; `--report` runs `--verify` and writes the [Report](#report); `--check` is the silent idempotency probe (the three are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and, like positional arguments, exits `2` here. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
 
 Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl`, where `MODE` is `verify`, `check`, or `report`; `--report` adds `report-YYYYMMDD-HHMMSS±ZZZZ-PID.html` (`0600`) beside its log, same stem. A fresh install's `./ry-verify.fish --check` reports drift until reboot.
 
@@ -43,7 +43,7 @@ Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYY
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
 | `1` | a `--verify` or `--report` mismatch, a report that could not be written, or `-h`/`-v` output that could not be written (stdout full, or closed under fish 3) |
 | `2` | bad arguments, root misuse — except a valid `--check` run as root, which exits `3` silently |
-| `3` | missing dependency; uncached sudo that no TTY prompt resolved; gate mismatch; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides); `--check` stays silent |
+| `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
 ## Environment Overrides
@@ -67,7 +67,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Static › System configuration | resolved, logind, NetworkManager dispatcher logging, NetworkManager, `iw-regdomain`, bluetooth, `cpupower-service.conf`, sysctl drop-in, udev, modprobe plus the unmanaged `60-ry-*` sweep, nftables |
 | Static › User configuration | `environment.d` (`ENV_VARS`), MangoHud |
 | Static › Packages | `PKGS_ADD` and `EXPECTED_VULKAN_PKGS` present, `PKGS_DEL` absent, `pacman.conf` `IgnorePkg` and `ParallelDownloads` |
-| Static › Services | `MASK` unit state, plus masked units the profile no longer declares |
+| Static › Services | `MASK` unit state, plus admin-scope masks not in `MASK` |
 | Static › Syntax validation | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
 | Static › Checksum verification | installed bytes compared with generator output, a symlinked destination rejected rather than followed, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty, stray files beside managed files |
 | Runtime › Kernel cmdline | live `/proc/cmdline`, kernel parser rejections |
@@ -80,7 +80,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Report
 
-`--report` runs every `--verify` check, then renders the run into one self-contained HTML file beside its JSONL log — inline styles, an SVG counts ring and CSS bar charts, no scripts, no network. Sections run from most to least urgent:
+`--report` runs every `--verify` check, then renders the run into one self-contained HTML file beside its JSONL log — no scripts, no network. Sections run from most to least urgent:
 
 | Section | Content |
 |---|---|
@@ -91,9 +91,9 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Verification ledger | a per-group chart, then every logged row, groups with a `FAIL` first, then groups with a `WARN` |
 | Appendix | every structured log event, each generated file body with its SHA-256, and the method |
 
-A report that cannot be written prints `[ERR] Report not written`, logs `REPORT_WRITE_FAIL`, and turns an otherwise clean exit into `1`.
+A report that cannot be written prints `[ERR] Report not written` and turns an otherwise clean exit into `1`.
 
-Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `no sudo`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled (for `nftables.service`, a live ruleset) warn; a unit to mask that is `not installed` is neutral; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. A file whose generator needs the unresolved root UUID is compared under the UUID its installed copy carries, as the ledger compares it. With no user bus, the ledger warns once for each check it skips — session `ENV_VARS` and user units — and the report marks every `ENV_VARS` row; a failed `systemctl --user show-environment` warns once and marks them `unreadable`. The unit table grades the unit file; whether an enabled unit is running is a row in the ledger's `Runtime › Service state` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither, and the Session environment bar is left out when the session environment cannot be read.
+Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `no sudo`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled (for `nftables.service`, a live ruleset) warn; a unit to mask that is `not installed` is neutral; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. A file whose generator needs the unresolved root UUID is compared under the UUID its installed copy carries. With no user bus, the ledger warns once for each check it skips — session `ENV_VARS` and user units — and the report marks every `ENV_VARS` row `no user bus`; a failed `systemctl --user show-environment` warns once and marks them `unreadable`. The unit table grades the unit file; whether an enabled unit is running is a row in the ledger's `Runtime › Service state` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither, and the Session environment bar is left out when the session environment cannot be read.
 
 ## Safety and Reliability
 
@@ -121,7 +121,7 @@ Firmware is not checked — the assumed ceiling and the per-setting walkthrough 
 
 ## Troubleshooting
 
-**Unmanaged 60-ry- drop-in warned** — `pacman -Qo /etc/modprobe.d/*` to confirm ownership, then `sudo rm` the files left by earlier versions.
+**Unmanaged `60-ry-*` drop-in warned** — `pacman -Qo /etc/modprobe.d/*` to confirm ownership, then `sudo rm` the files left by earlier versions.
 
 **Masked unit not in `MASK` reported** — `sudo systemctl unmask <unit>` if an earlier `MASK` masked it; leave distro and hand-made masks alone.
 
