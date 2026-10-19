@@ -3,7 +3,7 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.251.0
+7.252.0
 -------
 
   - signals: a signal during an early exit, before the main handler takes
@@ -12,25 +12,42 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     can no longer make it load or run a user's _dc_settle or _write_footer
   - guard: an invalid root UUID resets the global, never erases it, so a
     fish universal of that name cannot steer the cmdline checks
+  - cli: an unexpected positional argument prints escaped, so an empty one
+    reads '' rather than nothing
+  - preflight: a HOME that normalizes to empty or a non-directory names the
+    value set in its exit-3 error
+  - preflight: the CPUPOWER_GOVERNOR refusal names the ry-install check
+    whose domain it enforces
   - check: nftables.service is probed for a live ruleset even when a
     RemainAfterExit drop-in keeps the unit active
   - check: a not-found unit records load=not-found expected=loaded
+  - check: a disabled systemd-resolved, which ry-install never enables, logs
+    CONFD_UNIT_NOT_ENABLED instead of drift no re-run clears
+  - check: with no sudo binary, an unlistable modprobe.d no longer writes
+    to stderr
   - verify: a 0700 mkinitcpio.conf.d or sdboot-manage.conf.d is listed as
     root, not skipped with a WARN
   - verify: the mkinitcpio preset scan skips an empty _config and a trailing
     comment, and reads preset names with digits
+  - verify: presets in a 0700 /etc/mkinitcpio.d or 0600 files are read as
+    root; a custom config several presets name is listed once
   - verify: the preset INFO says only that preset skips mkinitcpio.conf.d,
     no longer contradicting the drop-in WARN
-  - verify: a directory at a .ry.bak name WARNs only for the boot files and
-    fstab that ry-install backs up
+  - verify: .ry.bak checks cover only the boot files and fstab ry-install
+    backs up; an empty copy or a directory elsewhere no longer reports
   - verify: a lapsed sudo cache behind a 0700 /etc/NetworkManager WARNs,
     not an INFO that the connections directory is missing
+  - verify: a drop-in directory it cannot list names the cause in its WARN
   - verify: HOOKS build scripts are probed as this user first; sudo runs
     only for one this user cannot see
+  - verify: a linux boot entry with no options line FAILs as missing every
+    KERNEL_PARAMS token, not a WARN
   - configuration: the 60-ry-modules.conf header no longer claims module
     options, matching ry-install
-  - logging: the hardware gate logs HARDWARE_MATCH with the detected CPU
-  - readme: Checks names the mkinitcpio preset _config check
+  - logging: the hardware gate logs HARDWARE_MATCH and the root UUID gate
+    ROOT_UUID_OK
+  - readme: Checks and Unowned state name the mkinitcpio preset _config;
+    --check names its subset; exit 3 adds an unusable HOME or log tree
 
 
 7.250.0

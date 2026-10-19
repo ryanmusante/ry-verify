@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.251.0** · [Changelog](CHANGELOG.md)
+**Version 7.252.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 17 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -43,7 +43,7 @@ Each run writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYY
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
 | `1` | a `--verify` or `--report` mismatch, a report that could not be written, or `-h`/`-v` output that could not be written (stdout full, or closed under fish 3) |
 | `2` | bad arguments, root misuse — except a valid `--check` run as root, which exits `3` silently |
-| `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides); `--check` stays silent |
+| `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; an unusable HOME or log tree; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
 ## Environment Overrides
@@ -59,7 +59,7 @@ The 17 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Checks
 
-`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset and reports drift only. Groups carry the names the [Report](#report) ledger uses; the console prints each in capitals, `Wi-Fi state` as `WIFI STATE`.
+`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes and modes, live `/proc/cmdline` tokens, unit states — and reports drift only. Groups carry the names the [Report](#report) ledger uses; the console prints each in capitals, `Wi-Fi state` as `WIFI STATE`.
 
 | Group | Scope |
 |---|---|
@@ -97,9 +97,9 @@ Profile-change states are graded as the ledger grades the same finding: `match`,
 
 ## Safety and Reliability
 
-**Read-only** — no mode takes a lock or writes outside its log tree, `~/ry-install/logs/`, kept `0700`; nothing lands in `/tmp`. A missing `~/ry-install` is created `0700` to hold it; an existing one is never re-moded — a group- or world-writable one stops the run, exit `3`.
+**Read-only** — no mode takes a lock or writes outside its log tree, `~/ry-install/logs/`, kept `0700`; nothing lands in `/tmp`. A missing `~/ry-install` is created `0700` to hold the log tree; an existing one is never re-moded — a group- or world-writable one stops the run, exit `3`.
 
-**Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins each tool reads, and stray files beside managed files.
+**Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins each tool reads, a mkinitcpio preset `_config`, and stray files beside managed files.
 
 ## Embedded Values
 
@@ -108,7 +108,7 @@ Profile-change states are graded as the ledger grades the same finding: `match`,
 
 The length of each array among the shared tunables is a drift tripwire in `_ir_validate_counts` of both scripts — `KERNEL_PARAMS:15` among them; the verify-only `EXPECTED_VULKAN_PKGS` below is pinned, as `EXPECTED_VULKAN_PKGS:2`, in `ry-verify.fish` alone, and the accepted-value sets `_RY_DPM_LEVELS` and `_RY_EPP_LEVELS` carry no pin. Adding or dropping an element also means updating that `NAME:<n>` in each script that pins it; otherwise that script refuses to run with `NAME count drift` and exits `3`. A kernel token is one such element — see [ry-install](https://github.com/ryanmusante/ry-install)'s Kernel Parameter Notes.
 
-Value tables, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below exist only on the verify side.
+Value lists, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below exist only on the verify side.
 
 ### Verify-Only Keys
 
