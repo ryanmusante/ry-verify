@@ -3,6 +3,36 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.251.0
+-------
+
+  - signals: a signal during an early exit, before the main handler takes
+    over, keeps the exit code instead of exiting 128+N
+  - guard: an early exit reads only this run's globals, so a fish universal
+    can no longer make it load or run a user's _dc_settle or _write_footer
+  - guard: an invalid root UUID resets the global, never erases it, so a
+    fish universal of that name cannot steer the cmdline checks
+  - check: nftables.service is probed for a live ruleset even when a
+    RemainAfterExit drop-in keeps the unit active
+  - check: a not-found unit records load=not-found expected=loaded
+  - verify: a 0700 mkinitcpio.conf.d or sdboot-manage.conf.d is listed as
+    root, not skipped with a WARN
+  - verify: the mkinitcpio preset scan skips an empty _config and a trailing
+    comment, and reads preset names with digits
+  - verify: the preset INFO says only that preset skips mkinitcpio.conf.d,
+    no longer contradicting the drop-in WARN
+  - verify: a directory at a .ry.bak name WARNs only for the boot files and
+    fstab that ry-install backs up
+  - verify: a lapsed sudo cache behind a 0700 /etc/NetworkManager WARNs,
+    not an INFO that the connections directory is missing
+  - verify: HOOKS build scripts are probed as this user first; sudo runs
+    only for one this user cannot see
+  - configuration: the 60-ry-modules.conf header no longer claims module
+    options, matching ry-install
+  - logging: the hardware gate logs HARDWARE_MATCH with the detected CPU
+  - readme: Checks names the mkinitcpio preset _config check
+
+
 7.250.0
 -------
 
@@ -54,8 +84,6 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - logging: the closing log-file lines are skipped once stderr is gone
   - logging: the preflight log is created as soon as its dir exists, so a
     concurrent run's early exit cannot remove that dir
-  - readme: exit 3 lists a fish universal named like internal state or
-    regex-easyesc off, Shell names it; Unowned state names drop-ins read
 
 
 7.246.0 - 7.249.0

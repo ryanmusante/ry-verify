@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.250.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.251.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.250.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.251.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t # config.fish job control or IFS would steer this run
@@ -17,6 +17,7 @@ set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check,report h/help v/version ver
 # ── STARTUP SIGNAL STUB (until _cleanup is defined) ──
 set -gu _RY_MVPROBE_DIR "" # mv -T probe dir; pinned empty: inherited values are never swept
 function _cleanup_startup --on-signal INT --on-signal TERM --on-signal HUP --on-signal ABRT --description "Startup signal stub until _cleanup is defined: re-raise 128+N, silent" # no handler: fish ends on a SIGINT between commands with exit 0
+    set -q -g _CLEANUP_DONE; and test "$_CLEANUP_DONE" = true; and return 0 # a bail in progress keeps its exit code
     set -l _n (string replace -r '^SIG' '' -- "$argv[1]"); set -l _x 130 # stays defined: an unobserved signal cuts it short
     for _sm in HUP:129 INT:130 TERM:143 ABRT:134; string match -q "$_n:*" -- $_sm; and set _x (string split ':' -- $_sm)[2]; end
     test -n "$_RY_MVPROBE_DIR"; and for _try in 1 2 3 4 5; set -l _ps $_RY_MVPROBE_DIR/.ry-mvprobe.$fish_pid.*; set -q _ps[1]; or break; command rm -f -- $_ps 2>/dev/null; end # a signal can beat the probe's rm; a killed rm is redone
@@ -105,7 +106,7 @@ set --erase _ry_path_new _ry_p
 command -q id; or begin; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] GNU coreutils id(1) required (resolves UID before privilege checks)" >&2; exit $EXIT_PREFLIGHT; end # first external command
 set -g _MY_UID (command id -u)
 
-# ── BAIL PRIMITIVES: _RY_EXIT + _SET_EXIT + HANDLER ERASE + ROOT USAGE ──
+# ── BAIL PRIMITIVES: _RY_EXIT + _SET_EXIT + HANDLER ERASE + LOG/DIR REMOVAL + ROOT USAGE ──
 function _ry_erase_handlers --description "Erase signal/exit handler functions"; functions -e _cleanup_startup _cleanup _cleanup_on_exit 2>/dev/null; end
 function _ry_rm_new_dirs --description "Remove the empty log dirs and ~/ry-install this run created"
     set -l _d # deepest first: rmdir takes its operands in order
@@ -125,9 +126,9 @@ end
 function _ry_exit --argument-names code --description "Set bail sentinel and exit"
     test -z "$code"; and set code 0
     string match -qr '^\d+$' -- "$code"; or set code $EXIT_FAIL # non-numeric breaks footer printf %d
-    if set -q _RY_INSTALL_BAILING; and test "$_RY_INSTALL_BAILING" = true; set -g _RY_INSTALL_LAST_EXIT $code; exit $code; end
+    if set -q -g _RY_INSTALL_BAILING; and test "$_RY_INSTALL_BAILING" = true; set -g _RY_INSTALL_LAST_EXIT $code; exit $code; end
     set -g _CLEANUP_DONE true; set -g _RY_INSTALL_LAST_EXIT $code; set -g _RY_INSTALL_BAILING true
-    if not set -q _RY_HEADER_WRITTEN; and not set -q _RY_LOG_WRITTEN
+    if not set -q -g _RY_HEADER_WRITTEN; and not set -q -g _RY_LOG_WRITTEN # this run's globals: a universal must not pick the branch
         _ry_rm_log # nothing was written to it
         _ry_rm_new_dirs # only the empty dirs this run created
     else
@@ -140,7 +141,7 @@ end
 function _set_exit --argument-names _code --description "Set both _RY_EXIT_CODE and _INTENDED_EXIT_CODE atomically"; set -g _RY_EXIT_CODE $_code; set -g _INTENDED_EXIT_CODE $_code; end
 function _ry_root_usage --description "Root-guard usage error: print msg + help to stderr, exit EXIT_USAGE"; echo "[ERR] $argv" >&2; _ry_show_help >&2; _ry_exit $EXIT_USAGE; end
 
-# ── ROOT GUARD + COLOR/TTY + FISH VERSION CHECK ──
+# ── ROOT GUARD + COLOR/TTY + FISH VERSION/FEATURE CHECK + UNIVERSAL-STATE GUARD ──
 if not string match -qr '^\d+$' -- "$_MY_UID"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] id -u returned non-numeric value: '$_MY_UID' — cannot determine user identity" >&2; _ry_exit $EXIT_PREFLIGHT; end
 if test "$_MY_UID" -eq 0
     if test "$_RY_ARGV_CHECK_ONLY" = true; _ry_exit $EXIT_PREFLIGHT; end # --check + valid mode: silent, 3 = cannot probe
@@ -214,7 +215,7 @@ for _ld_path in $_ld_paths
     command chmod -- 00700 "$_ld_path" 2>/dev/null # 5 digits: GNU chmod keeps a dir's setgid on '700'
     set -l _post (command stat -L -c '%a' -- "$_ld_path" 2>/dev/null)
     if test -n "$_pre"; and test "$_pre" != "$_post"; set -ga _RY_PERM_FIX_NOTICES "LOG_DIR_PERM_FIX: $_ld_path $_pre→$_post"; end
-    if test "$_post" != 700; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Log dir mode is $_post (expected 700): $_ld_path" >&2; _ry_exit $EXIT_PREFLIGHT; end
+    if test "$_post" != 700; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Log tree dir mode is $_post (expected 700): $_ld_path" >&2; _ry_exit $EXIT_PREFLIGHT; end
 end
 set --erase _ld_path _ld_paths _prev_mkdir_umask
 set -g _RY_MVPROBE_DIR "$LOG_DIR"; set -l _ry_mv_a (command mktemp -p "$LOG_DIR" ".ry-mvprobe.$fish_pid.XXXXXX" 2>/dev/null); set -l _ry_mv_b (command mktemp -p "$LOG_DIR" ".ry-mvprobe.$fish_pid.XXXXXX" 2>/dev/null) # log tree, not /tmp; PID-scoped
@@ -348,16 +349,16 @@ set -g _RY_DO_CLEANUP_OURS true # _ry_exit runs _do_cleanup only once it is this
 # ── VERIFY COUNTERS + TEARDOWN + SIGNAL/EXIT HANDLERS ──
 set -g VERIFY_OK 0; set -g VERIFY_FAIL 0; set -g VERIFY_WARN 0; set -g VERIFY_GEN_FAIL 0
 function _teardown --argument-names mode --description "Unified cleanup: footer, resources"
-    set -l _signum 0 # validate argv[2] numeric before footer
-    test (count $argv) -ge 2; and string match -qr '^\d+$' -- "$argv[2]"; and set _signum $argv[2]
+    set -l _code 0 # validate argv[2] numeric before footer
+    test (count $argv) -ge 2; and string match -qr '^\d+$' -- "$argv[2]"; and set _code $argv[2]
     switch "$mode"
         case signal
             _dc_settle # reap and tmpfile records precede the footer
-            _write_footer "$_signum" interrupted
+            _write_footer "$_code" interrupted
             _do_cleanup
         case exit
             _dc_settle # its records precede the footer
-            _write_footer "$_signum" ""
+            _write_footer "$_code" ""
             _do_cleanup
         case '*'
             _err "_teardown: unknown mode '$mode'"
@@ -464,7 +465,7 @@ function _ir_resolve_root_uuid --description "Cache root UUID into _ROOT_UUID"
     set -l _reason "findmnt failed (rc=$_fm_rc)"; test "$_fm_rc" -eq 0; and set _reason "findmnt returned no UUID"; test "$_fm_rc" -eq 127; and set _reason "findmnt absent"
     if test -n "$_ROOT_UUID"; and not string match -qr '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' -- "$_ROOT_UUID"
         set _reason "invalid UUID shape (got: $_ROOT_UUID)"
-        set --erase _ROOT_UUID
+        set -g _ROOT_UUID # reset, not erased: no universal surfaces
     end
     test -n "$_ROOT_UUID"; and return 0
     switch "$MODE"
@@ -587,6 +588,8 @@ function _init_runtime --description "Cache root UUID + CPU-model gate + validat
                 _err_loud_cont "  Override (at your risk): RY_INSTALL_SKIP_HARDWARE_CHECK=1 ./ry-verify.fish --check"
                 _pre_dispatch_exit $EXIT_PREFLIGHT
             end
+        else
+            _log "HARDWARE_MATCH: expected=$EXPECTED_CPU_MATCH detected=$_cpu_model"
         end
     end
     _ir_validate_counts
@@ -700,7 +703,7 @@ function _content__etc_udev_rules.d_99-ry-perf.rules --description "Generate con
 end
 function _content__etc_modprobe.d_60-ry-modules.conf --description "Generate content for /etc/modprobe.d/60-ry-modules.conf (optional amdxdna blacklist)"
     printf '%s\n' \
-        "# ry-install: module options + blacklist (managed file, do not edit by hand)"
+        "# ry-install: module blacklist (managed file, do not edit by hand)"
     if test "$BLACKLIST_AMDXDNA" = true # false = NPU path (see BLACKLIST_AMDXDNA global)
         printf '%s\n' \
             "# blacklist amdxdna: XDNA NPU needs IOMMU, probes -ENODEV (ret -19) under amd_iommu=off" \
@@ -1159,7 +1162,8 @@ end
 # ── MKINITCPIO HOOK VALIDATORS ──
 function _mkinitcpio_hook_exists --argument-names hook --description "True iff a HOOKS entry has a build script in an initcpio install dir"
     test -z "$hook"; and return 1
-    for _d in /etc/initcpio/install /usr/lib/initcpio/install; test -f "$_d/$hook"; or sudo -n test -f "$_d/$hook" 2>/dev/null; and return 0; end # mkinitcpio reads them as root
+    for _d in /etc/initcpio/install /usr/lib/initcpio/install; test -f "$_d/$hook"; and return 0; end # this user first: no sudo exec per hook
+    for _d in /etc/initcpio/install /usr/lib/initcpio/install; sudo -n test -f "$_d/$hook" 2>/dev/null; and return 0; end # mkinitcpio reads them as root
     return 1
 end
 function _vmh_existence_only --description "_ry_validate_mkinitcpio_hooks sub: Existence-only path: emit _ok/_fail per hook"
@@ -1252,8 +1256,11 @@ function _vsb_dropins --argument-names name conf dots follow keys logkey --descr
     set -l _found; set -l _unlistable false; set -l _nodot '!' -name '.*'; test "$dots" = true; and set _nodot # dots=true: the tool's own find counts dotfiles
     set -l _fl -H; test "$follow" = true; or set _fl # follow=false: the tool's find never enters a linked dir
     for _dir in $argv[7..-1]
-        test -d "$_dir"; or test -L "$_dir"; or continue # a link this user cannot resolve reaches find, which fails
+        test -d "$_dir"; or test -L "$_dir"; or continue # a link this user cannot resolve reaches find; -H fails on it
         set -l _hits (command find $_fl "$_dir" -maxdepth 1 -name '*.conf' $_nodot '(' -type f -o -type l ')' 2>/dev/null | path sort); set -l _ps $pipestatus
+        if test "$_ps[1]" -ne 0 # a 0700 dir hides its drop-ins from this user: list them as root
+            set _hits (sudo -n find $_fl "$_dir" -maxdepth 1 -name '*.conf' $_nodot '(' -type f -o -type l ')' 2>/dev/null | path sort); set _ps $pipestatus
+        end
         if test "$_ps[1]" -ne 0; _warn "  $_dir: cannot list — $name drop-in check skipped"; set _unlistable true; continue; end
         for _h in $_hits # the tool reads them as root: a regular file or a link to one
             if test -f "$_h"; or sudo -n test -f "$_h" 2>/dev/null; set -a _found "$_h"; continue; end
@@ -1330,13 +1337,13 @@ function _vsb_mkinitcpio --description "_verify_static_boot sub: /etc/mkinitcpio
         end
     end
 end
-function _vsb_mkinitcpio_dropins --description "_verify_static_boot sub: mkinitcpio.conf.d drop-ins that outrank the managed conf"
+function _vsb_mkinitcpio_dropins --description "_verify_static_boot sub: conf.d drop-ins and preset _config that outrank mkinitcpio.conf"
     _echo "── mkinitcpio drop-ins ──"
     _vsb_dropins mkinitcpio /etc/mkinitcpio.conf true false "HOOKS and MODULES" MKINITCPIO_DROPIN_PRESENT /etc/mkinitcpio.conf.d # upstream find -xtype f: dotfiles count; a linked dir is skipped
-    set -l _pf /etc/mkinitcpio.d/*.preset; set -l _pc; set -q _pf[1]; and set _pc (command grep -hoE '^[[:space:]]*[A-Za-z_]+_config=.*' -- $_pf 2>/dev/null | string replace -r '^[^=]*=' '' | string trim | string trim -c '"\'')
+    set -l _pf /etc/mkinitcpio.d/*.preset; set -l _pc; set -q _pf[1]; and set _pc (command grep -hoE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*_config=.*' -- $_pf 2>/dev/null | string replace -r '^[^=]*=' '' | string replace -r '\s+#.*$' '' | string trim | string trim -c '"\'' | string match -v -- '') # an empty _config passes no -c
     set -l _po (string match -v -- /etc/mkinitcpio.conf $_pc) # a preset _config makes mkinitcpio -P pass -c
-    set -q _po[1]; and _warn "  a mkinitcpio preset builds from $_po, not /etc/mkinitcpio.conf, and skips mkinitcpio.conf.d"
-    set -q _pc[1]; and not set -q _po[1]; and _info "  a mkinitcpio preset sets _config=/etc/mkinitcpio.conf: mkinitcpio -P passes -c, so mkinitcpio.conf.d is skipped"
+    set -q _po[1]; and _warn "  A mkinitcpio preset builds from $_po, not /etc/mkinitcpio.conf, and skips mkinitcpio.conf.d"
+    set -q _pc[1]; and not set -q _po[1]; and _info "  A mkinitcpio preset sets _config=/etc/mkinitcpio.conf: mkinitcpio -P passes -c, so that preset skips mkinitcpio.conf.d"
 end
 function _vsb_entry_options --description "_vsb_entries sub: Assert each non-fallback linux entry carries every KERNEL_PARAMS token"
     for _e in $argv
@@ -1663,7 +1670,7 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
     set -l _present 0; set -l _empty; set -l _odd
     for _dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS /etc/fstab
         set -l _cand (_ry_bak_path "$_dst")
-        if not test -f "$_cand"; test -d "$_cand"; and not test -L "$_cand"; and set -a _odd "$_cand"; continue; end # a real dir blocks the next copy
+        if not test -f "$_cand"; test -d "$_cand"; and not test -L "$_cand"; and contains -- "$_dst" $_RY_BACKUP_TARGETS /etc/fstab; and set -a _odd "$_cand"; continue; end # a real dir blocks the next copy
         set _present (math $_present + 1)
         test -s "$_cand"; or set -a _empty "$_cand"
     end
@@ -1795,9 +1802,9 @@ function _svc_chk_expected --description "Check EXPECTED_SERVICES units"
         if test "$load" = ERR_NO_DATA
             _log "CHECK_PREFLIGHT: cannot determine state for $unit (systemctl error)"; return $EXIT_PREFLIGHT
         else if test "$load" = not-found
-            _check_drift CHECK_UNIT_DRIFT "unit=$unit state=not-found"
+            _check_drift CHECK_UNIT_DRIFT "unit=$unit load=not-found expected=loaded"
         else
-            if test "$unit" = nftables.service; and test "$active" != active # oneshot reads inactive after clean load
+            if test "$unit" = nftables.service # oneshot reads inactive; an active one can still lack the ruleset
                 if not command -q nft
                     _log "CHECK_NFT_UNPROBEABLE: nft(8) absent — live ruleset unverifiable, treating as drift (fail-closed)"
                     _check_drift CHECK_UNIT_DRIFT "unit=$unit reason=nft-absent"
@@ -2252,7 +2259,7 @@ function _vrsv_wifi_nm_backend --description "_vrsv_wifi sub: Verify NM effectiv
 end
 function _vrsv_fw_posture --description "_verify_runtime_services sub: Firewall posture (ufw unit state + live nft rule count; info only)"
     _echo "── Firewall posture ──"
-    set -l _ufw (command systemctl is-active ufw.service 2>/dev/null | string trim --)
+    set -l _ufw (command systemctl is-active -- ufw.service 2>/dev/null | string trim --)
     set -l _nft n/a # n/a=nft absent, unknown=sudo lapse or nft failed, else count
     if command -q nft
         if sudo -n true 2>/dev/null
@@ -2484,7 +2491,10 @@ function _verify_runtime_env --description "Verify ENV_VARS, sysctl, fstab, ntsy
 # ── VERIFY-RUNTIME: SESSION + PERMS ──
 function _vrs_nm_perms --description "_verify_runtime_session sub: NetworkManager system-connections perms (0600 root:root)"
     set -l nm_conn_dir /etc/NetworkManager/system-connections; set -l nm_dropin /etc/NetworkManager/conf.d/99-cachyos-nm.conf
-    if not test -d "$nm_conn_dir"; and not sudo -n test -d "$nm_conn_dir" 2>/dev/null; _info "  NetworkManager connections: directory not found"; return 0; end # a 0700 parent hides it
+    if not test -d "$nm_conn_dir"; and not sudo -n test -d "$nm_conn_dir" 2>/dev/null # a 0700 parent hides it
+        if test -x /etc/NetworkManager; or sudo -n true 2>/dev/null; _info "  NetworkManager connections: directory not found"; else; _warn "  NetworkManager connections: sudo cache lapsed — cannot verify"; end
+        return 0
+    end
     set -l conn_files (sudo -n find -H "$nm_conn_dir" -maxdepth 1 -type f -print0 2>/dev/null | string split0); set -l _conn_ps $pipestatus # keyfile reads every file there
     test (count $conn_files) -gt 1; and set conn_files (path sort -- $conn_files)
     if test "$_conn_ps[1]" -ne 0; _warn "  NetworkManager connections: cannot enumerate (sudo lapse or read error)"; return 0; end
@@ -3151,7 +3161,7 @@ function _rpt_sec_appendix --description "_rpt_render sub: Section 6, logged evi
 end
 
 # ── REPORT: ORCHESTRATOR (_rpt_write: _rpt_render → _rpt_erase; _rpt_fail on error) ──
-function _rpt_fail --argument-names why --description "_rpt_render sub: Loud ERR plus REPORT_WRITE_FAIL; a clean exit becomes 1"; _msg_nocount ERR "Report not written: $why"; _log "REPORT_WRITE_FAIL: $why"; test "$_RY_EXIT_CODE" -eq 0; and _set_exit $EXIT_FAIL; return 0; end
+function _rpt_fail --argument-names why --description "_rpt_render sub: ERR line plus REPORT_WRITE_FAIL; a clean exit becomes 1"; _msg_nocount ERR "Report not written: $why"; _log "REPORT_WRITE_FAIL: $why"; test "$_RY_EXIT_CODE" -eq 0; and _set_exit $EXIT_FAIL; return 0; end
 function _rpt_render --description "_rpt_write sub: Parse the run log, render every section to a tmpfile, move it into place"
     set -g _RPT_ARGV (string join ' ' -- (status filename) $argv); set -l dst "$LOG_DIR/report-$TIMESTAMP.html"; set -l now (command date $_RY_TS_FMT)
     set -l tmp (_mktemp_or_null -p "$LOG_DIR" ".report-$TIMESTAMP.XXXXXX")
@@ -3242,13 +3252,7 @@ function _resolve_boot_path --description "Resolve \$BOOT (XBOOTLDR if present, 
 end
 
 # ── PRE-DISPATCH EXIT (ARGPARSE-ERROR + EARLY-BAIL LOG CLEANUP) ──
-function _pre_dispatch_log_cleanup --description "_pre_dispatch_exit sub: Remove an unwritten log file and empty log dirs"
-    set -l _preserve false
-    set -q _RY_HEADER_WRITTEN; and test "$_RY_HEADER_WRITTEN" = true; and set _preserve true
-    set -q _RY_LOG_WRITTEN; and test "$_RY_LOG_WRITTEN" = true; and set _preserve true
-    if test "$_preserve" = false; _ry_rm_log; _ry_rm_new_dirs; end # a kept log keeps its dirs
-    set -g _RY_LOG_SUPPRESS_CREATE true # suppress lazy-create
-end
+function _pre_dispatch_log_cleanup --description "_pre_dispatch_exit sub: Suppress lazy JSONL creation; _ry_exit removes the empty log and dirs"; set -g _RY_LOG_SUPPRESS_CREATE true; end
 function _pre_dispatch_exit --argument-names code --description "Pre-dispatch teardown: log/dir cleanup, then exit"; _pre_dispatch_log_cleanup; _ry_exit $code; end
 
 # ── MAIN: ARGPARSE + MODE SELECTION ──
