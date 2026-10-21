@@ -3,7 +3,79 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.254.0
+-------
+
+  - cli: a root run escapes each leftover argument whole, so an embedded
+    newline no longer splits the message
+  - cli: argument errors print control characters escaped or as ?, C1 and
+    raw bytes included
+  - cli: -h or -v ending in a newline is an unknown option (exit 2), not help
+  - preflight: embedded values match to the string end (\z), so one ending in
+    a newline (governor, country, count, kernel or HOOKS token) is refused
+  - preflight: a relative HOME takes the passwd entry, and a relative passwd
+    entry exits 3, instead of resolving under the current directory
+  - preflight: the root UUID takes findmnt's first match, so a mount stacked
+    on / no longer leaves it unresolved
+  - verify: presets behind an x-only /etc/mkinitcpio.d are read as root too,
+    and hidden presets are skipped as mkinitcpio skips them
+  - verify: a HOOKS or MODULES token no longer reads as present inside a
+    hyphenated neighbor (systemd-tool for systemd)
+  - verify: COMPRESSION and its options match as whole tokens, so zstdmt no
+    longer reads as zstd and a quoted option no longer reads missing
+  - verify: the hook existence check strips quotes and reads a HOOKS line
+    without parentheses
+  - verify: a missing BINARIES= or FILES= line FAILs naming the line, not an
+    empty found value
+  - verify: a whole-line check FAILs a trailing # comment in files whose
+    parser keeps it in the value (systemd, sysctl, NM, BlueZ, environment.d)
+  - verify: an initramfs array still open at EOF reads as empty, not as an
+    earlier assignment
+  - verify: an indented LINUX_OPTIONS line is read, as bash reads it, not
+    reported missing
+  - verify: an unlistable /etc/modprobe.d WARNs that the 60-ry-* sweep was
+    skipped instead of reporting none
+  - verify: an fstab mount point with \040 before a digit decodes to a space
+  - verify: a GPU DPM mismatch counts one FAIL per card, its dmesg hint no
+    longer a WARN; an unreadable level WARNs instead of FAILing empty
+  - verify: an unreadable cpufreq attribute WARNs, not a FAIL with an empty
+    value
+  - verify: a masked unit that is activating or reloading FAILs as active
+  - verify: bool module parameters accept every kstrtobool spelling, such as
+    on/off and true/false
+  - report: a signal before the report tmpfile is tracked no longer strands
+    it in the log tree
+  - report: a failed pacman -Q grades packages unreadable, as the ledger
+    skips them, not missing or removed
+  - logging: preset _config values log MKINITCPIO_PRESET_CONFIG
+  - readme: Requirements names the ESP at /boot (no XBOOTLDR)
+  - readme: exit 3 names failed config validation
+
+
 7.252.0
+-------
+
+  - cli: an unexpected positional argument prints escaped, so an empty one
+    reads '' rather than nothing
+  - preflight: a HOME that normalizes to empty or a non-directory names the
+    value set in its exit-3 error
+  - preflight: the CPUPOWER_GOVERNOR refusal names the ry-install check
+    whose domain it enforces
+  - check: a disabled systemd-resolved, which ry-install never enables, logs
+    CONFD_UNIT_NOT_ENABLED instead of drift no re-run clears
+  - check: with no sudo binary, an unlistable modprobe.d no longer writes
+    to stderr
+  - verify: presets in a 0700 /etc/mkinitcpio.d or 0600 files are read as
+    root; a custom config several presets name is listed once
+  - verify: an empty .ry.bak reports only for the boot files and fstab
+    ry-install backs up
+  - verify: a drop-in directory it cannot list names the cause in its WARN
+  - verify: a linux boot entry with no options line FAILs as missing every
+    KERNEL_PARAMS token, not a WARN
+  - logging: the root UUID gate logs ROOT_UUID_OK
+
+
+7.251.0
 -------
 
   - signals: a signal during an early exit, before the main handler takes
@@ -12,42 +84,24 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     can no longer make it load or run a user's _dc_settle or _write_footer
   - guard: an invalid root UUID resets the global, never erases it, so a
     fish universal of that name cannot steer the cmdline checks
-  - cli: an unexpected positional argument prints escaped, so an empty one
-    reads '' rather than nothing
-  - preflight: a HOME that normalizes to empty or a non-directory names the
-    value set in its exit-3 error
-  - preflight: the CPUPOWER_GOVERNOR refusal names the ry-install check
-    whose domain it enforces
   - check: nftables.service is probed for a live ruleset even when a
     RemainAfterExit drop-in keeps the unit active
   - check: a not-found unit records load=not-found expected=loaded
-  - check: a disabled systemd-resolved, which ry-install never enables, logs
-    CONFD_UNIT_NOT_ENABLED instead of drift no re-run clears
-  - check: with no sudo binary, an unlistable modprobe.d no longer writes
-    to stderr
   - verify: a 0700 mkinitcpio.conf.d or sdboot-manage.conf.d is listed as
     root, not skipped with a WARN
   - verify: the mkinitcpio preset scan skips an empty _config and a trailing
     comment, and reads preset names with digits
-  - verify: presets in a 0700 /etc/mkinitcpio.d or 0600 files are read as
-    root; a custom config several presets name is listed once
   - verify: the preset INFO says only that preset skips mkinitcpio.conf.d,
     no longer contradicting the drop-in WARN
-  - verify: .ry.bak checks cover only the boot files and fstab ry-install
-    backs up; an empty copy or a directory elsewhere no longer reports
+  - verify: a directory at a .ry.bak name WARNs only for the boot files and
+    fstab that ry-install backs up
   - verify: a lapsed sudo cache behind a 0700 /etc/NetworkManager WARNs,
     not an INFO that the connections directory is missing
-  - verify: a drop-in directory it cannot list names the cause in its WARN
   - verify: HOOKS build scripts are probed as this user first; sudo runs
     only for one this user cannot see
-  - verify: a linux boot entry with no options line FAILs as missing every
-    KERNEL_PARAMS token, not a WARN
   - configuration: the 60-ry-modules.conf header no longer claims module
     options, matching ry-install
-  - logging: the hardware gate logs HARDWARE_MATCH and the root UUID gate
-    ROOT_UUID_OK
-  - readme: Checks and Unowned state name the mkinitcpio preset _config;
-    --check names its subset; exit 3 adds an unusable HOME or log tree
+  - logging: the hardware gate logs HARDWARE_MATCH with the detected CPU
 
 
 7.250.0

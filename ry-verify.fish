@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.252.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.254.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.252.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.254.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t # config.fish job control or IFS would steer this run
@@ -67,7 +67,7 @@ for _early_arg in $argv
             echo "v$VERSION"; or exit $EXIT_FAIL
             exit $EXIT_OK
         case '-*'
-            if string match -qr -- '^-[hv]+$' "$_early_arg" # glued h/v only; first h/v wins (getopt order)
+            if string match -qr -- '^-[hv]+\z' "$_early_arg" # glued h/v only; first h/v wins (getopt order)
                 for _early_ch in (string split '' -- (string sub -s 2 -- "$_early_arg"))
                     test "$_early_ch" = h; and begin; _ry_show_help; or exit $EXIT_FAIL; exit $EXIT_OK; end
                     test "$_early_ch" = v; and begin; echo "v$VERSION"; or exit $EXIT_FAIL; exit $EXIT_OK; end
@@ -82,12 +82,10 @@ for _rsc_a in $argv
     switch "$_rsc_a"
         case --
             set _rsc_after_dd true
-        case --verify
-            set _rsc_other_mode true
         case --check --chec --che --ch --c -check -chec -che -ch -c # argparse abbreviations keep the silent contract
             set _ry_root_silent_check true
         case '*'
-            set _rsc_other_mode true # unknown flag/positional: non-root exits 2 — keep parity
+            set _rsc_other_mode true # any other mode, flag or positional: not the silent probe
     end
 end
 set -q _rsc_a; and set --erase _rsc_a
@@ -145,18 +143,18 @@ function _ry_root_usage --description "Root-guard usage error: print msg + help 
 if not string match -qr '^\d+$' -- "$_MY_UID"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] id -u returned non-numeric value: '$_MY_UID' — cannot determine user identity" >&2; _ry_exit $EXIT_PREFLIGHT; end
 if test "$_MY_UID" -eq 0
     if test "$_RY_ARGV_CHECK_ONLY" = true; _ry_exit $EXIT_PREFLIGHT; end # --check + valid mode: silent, 3 = cannot probe
-    set -l _rg_msgout (begin; argparse --name=(command basename -- (status filename)) $_RY_ARGPARSE_SPEC -- $argv 2>&1 >/dev/null; echo "@@RC@@$status"; end) # parity argparse in a cmdsub block; parent argv intact
+    set -l _rg_msgout (begin; argparse --name=(command basename -- (status filename)) $_RY_ARGPARSE_SPEC -- (string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?' $argv) 2>&1 >/dev/null; echo "@@RC@@$status"; end) # parity argparse in a cmdsub block; parent argv intact
     set -l _rg_prc 0; set -l _rg_msg ""
     for _rg_l in $_rg_msgout
-        if string match -q '@@RC@@*' -- "$_rg_l"; set _rg_prc (string replace '@@RC@@' '' -- "$_rg_l"); else if test -z "$_rg_msg"; set _rg_msg (string replace -ra '\e\[[0-9;]*[a-zA-Z]' '' -- "$_rg_l" | string trim --); end
+        if string match -q '@@RC@@*' -- "$_rg_l"; set _rg_prc (string replace '@@RC@@' '' -- "$_rg_l"); else if test -z "$_rg_msg"; set _rg_msg (string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?' "$_rg_l" | string trim --); end
     end
-    set -l _rg_state (begin; argparse --name=ry-verify $_RY_ARGPARSE_SPEC -- $argv 2>/dev/null; for _rg_p in $argv; echo "@@LEFT@@$_rg_p"; end; end) # one @@LEFT@@ per leftover; display-only
+    set -l _rg_state (begin; argparse --name=ry-verify $_RY_ARGPARSE_SPEC -- $argv 2>/dev/null; for _rg_p in $argv; echo "@@LEFT@@"(string escape -- $_rg_p); end; end) # one @@LEFT@@ per leftover; display-only
     set -l _rg_left
     for _rg_l in $_rg_state
         string match -q '@@LEFT@@*' -- "$_rg_l"; and set -a _rg_left "$_rg_l"
     end
-    if test "$_rg_prc" -ne 0; test -n "$_rg_msg"; or set _rg_msg "Invalid arguments: $argv"; _ry_root_usage "$_rg_msg"; end
-    if test (count $_rg_left) -gt 0; set -l _rg_disp (string replace -r -- '^@@LEFT@@' '' $_rg_left); _ry_root_usage "Unexpected positional argument(s): "(string join ' ' -- (string escape -- $_rg_disp)); end
+    if test "$_rg_prc" -ne 0; test -n "$_rg_msg"; or set _rg_msg "Invalid arguments: "(string join ' ' -- (string escape -- $argv | string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?')); _ry_root_usage "$_rg_msg"; end
+    if test (count $_rg_left) -gt 0; set -l _rg_disp (string replace -r -- '^@@LEFT@@' '' $_rg_left | string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?'); _ry_root_usage "Unexpected positional argument(s): "(string join ' ' -- $_rg_disp); end
     echo "[ERR] "(command basename -- (status filename))" must not run as root. Run as your normal user; sudo is invoked internally." >&2
     _ry_exit $EXIT_USAGE
 end
@@ -186,9 +184,9 @@ if not command -q findmnt; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] 
 
 # ── TIMESTAMPS + HOME + LOG_DIR + MV -T PROBE ──
 set -l _ry_now (command date '+%Y-%m-%d|%Y%m%d-%H%M%S%z'); set -l _ry_dt (string split -m1 '|' -- "$_ry_now"); set -g DATE_LABEL $_ry_dt[1]; set -g TIMESTAMP (string join -- '-' $_ry_dt[2] $fish_pid); set --erase _ry_now _ry_dt
-if test -z "$HOME"; or not test -d "$HOME"
+if test -z "$HOME"; or not string match -q -- '/*' "$HOME"; or not test -d "$HOME"
     set -gx HOME (command getent passwd $_MY_UID 2>/dev/null | command head -n 1 | command awk -F: '{print $6}')
-    if test -z "$HOME"; or not test -d "$HOME"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Cannot determine HOME directory" >&2; _ry_exit $EXIT_PREFLIGHT; end
+    if test -z "$HOME"; or not string match -q -- '/*' "$HOME"; or not test -d "$HOME"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] Cannot determine HOME directory" >&2; _ry_exit $EXIT_PREFLIGHT; end
 end
 set -l _ry_home (string trim -r -c / -- (string trim -- "$HOME"))
 if test -z "$_ry_home"; or not test -d "$_ry_home"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] HOME '$HOME' resolves to empty/non-dir after normalization: '$_ry_home'" >&2; _ry_exit $EXIT_PREFLIGHT; end
@@ -287,7 +285,7 @@ function _write_footer --argument-names exit_code extra_key --description "Appen
     test -n "$extra_key"; and set _extra ",\""(_json_str "$extra_key")"\":true"
     set -l _gen_fail 0
     set -q VERIFY_GEN_FAIL; and set _gen_fail $VERIFY_GEN_FAIL
-    set -g _FOOTER_WRITTEN true # after every fork: a signal before this still writes the footer
+    set -g _FOOTER_WRITTEN true # after every fork but --check's tee: one footer at most
     _jsonl_write (printf '{"ts":"%s","event":"footer","mode":"%s","exit_code":%d,"pass":%d,"fail":%d,"warn":%d,"gen_fail":%d%s}' "$_ts" "$_mode_esc" "$exit_code" "$VERIFY_OK" "$VERIFY_FAIL" "$VERIFY_WARN" "$_gen_fail" "$_extra")
     test "$status" -ne 0; and not set -q _RY_LOG_WRITE_FAIL; and set -g _RY_LOG_WRITE_FAIL true
 end
@@ -304,8 +302,9 @@ function _dc_sweep_tmpfiles --description "_dc_settle sub: Remove tracked tmpfil
         end
     end
     for _tf in $_stuck_tmpfiles # tracked paths are user-owned tmp files: nothing to escalate
-        not set -q _FOOTER_WRITTEN; and functions -q _log; and _log "TMPFILE_STUCK: $_tf"
+        not set -q _FOOTER_WRITTEN; and _log "TMPFILE_STUCK: $_tf"
     end
+    test -n "$LOG_DIR"; and test -n "$TIMESTAMP"; and begin; set -l _rt $LOG_DIR/.report-$TIMESTAMP.*; set -q _rt[1]; and command rm -f -- $_rt 2>/dev/null; end # untracked until mktemp returns
     set -g _TRACKED_TMPFILES # reset, not erased: no universal surfaces
 end
 function _dc_erase_globals --description "_do_cleanup sub: Erase cached globals"
@@ -460,9 +459,9 @@ set -g EXPECTED_CPU_MATCH "Ryzen AI Max"
 # ── RUNTIME INIT: ROOT UUID + INVARIANT VALIDATION + CACHE PRECOMPUTE ──
 function _ir_resolve_root_uuid --description "Cache root UUID into _ROOT_UUID"
     set -g _ROOT_UUID; set -l _fm_rc 127 # probe first: fish prints its own not-found error past 2>/dev/null
-    command -q findmnt; and begin; set -g _ROOT_UUID (command findmnt -no UUID / 2>/dev/null); set _fm_rc $status; end
+    command -q findmnt; and begin; set -g _ROOT_UUID (command findmnt -f -no UUID / 2>/dev/null); set _fm_rc $status; end
     set -l _reason "findmnt failed (rc=$_fm_rc)"; test "$_fm_rc" -eq 0; and set _reason "findmnt returned no UUID"; test "$_fm_rc" -eq 127; and set _reason "findmnt absent"
-    if test -n "$_ROOT_UUID"; and not string match -qr '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' -- "$_ROOT_UUID"
+    if test -n "$_ROOT_UUID"; and not string match -qr '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\z' -- "$_ROOT_UUID"
         set _reason "invalid UUID shape (got: $_ROOT_UUID)"
         set -g _ROOT_UUID # reset, not erased: no universal surfaces
     end
@@ -516,21 +515,21 @@ function _ir_validate_keys --description "Refuse to run on out-of-domain embedde
         if not contains -- "$$_k" yes no; _err_loud "$_k must be yes|no (got: '$$_k') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _k in LOADER_TIMEOUT BT_RECONNECT_ATTEMPTS
-        if not string match -qr '^\d+$' -- "$$_k"; _err_loud "$_k must be a non-negative integer (got: '$$_k') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not string match -qr '^\d+\z' -- "$$_k"; _err_loud "$_k must be a non-negative integer (got: '$$_k') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
-    if not string match -qr '^[0-3]$' -- "$NM_WIFI_POWERSAVE"; _err_loud "NM_WIFI_POWERSAVE must be 0|1|2|3 (got: '$NM_WIFI_POWERSAVE') — refuse to run (NetworkManager wifi.powersave accepts no other value)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
-    if not string match -qr '^[A-Z][A-Z]$' -- "$COUNTRY"; _err_loud "COUNTRY must be an ISO-3166-1 alpha-2 code (got: '$COUNTRY') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
-    if string match -qr '^(AA|Q[M-Z]|X[A-Z]|ZZ)$' -- "$COUNTRY"; _err_loud "COUNTRY '$COUNTRY' is in the ISO-3166-1 user-assigned/reserved range (AA, QM-QZ, XA-XZ, ZZ) — not a real country code; would silently fall back to world regdomain; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if not string match -qr '^[0-3]\z' -- "$NM_WIFI_POWERSAVE"; _err_loud "NM_WIFI_POWERSAVE must be 0|1|2|3 (got: '$NM_WIFI_POWERSAVE') — refuse to run (NetworkManager wifi.powersave accepts no other value)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if not string match -qr '^[A-Z][A-Z]\z' -- "$COUNTRY"; _err_loud "COUNTRY must be an ISO-3166-1 alpha-2 code (got: '$COUNTRY') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if string match -qr '^(AA|Q[M-Z]|X[A-Z]|ZZ)\z' -- "$COUNTRY"; _err_loud "COUNTRY '$COUNTRY' is in the ISO-3166-1 user-assigned/reserved range (AA, QM-QZ, XA-XZ, ZZ) — not a real country code; would silently fall back to world regdomain; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     if not contains -- "$GPU_DPM_LEVEL" $_RY_DPM_LEVELS; _err_loud "GPU_DPM_LEVEL must be one of "(string join '|' -- $_RY_DPM_LEVELS)" (got: '$GPU_DPM_LEVEL') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
     if not contains -- "$EPP_PREFERENCE" $_RY_EPP_LEVELS; _err_loud "EPP_PREFERENCE must be one of "(string join '|' -- $_RY_EPP_LEVELS)" (got: '$EPP_PREFERENCE') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
-    if not string match -qr '^[a-z][a-z0-9_-]*$' -- "$CPUPOWER_GOVERNOR"; _err_loud "CPUPOWER_GOVERNOR must match ^[a-z][a-z0-9_-]*\$ (got: '$CPUPOWER_GOVERNOR') — refuse to run (the domain ry-install's _grep_cpupower_entry accepts)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if not string match -qr '^[a-z][a-z0-9_-]*\z' -- "$CPUPOWER_GOVERNOR"; _err_loud "CPUPOWER_GOVERNOR must match ^[a-z][a-z0-9_-]*\\z (got: '$CPUPOWER_GOVERNOR') — refuse to run (the domain ry-install's _grep_cpupower_entry accepts)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     if contains -- /etc/nftables.conf $SYSTEM_DESTINATIONS; and not contains -- ipv6.disable=1 $KERNEL_PARAMS # base ICMPv6 is accepted; service rules are not
         _warn "Dual-stack: the ruleset accepts only the ICMPv6 base set — add service-specific IPv6 rules to _content__etc_nftables.conf in both scripts and re-run ry-install (a hand edit to /etc/nftables.conf reads as MISMATCH)"
     end
     if test "$BLACKLIST_AMDXDNA" = false; and begin; contains -- amd_iommu=off $KERNEL_PARAMS; or contains -- iommu=off $KERNEL_PARAMS; end # amdxdna probes -ENODEV without the IOMMU; iommu=off disables AMD-Vi
         _err_loud "BLACKLIST_AMDXDNA=false requires the IOMMU (drop amd_iommu=off / iommu=off; set iommu=pt) — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT
     end
-    for _k in LOADER_DEFAULT LOADER_CONSOLE_MODE LOADER_EDITOR SDBOOT_DEFAULT_ENTRY NM_WIFI_BACKEND NM_LOG_LEVEL CPUPOWER_GOVERNOR NM_DISPATCHER_LOGLEVELMAX MKINITCPIO_COMPRESSION EXPECTED_SCALING_DRIVER
+    for _k in LOADER_DEFAULT LOADER_CONSOLE_MODE LOADER_EDITOR SDBOOT_DEFAULT_ENTRY NM_WIFI_BACKEND NM_LOG_LEVEL NM_DISPATCHER_LOGLEVELMAX MKINITCPIO_COMPRESSION EXPECTED_SCALING_DRIVER
         if test -z "$$_k"; _err_loud "$_k must be non-empty — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     set -l _scalar_metachar_re '[\s"`$;\\\\&|<>(){}*?\x27~!#]' # shell metachar class for scalars written to boot configs
@@ -538,13 +537,13 @@ function _ir_validate_keys --description "Refuse to run on out-of-domain embedde
         if string match -qr -- "$_scalar_metachar_re" "$$_k"; _err_loud "$_k contains whitespace, quote, or shell metachar: '$$_k' — refuse to run (would corrupt a shell-sourced or parser-read boot config)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _co in $MKINITCPIO_COMPRESSION_OPTIONS # spliced into a shell array literal; flag charset only
-        if not string match -qr -- '^-?[A-Za-z0-9]+$' "$_co"; _err_loud "MKINITCPIO_COMPRESSION_OPTIONS token invalid: '$_co' — refuse to run (spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not string match -qr -- '^-?[A-Za-z0-9]+\z' "$_co"; _err_loud "MKINITCPIO_COMPRESSION_OPTIONS token invalid: '$_co' — refuse to run (spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _kp in $KERNEL_PARAMS # spliced into boot configs; charset excludes shell metachars
-        if not string match -qr -- '^[A-Za-z0-9._,=-]+$' "$_kp"; _err_loud "KERNEL_PARAMS token invalid: '$_kp' — refuse to run (spliced into a shell-sourced boot config and the kernel cmdline)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not string match -qr -- '^[A-Za-z0-9._,=-]+\z' "$_kp"; _err_loud "KERNEL_PARAMS token invalid: '$_kp' — refuse to run (spliced into a shell-sourced boot config and the kernel cmdline)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _mt in $MKINITCPIO_MODULES $MKINITCPIO_HOOKS # plain names (no ? marker): presence checks take them literally
-        if not string match -qr -- '^[A-Za-z0-9_-]+$' "$_mt"; _err_loud "MKINITCPIO_MODULES/HOOKS token invalid: '$_mt' — refuse to run (plain names only; spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not string match -qr -- '^[A-Za-z0-9_-]+\z' "$_mt"; _err_loud "MKINITCPIO_MODULES/HOOKS token invalid: '$_mt' — refuse to run (plain names only; spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
 end
 function _ir_validate_sets --description "Refuse to run when add and remove sets contradict each other"
@@ -918,12 +917,7 @@ function _log --description "Append a timestamped JSONL line to LOG_FILE"
         if test "$_create_rc" -ne 0; not set -q _RY_LOG_WRITE_FAIL; and set -g _RY_LOG_WRITE_FAIL true; return 0; end
     end
     set -l _ts (command date $_RY_TS_FMT); set -l raw "$argv"; set -l data (_json_str "$raw") # quoted: keeps embedded and trailing \n for _json_str
-    set -l _write_rc 0
-    if test "$MODE" = check # fish reports its own open/write errors past 2>/dev/null
-        printf '{"ts":"%s","event":"log","data":"%s"}\n' "$_ts" "$data" | command tee -a -- "$LOG_FILE" >/dev/null 2>/dev/null; set _write_rc $pipestatus[2]
-    else
-        printf '{"ts":"%s","event":"log","data":"%s"}\n' "$_ts" "$data" >>"$LOG_FILE" 2>/dev/null; set _write_rc $status
-    end
+    _jsonl_write (printf '{"ts":"%s","event":"log","data":"%s"}' "$_ts" "$data"); set -l _write_rc $status
     test "$_write_rc" -eq 0; and not set -q _RY_LOG_WRITTEN; and set -g _RY_LOG_WRITTEN true
     if test "$_write_rc" -ne 0; and not set -q _RY_LOG_WRITE_FAIL; set -g _RY_LOG_WRITE_FAIL true; end
 end
@@ -982,15 +976,15 @@ function _err --description "Emit ERR-level message and increment VERIFY_FAIL"; 
 
 # ── MESSAGING: LOUD EMITTERS (bypass QUIET) + PLAIN ECHO ──
 function _err_loud --description "Fatal-preflight err: stderr regardless of QUIET, except MODE=check (silent-probe contract)"
-    set -l msg (string join -- " " $argv)
+    set -l msg (string join -- " " $argv); test -n "$msg"; or return 0 # as _msg: an empty message neither logs nor counts
     _log "ERR: $msg"
     set -q VERIFY_FAIL; and set -g VERIFY_FAIL (math $VERIFY_FAIL + 1)
     test "$MODE" = check; and return 0
     _msg_print --force ERR $argv
 end
-function _err_loud_cont --description "Continuation for _err_loud: same routing, no VERIFY_FAIL bump"; set -l msg (string join -- " " $argv); _log "ERR: $msg"; test "$MODE" = check; and return 0; _msg_print --force ERR $argv; end
+function _err_loud_cont --description "Continuation for _err_loud: same routing, no VERIFY_FAIL bump"; set -l msg (string join -- " " $argv); test -n "$msg"; or return 0; _log "ERR: $msg"; test "$MODE" = check; and return 0; _msg_print --force ERR $argv; end
 function _warn_loud --description "Override-path warn: stderr regardless of QUIET, except MODE=check (silent-probe contract)" # mirrors _err_loud
-    set -l msg (string join -- " " $argv)
+    set -l msg (string join -- " " $argv); test -n "$msg"; or return 0 # as _msg: an empty message neither logs nor counts
     _log "WARN: $msg"
     set -q VERIFY_WARN; and set -g VERIFY_WARN (math $VERIFY_WARN + 1)
     test "$MODE" = check; and return 0
@@ -1115,7 +1109,7 @@ function _cg_access_ok --argument-names file label use_sudo --description "Pre-f
 end
 
 # ── CHECK HELPERS: GREP/TOKEN (sudo-aware file-content assertions) ──
-function _chk_grep --argument-names file pattern label match --description "Verify a file contains an expected token (match=line: the whole trimmed line)"
+function _chk_grep --argument-names file pattern label match cmt --description "Verify a file contains an expected token (match=line: whole trimmed line; cmt=inline: # trails)"
     test -z "$label"; and set label "$pattern"
     _log "CHECK_GREP: file=$file pattern=$pattern"
     set -l use_sudo false
@@ -1124,7 +1118,8 @@ function _chk_grep --argument-names file pattern label match --description "Veri
     _cg_access_ok "$file" "$label" $use_sudo; or return 1
     set -l _grep_flags -wF
     test "$match" = line; and set _grep_flags -xF # KEY=value: -w lets KEY=a,b satisfy KEY=a
-    set -l _cg_awk '{ sub(/[[:space:]]+#.*$/, ""); sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") } /^[[:space:]]*#/ { next } NF { print; f=1 } END { exit f ? 0 : 1 }' # strips comments + edge blanks; exit 1 = no non-comment line
+    set -l _cg_awk '{ sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") } /^#/ { next } NF { print; f=1 } END { exit f ? 0 : 1 }' # whole-line # comments only; exit 1 = no content line
+    test "$cmt" = inline; and set _cg_awk '{ sub(/[[:space:]]+#.*$/, "") } '$_cg_awk # bash, nft, MangoHud: a trailing # comment too
     _as $use_sudo awk "$_cg_awk" "$file" 2>/dev/null | command grep $_grep_flags -- "$pattern" >/dev/null 2>/dev/null
     set -l _stage1_rc $pipestatus[1]; set -l _grep_rc $pipestatus[2]
     switch "$_stage1_rc"
@@ -1149,9 +1144,9 @@ function _chk_grep --argument-names file pattern label match --description "Veri
             return 1
     end
 end
-function _chk_token_in --argument-names line token label --description "Verify a whole-word token is present in a config line"
-    set -l _re (string escape --style=regex -- "$token")
-    if string match -qr "\\b$_re\\b" -- "$line"
+function _chk_token_in --argument-names line token label opt --description "Verify a token is present in a config line, bounded by whitespace, parens, = or quotes"
+    set -l _re (string escape --style=regex -- "$token"); test "$opt" = '?'; and set _re "$_re\\??" # mkinitcpio MODULES: name? loads only if present
+    if string match -qr -- "(^|[\\s(=\"'])$_re([\\s)\"']|\$)" "$line"
         _ok "  $label: present"
     else
         _fail "  $label: MISSING"
@@ -1190,14 +1185,14 @@ function _ry_mkinitcpio_array --argument-names key file --description "Last KEY=
 {sub(/(^|[[:space:]])#.*$/, "")}
 $0 ~ "^[[:space:]]*"K"=" {c=1; buf=$0; n++; if (buf !~ /\(/ || buf ~ /\)/) {last=buf; c=0}; next}
 c {buf=buf" "$0; if ($0 ~ /\)/) {last=buf; c=0}}
-END{if (last != "") printf "%d\n%s\n", n, last}' # 2nd rule drops a bash comment; no terminated block, no output
+END{if (!c && last != "") printf "%d\n%s\n", n, last}' # 2nd rule drops a bash comment; a block open at EOF, no output
     set -l _out
     if test -r "$file"
         set _out (command awk -v K="$key" "$_awk" "$file" 2>/dev/null)
     else
         set _out (sudo -n awk -v K="$key" "$_awk" "$file" 2>/dev/null)
     end
-    test (count $_out) -ge 2; or return 0 # no assignment, or sole block unterminated
+    test (count $_out) -ge 2; or return 0 # no assignment, or a block still open at EOF
     test "$_out[1]" -gt 1 2>/dev/null; and not contains -- "$file:$key" $_RY_MKI_DUP_WARNED; and set -ga _RY_MKI_DUP_WARNED "$file:$key"; and _warn "  $file: multiple $key= assignments ($_out[1]) — using last (conf is shell-sourced)" # once per key per run: boot + syntax both read HOOKS
     printf '%s\n' (string join ' ' -- $_out[2..-1] | string replace -ra '\s+' ' ' | string trim --)
 end
@@ -1223,9 +1218,9 @@ end
 function _vsb_sdboot --description "_verify_static_boot sub: sdboot-manage.conf LINUX_OPTIONS + key checks"
     _echo "── sdboot-manage.conf ──"
     _chk_file /etc/sdboot-manage.conf; or return 0
-    set -l _opts_raw (command grep -- '^LINUX_OPTIONS=' /etc/sdboot-manage.conf 2>/dev/null); set -l _grep_rc $status
+    set -l _opts_raw (command grep -- '^[[:space:]]*LINUX_OPTIONS=' /etc/sdboot-manage.conf 2>/dev/null); set -l _grep_rc $status
     if test "$_grep_rc" -gt 1; or begin; test "$_grep_rc" -eq 1; and not test -r /etc/sdboot-manage.conf; end # perms drift: sudo retry before judging missing
-        set _opts_raw (sudo -n grep -- '^LINUX_OPTIONS=' /etc/sdboot-manage.conf 2>/dev/null); set _grep_rc $status
+        set _opts_raw (sudo -n grep -- '^[[:space:]]*LINUX_OPTIONS=' /etc/sdboot-manage.conf 2>/dev/null); set _grep_rc $status
         if test "$_grep_rc" -gt 1; or begin; test "$_grep_rc" -eq 1; and not sudo -n true 2>/dev/null; end # sudo -n exits 1 on a lapse, same as grep's no-match
             _warn "  /etc/sdboot-manage.conf: unreadable (sudo lapse or read error) — skipping sdboot-manage.conf checks"; return 0
         end
@@ -1240,13 +1235,13 @@ function _vsb_sdboot --description "_verify_static_boot sub: sdboot-manage.conf 
         if test "$_quote_count" -ne 2; _fail "  /etc/sdboot-manage.conf: LINUX_OPTIONS= has $_quote_count quote chars (expected 2) — skipping param extraction"; set _opts_ok false; end
     end
     if test "$_opts_ok" = true
-        set -l opts (printf '%s\n' "$_opts_raw" | string replace -r -- '^LINUX_OPTIONS="([^"]*)".*$' '$1')
+        set -l opts (printf '%s\n' "$_opts_raw" | string replace -r -- '^\s*LINUX_OPTIONS="([^"]*)".*$' '$1')
         for param in $KERNEL_PARAMS; set -l _param_re (string escape --style=regex -- "$param"); string match -qr -- "(^|\s)$_param_re(\s|\$)" "$opts"; _chk_present $status "$param"; end
     end
-    _chk_grep /etc/sdboot-manage.conf 'LINUX_FALLBACK_OPTIONS="quiet"' "LINUX_FALLBACK_OPTIONS=quiet" line
+    _chk_grep /etc/sdboot-manage.conf 'LINUX_FALLBACK_OPTIONS="quiet"' "LINUX_FALLBACK_OPTIONS=quiet" line inline
     for _kv in "DEFAULT_ENTRY:$SDBOOT_DEFAULT_ENTRY" "REMOVE_EXISTING:$SDBOOT_REMOVE_EXISTING" "OVERWRITE_EXISTING:$SDBOOT_OVERWRITE" "REMOVE_OBSOLETE:$SDBOOT_REMOVE_OBSOLETE" # emission order
         set -l _p (string split -m1 ':' -- $_kv)
-        _chk_grep /etc/sdboot-manage.conf "$_p[1]=\"$_p[2]\"" "$_p[1]=$_p[2]" line
+        _chk_grep /etc/sdboot-manage.conf "$_p[1]=\"$_p[2]\"" "$_p[1]=$_p[2]" line inline
     end
 end
 
@@ -1310,25 +1305,21 @@ function _vsb_mkinitcpio --description "_verify_static_boot sub: /etc/mkinitcpio
     if not test -r /etc/mkinitcpio.conf; and not sudo -n true 2>/dev/null; _warn "  /etc/mkinitcpio.conf: unreadable (sudo cache lapsed) — array checks skipped"; return 0; end # an empty read would FAIL every token
     set -l modules_line (_ry_mkinitcpio_array MODULES)
     _echo "  Config: $modules_line"
-    string match -qr -- '\bamdgpu\b' "$modules_line"
+    string match -qr -- '(^|[\s(="\'])amdgpu\??([\s)"\']|$)' "$modules_line" # amdgpu? is mkinitcpio's optional form
     _chk_present $status amdgpu MISSING "present (early KMS)"
-    for mod in $MKINITCPIO_MODULES; test "$mod" = amdgpu; and continue; _chk_token_in "$modules_line" "$mod" "$mod"; end
+    for mod in $MKINITCPIO_MODULES; test "$mod" = amdgpu; and continue; _chk_token_in "$modules_line" "$mod" "$mod" '?'; end
     for _mka in BINARIES FILES # generator emits both empty; a populated array is drift
         set -l _mkl (_ry_mkinitcpio_array $_mka)
-        if string match -qr -- "^$_mka=\\(\\s*\\)\$" "$_mkl"; _ok "  $_mka=(): empty"; else; _fail "  $_mka: expected an empty array (found: $_mkl)"; end
+        if string match -qr -- "^$_mka=\\(\\s*\\)\$" "$_mkl"; _ok "  $_mka=(): empty"; else if test -z "$_mkl"; _fail "  $_mka: no $_mka= line (expected an empty array)"; else; _fail "  $_mka: expected an empty array (found: $_mkl)"; end
     end
     set -l hooks_line (_ry_mkinitcpio_array HOOKS)
     _echo "  Config: $hooks_line"
     for hook in $MKINITCPIO_HOOKS; _chk_token_in "$hooks_line" "$hook" "$hook"; end
     set -l comp_line (_ry_mkinitcpio_array COMPRESSION)
-    if string match -q "*$MKINITCPIO_COMPRESSION*" -- "$comp_line"
-        _ok "  COMPRESSION=$MKINITCPIO_COMPRESSION: present"
-    else
-        _fail "  COMPRESSION=$MKINITCPIO_COMPRESSION: MISSING"
-    end
+    _chk_token_in "$comp_line" "$MKINITCPIO_COMPRESSION" "COMPRESSION=$MKINITCPIO_COMPRESSION" # whole token: zstdmt is not zstd
     if set -q MKINITCPIO_COMPRESSION_OPTIONS; and test -n "$MKINITCPIO_COMPRESSION_OPTIONS"
         set -l comp_opts_line (_ry_mkinitcpio_array COMPRESSION_OPTIONS); set -l _missing
-        for _co in $MKINITCPIO_COMPRESSION_OPTIONS; set -l _co_re (string escape --style=regex -- "$_co"); string match -qr -- "(^|\(|\s)$_co_re(\s|\)|\$)" "$comp_opts_line"; or set -a _missing "$_co"; end
+        for _co in $MKINITCPIO_COMPRESSION_OPTIONS; set -l _co_re (string escape --style=regex -- "$_co"); string match -qr -- "(^|[\\s(=\"'])$_co_re([\\s)\"']|\$)" "$comp_opts_line"; or set -a _missing "$_co"; end
         if test (count $_missing) -eq 0
             _ok "  COMPRESSION_OPTIONS=$MKINITCPIO_COMPRESSION_OPTIONS: present"
         else
@@ -1338,8 +1329,8 @@ function _vsb_mkinitcpio --description "_verify_static_boot sub: /etc/mkinitcpio
 end
 function _vsb_preset_configs --description "_vsb_mkinitcpio_dropins sub: Preset _config values, read as root where this user cannot"
     set -l _d /etc/mkinitcpio.d; set -l _pf /etc/mkinitcpio.d/*.preset
-    if test -d $_d; and not test -x $_d # a 0700 dir hides its presets from this user: list them as root
-        set _pf (sudo -n find $_d -maxdepth 1 -name '*.preset' 2>/dev/null | path sort); test "$pipestatus[1]" -eq 0; or return 1
+    if test -d $_d; and begin; not test -r $_d; or not test -x $_d; end # a 0700 or x-only dir hides its presets: list as root
+        set _pf (sudo -n find -H $_d -maxdepth 1 -name '*.preset' -not -name '.*' 2>/dev/null | path sort); test "$pipestatus[1]" -eq 0; or return 1
     end
     set -q _pf[1]; or return 0
     set -l _re '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*_config=.*'
@@ -1359,6 +1350,7 @@ function _vsb_mkinitcpio_dropins --description "_verify_static_boot sub: conf.d 
     set -l _po (string match -v -- /etc/mkinitcpio.conf $_pc | path sort -u) # a preset _config makes mkinitcpio -P pass -c
     set -q _po[1]; and _warn "  A mkinitcpio preset builds from $_po, not /etc/mkinitcpio.conf, and skips mkinitcpio.conf.d"
     set -q _pc[1]; and not set -q _po[1]; and _info "  A mkinitcpio preset sets _config=/etc/mkinitcpio.conf: mkinitcpio -P passes -c, so that preset skips mkinitcpio.conf.d"
+    set -q _pc[1]; and _log "MKINITCPIO_PRESET_CONFIG: "(path sort -u -- $_pc | string join -- ', ')" (mkinitcpio -P passes -c: mkinitcpio.conf.d skipped)"
 end
 function _vsb_entry_options --description "_vsb_entries sub: Assert each non-fallback linux entry carries every KERNEL_PARAMS token"
     for _e in $argv
@@ -1436,8 +1428,8 @@ function _vss_sysctl --description "_verify_static_system sub: sysctl drop-in ke
         for entry in $SYSCTL_VALUES; set -l parts (string split -m1 '=' -- "$entry" | string trim --); set -l key $parts[1]; set -l val $parts[2]; _chk_grep /etc/sysctl.d/95-ry-overrides.conf "$key = $val" "$key=$val" line; end
     end
 end
-function _vss_regdom --description "_verify_static_system sub: Wireless regdom (/etc/iw-regdomain)"; _echo "── wireless regdom (iw-regdomain) ──"; _chk_file /etc/iw-regdomain; and _chk_grep /etc/iw-regdomain "COUNTRY=$COUNTRY" "iw-regdomain COUNTRY=$COUNTRY" line; end
-function _vss_bluetooth --description "_verify_static_system sub: BlueZ main.conf (adapter auto-power-on)"
+function _vss_regdom --description "_verify_static_system sub: Wireless regdom (/etc/iw-regdomain)"; _echo "── wireless regdom (iw-regdomain) ──"; _chk_file /etc/iw-regdomain; and _chk_grep /etc/iw-regdomain "COUNTRY=$COUNTRY" "iw-regdomain COUNTRY=$COUNTRY" line inline; end
+function _vss_bluetooth --description "_verify_static_system sub: BlueZ main.conf (auto-power-on, fast connect, reconnect attempts)"
     _echo "── bluetooth (main.conf) ──"
     _chk_file /etc/bluetooth/main.conf; or return 0
     _chk_grep /etc/bluetooth/main.conf "FastConnectable=$BT_FAST_CONNECTABLE" "" line
@@ -1456,13 +1448,13 @@ end
 function _vss_nft --description "_verify_static_system sub: nftables default-deny-inbound + IPv4 ping and ICMPv6 base accept"
     _echo "── nftables ──"
     _chk_file /etc/nftables.conf; or return 0
-    _chk_grep /etc/nftables.conf "hook input priority filter; policy drop" "nftables input policy drop"
-    _chk_grep /etc/nftables.conf "icmp type { echo-request, destination-unreachable, time-exceeded, parameter-problem } accept" "nftables IPv4 ping accept" line # regression guard: inbound ping stays accepted
-    _chk_grep /etc/nftables.conf "icmpv6 type { echo-request, destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, mld-listener-query } accept" "nftables ICMPv6 base accept" line # NDP/MLD
+    _chk_grep /etc/nftables.conf "hook input priority filter; policy drop" "nftables input policy drop" "" inline
+    _chk_grep /etc/nftables.conf "icmp type { echo-request, destination-unreachable, time-exceeded, parameter-problem } accept" "nftables IPv4 ping accept" line inline # regression guard: inbound ping stays accepted
+    _chk_grep /etc/nftables.conf "icmpv6 type { echo-request, destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, mld-listener-query } accept" "nftables ICMPv6 base accept" line inline # NDP/MLD
 end
 function _vss_modprobe --description "_verify_static_system sub: modprobe drop-in + unmanaged 60-ry-* sweep"
     _echo "── modprobe (60-ry-modules.conf) ──"
-    set -l _stale (_ry_stale_ry_dropins) # same sweep --check records; one implementation, two modes
+    set -l _stale (_ry_stale_ry_dropins); or _warn "  /etc/modprobe.d: cannot list (sudo lapse or read error) — unmanaged 60-ry-* sweep skipped" # same sweep --check records
     if test (count $_stale) -gt 0
         _warn "  /etc/modprobe.d: unmanaged ry drop-in(s): $_stale — superseded by 60-ry-modules.conf; confirm with pacman -Qo, then remove"
         _log "MODPROBE_STALE_DROPIN: count="(count $_stale)" files="(string join ',' -- $_stale)
@@ -1481,7 +1473,7 @@ function _verify_static_system --description "Verify resolved, logind, NM, regdo
     _vss_regdom
     _vss_bluetooth
     _echo "── cpupower-service.conf ──"
-    _chk_file /etc/default/cpupower-service.conf; and _chk_grep /etc/default/cpupower-service.conf "GOVERNOR='$CPUPOWER_GOVERNOR'" "GOVERNOR=$CPUPOWER_GOVERNOR" line
+    _chk_file /etc/default/cpupower-service.conf; and _chk_grep /etc/default/cpupower-service.conf "GOVERNOR='$CPUPOWER_GOVERNOR'" "GOVERNOR=$CPUPOWER_GOVERNOR" line inline
     _vss_sysctl
     _vss_udev
     _vss_modprobe
@@ -1496,7 +1488,7 @@ function _verify_static_user --description "Verify environment.d ENV_VARS and th
     if _chk_file "$HOME/.config/MangoHud/MangoHud.conf"
         for _hud in horizontal legacy_layout=0 position=top-left toggle_hud=Shift_R+F12 fps frametime frame_timing gpu_stats gpu_temp gpu_core_clock gpu_power \
             cpu_stats cpu_mhz cpu_power vram ram font_size=20 text_outline=0 no_small_font alpha=0.8 background_alpha=0.4 # every generator directive, emission order; lockstep
-            _chk_grep "$HOME/.config/MangoHud/MangoHud.conf" "$_hud" "" line
+            _chk_grep "$HOME/.config/MangoHud/MangoHud.conf" "$_hud" "" line inline
         end
     end
 end
@@ -1589,7 +1581,7 @@ function _verify_static_services --description "Verify masked services state"
             _warn "  $_svc: systemctl state unavailable (absent or no running manager) — cannot verify mask state"
         else if test "$_rec[1]" = not-found
             _info "  $_svc: unit not found (may not be installed)"
-        else if test "$_rec[3]" = masked; and test "$_rec[2]" = active
+        else if test "$_rec[3]" = masked; and contains -- "$_rec[2]" active activating reloading
             _fail "  $_svc: masked but ACTIVE (stop or reboot)"
         else if test "$_rec[3]" = masked
             _ok "  $_svc: masked"
@@ -1604,7 +1596,7 @@ function _verify_static_syntax --description "Validate live mkinitcpio HOOKS pre
     if not test -r /etc/mkinitcpio.conf; and not sudo -n true 2>/dev/null; _warn "  /etc/mkinitcpio.conf: unreadable (sudo cache lapsed) — hook check skipped"; return 0; end
     set -l hooks_syntax_line (_ry_mkinitcpio_array HOOKS)
     if test -n "$hooks_syntax_line"
-        set -l hooks_str (string replace -r '.*HOOKS=\(([^)]*)\).*' '$1' -- "$hooks_syntax_line")
+        set -l hooks_str (string replace -r '^\s*HOOKS=\(?([^)]*)\)?.*$' '$1' -- "$hooks_syntax_line" | string replace -ra -- '["\']' '') # quotes are shell syntax, not hook names
         set hooks_str (string replace -ra '\s+' ' ' -- "$hooks_str" | string trim --)
         _ry_validate_mkinitcpio_hooks --existence-only (string split ' ' -- "$hooks_str")
     else
@@ -1800,7 +1792,6 @@ function _check_phase_files --description "Check-mode phase: file content byte c
             _check_drift CHECK_CONTENT_DRIFT "dst=$dst reason=content"
         end
         set -l _mc (_ry_mode_drift "$dst" "$_ms" "$_mp"); test -n "$_mc"; and _check_drift CHECK_MODE_DRIFT "dst=$dst mode=$_mc expected=$_mp"
-        set -g _RY_CHECK_FILES_CHECKED (math $_RY_CHECK_FILES_CHECKED + 1)
     end
     return 0
 end
@@ -1848,15 +1839,16 @@ function _implicit_confd_units --description "Units implied by managed conf.d dr
     test (count $_u) -gt 0; and printf '%s\n' $_u
     return 0
 end
-function _ry_stale_ry_dropins --description "Unmanaged 60-ry-* modprobe drop-ins (shared: --check + static verify)"
+function _ry_stale_ry_dropins --description "Unmanaged 60-ry-* modprobe drop-ins (shared: --check + static verify); rc 1: unlistable"
+    test -d /etc/modprobe.d; or return 0 # no dir: nothing to sweep
     set -l _q -H /etc/modprobe.d -maxdepth 1 -name '60-ry-*.conf' ! -name '60-ry-modules.conf' -xtype f -printf '%f\n' # kmod reads files and links to them
-    set -l _l (command find $_q 2>/dev/null); or begin; command -q sudo; and set _l (sudo -n find $_q 2>/dev/null); end # a 0700 modprobe.d hides them from this user
+    set -l _l (command find $_q 2>/dev/null); or begin; command -q sudo; or return 1; set _l (sudo -n find $_q 2>/dev/null); or return 1; end # a 0700 modprobe.d hides them from this user
     test (count $_l) -gt 0; and path sort -- $_l
     return 0 # pre-7.99 leftovers: this profile neither writes nor removes them
 end
 function _ry_orphan_masked_units --description "Masked units absent from MASK (shared: --check + static verify)"
     set -l _raw (command systemctl list-unit-files --state=masked,masked-runtime --no-legend --plain 2>/dev/null)
-    test "$status" -ne 0; and return 0 # no manager or old systemctl: report nothing, never guess
+    test "$status" -ne 0; and return 0 # none masked (rc 1), no manager or old systemctl: report nothing
     for _line in $_raw
         set -l _u (string match -rg -- '^(\S+)' (string trim -- "$_line")) # column padding is spaces today, tabs would still parse
         test -z "$_u"; and continue
@@ -1907,26 +1899,24 @@ function _check_phase_units --description "Check-mode phase: EXPECTED_SERVICES +
 end
 function _ry_do_check --description "Silent idempotency probe" # ERR_NO_DATA->preflight unless drift confirmed
     _log_section "CHECK START"
-    set -l _stale (_ry_stale_ry_dropins) # needs no sudo: recorded before the sudo gate can bail
+    set -l _stale (_ry_stale_ry_dropins) # sudo -n only when modprobe.d is unlistable: runs before the gate
     test (count $_stale) -gt 0; and _log "MODPROBE_STALE_DROPIN: count="(count $_stale)" files="(string join ',' -- $_stale)
     if not command -q sudo; or not sudo -n true 2>/dev/null; _log "CHECK_PREFLIGHT: sudo not cached"; _log_section "CHECK END"; return $EXIT_PREFLIGHT; end
     if not command -q systemctl; _log "CHECK_PREFLIGHT: systemctl not available"; _log_section "CHECK END"; return $EXIT_PREFLIGHT; end
     _check_record_orphans # observations only, before any phase can bail
-    set -g _RY_CHECK_DRIFT 0; set -g _RY_CHECK_FILES_CHECKED 0; set -l _rc 0
+    set -g _RY_CHECK_DRIFT 0; set -l _rc 0
     for _phase in _check_phase_files _check_phase_cmdline _check_phase_units # non-zero phase rc = cannot probe
         $_phase
         set _rc $status
         if test "$_rc" -ne 0
             set -l _drift_seen $_RY_CHECK_DRIFT
-            set --erase _RY_CHECK_DRIFT _RY_CHECK_FILES_CHECKED
+            set --erase _RY_CHECK_DRIFT
             if test "$_drift_seen" -ne 0; _log "CHECK_DRIFT_CONFIRMED_BEFORE_PREFLIGHT: returning EXIT_DRIFT despite later probe failure (probe_rc=$_rc)"; _log_section "CHECK END"; return $EXIT_DRIFT; end
             _log_section "CHECK END"; return $_rc
         end
     end
-    set -l _drift $_RY_CHECK_DRIFT; set -l _checked $_RY_CHECK_FILES_CHECKED
-    set --erase _RY_CHECK_DRIFT _RY_CHECK_FILES_CHECKED
+    set -l _drift $_RY_CHECK_DRIFT; set --erase _RY_CHECK_DRIFT
     if test "$_drift" -ne 0; _log_section "CHECK END"; return $EXIT_DRIFT; end
-    if test "$_checked" -eq 0; _log "CHECK_PREFLIGHT: no files could be checked"; _log_section "CHECK END"; return $EXIT_PREFLIGHT; end
     _log_section "CHECK END"
     return $EXIT_OK
 end
@@ -1993,7 +1983,7 @@ function _vrk_gpu_state --description "_verify_runtime_kparams sub: GPU performa
     for f in /sys/class/drm/card*/device/power_dpm_force_performance_level
         if test -f "$f"
             set found_gpu true
-            set -l level (command cat -- "$f" 2>/dev/null)
+            set -l level (command cat -- "$f" 2>/dev/null); or begin; _warn "  $f: unreadable"; continue; end
             if test "$level" = "$GPU_DPM_LEVEL"
                 _ok "  $f: $level"
                 set gpu_ok true
@@ -2005,7 +1995,7 @@ function _vrk_gpu_state --description "_verify_runtime_kparams sub: GPU performa
     if test "$found_gpu" = false
         _warn "  No GPU DPM sysfs entries found"
     else if test "$gpu_ok" = false
-        _warn "  GPU not at '$GPU_DPM_LEVEL' — check dmesg for amdgpu errors"
+        _info "  ↳ GPU not at '$GPU_DPM_LEVEL' — check dmesg for amdgpu errors"
     end
 end
 function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor/EPP + amd_pstate + boost"
@@ -2016,15 +2006,17 @@ function _vrk_cpu_state --description "_verify_runtime_kparams sub: CPU governor
         _warn "  No CPU frequency scaling found"
     else
         for _attr in scaling_driver:$EXPECTED_SCALING_DRIVER scaling_governor:$CPUPOWER_GOVERNOR energy_performance_preference:$EPP_PREFERENCE # one row each, every policy
-            set -l _a (string split -m1 ':' -- "$_attr"); set -l _bad; set -l _n 0 # _n = policies that expose the attr
+            set -l _a (string split -m1 ':' -- "$_attr"); set -l _bad; set -l _unread; set -l _n 0 # _n = policies read
             for _d in $_cpu_dirs
                 test -r "$_d/$_a[1]"; or continue
-                set _n (math $_n + 1)
                 set -l _v (command cat -- "$_d/$_a[1]" 2>/dev/null | string trim --)
+                if test "$pipestatus[1]" -ne 0; set -a _unread (string replace -r '.*/cpu(\d+)/.*' 'cpu$1' -- "$_d"); continue; end # offline CPU: EBUSY
+                set _n (math $_n + 1)
                 test "$_v" = "$_a[2]"; or set -a _bad (string replace -r '.*/cpu(\d+)/.*' 'cpu$1' -- "$_d")":$_v"
             end
+            set -q _unread[1]; and _warn "  $_a[1]: unreadable on $_unread"
             if test "$_n" -eq 0
-                _info "  $_a[1]: not exposed by any of "(count $_cpu_dirs)" policies" # e.g. EPP under acpi-cpufreq: nothing to compare
+                set -q _unread[1]; or _info "  $_a[1]: not exposed by any of "(count $_cpu_dirs)" policies" # e.g. EPP under acpi-cpufreq: nothing to compare
             else if test (count $_bad) -eq 0
                 _ok "  $_a[1]: $_a[2], uniform across $_n of "(count $_cpu_dirs)" policies"
             else
@@ -2051,9 +2043,9 @@ function _vrkm_param_assert --argument-names mp path want --description "_vrkm_m
         _chk_sysfs_match "$path" '\['(string escape --style=regex -- "$want")'\]' "$mp"
     else if not contains -- "$mp" $_bool_params
         _chk_sysfs_eq "$path" "$want" "$mp"
-    else if contains -- "$want" 0 n N
+    else if string match -qr -- '^([0nNfF]|[oO][fF])' "$want" # kstrtobool: first character decides
         _chk_sysfs_match "$path" '^[N0]$' "$mp"
-    else if contains -- "$want" 1 y Y
+    else if string match -qr -- '^([1yYtT]|[oO][nN])' "$want"
         _chk_sysfs_match "$path" '^[Y1]$' "$mp"
     else
         _chk_sysfs_eq "$path" "$want" "$mp"
@@ -2330,9 +2322,9 @@ function _vrsv_masked_inactive --description "_verify_runtime_services sub: MASK
             _warn "  $_u: systemctl state unavailable (absent or no running manager) — cannot verify"
         else if test "$_v[1]" = not-found
             _info "  $_u: not installed"
-        else if test "$_v[2]" = active; and test "$_v[3]" != masked
+        else if contains -- "$_v[2]" active activating reloading; and test "$_v[3]" != masked
             _fail "  $_u: ACTIVE and not masked ($_v[3]) — re-run ry-install"
-        else if test "$_v[2]" = active
+        else if contains -- "$_v[2]" active activating reloading
             _fail "  $_u: ACTIVE (masked but still running — stop or reboot)"
         else
             _ok "  $_u: $_v[2]"
@@ -2341,7 +2333,7 @@ function _vrsv_masked_inactive --description "_verify_runtime_services sub: MASK
 end
 
 # ── VERIFY-RUNTIME: USER-SCOPE UNIT COLLECTOR ──
-function _vrsv_user_units --description "_verify_runtime_services sub: Managed user-scope units not failed"
+function _vrsv_user_units --description "_verify_runtime_services sub: plasma-powerdevil not failed; other failed user units warn"
     _echo "── User units (runtime) ──"
     if not _has_user_bus_active; _warn "  User units: skipped (no active user-bus — log in graphically or enable-linger to verify)"; return 0; end # unverifiable warns, as the ENV_VARS skip does
     if test (command systemctl --user list-unit-files --no-legend -- plasma-powerdevil.service 2>/dev/null | count) -eq 0
@@ -2444,7 +2436,7 @@ function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mount
         _warn "  /etc/fstab not readable (even via sudo) — live mount options unverified"; return 0
     end
     set -l _fstab_paths; set -l _fstab_opts # fstab escapes \040, findmnt -r escapes \x20 — compare decoded
-    for _m in $_fstab_mps; set -l _mo (string split -m1 ' ' -- "$_m"); set -a _fstab_paths (printf '%b' "$_mo[1]"); set -a _fstab_opts "$_mo[2]"; end
+    for _m in $_fstab_mps; set -l _mo (string split -m1 ' ' -- "$_m"); set -a _fstab_paths (printf '%b' (string replace -ra -- '\\\\([0-7]{3})' '\\\\0$1' "$_mo[1]")); set -a _fstab_opts "$_mo[2]"; end
     set -l _pending; set -l _checked 0; set -l _skipped 0
     for _row in $_rows
         set -l _f (string split -m1 ' ' -- "$_row"); set -l _mp (printf '%b' "$_f[1]"); set -l _opts "$_f[2]"
@@ -2889,7 +2881,7 @@ function _rpt_gpu_dir --description "First amdgpu device directory that exposes 
 end
 function _rpt_mi --argument-names key --description "_rpt_sys_mem sub: One /proc/meminfo field in bytes"; set -l v (string match -rg -- "^$key:\s+(\d+) kB" (command cat -- /proc/meminfo 2>/dev/null))[1]; test -n "$v"; and math "$v * 1024"; end
 function _rpt_pkgver --argument-names p --description "Installed version of a package from one cached pacman -Q listing"
-    if not set -q -g _RPT_PQ; set -g _RPT_PQ; set -g _RPT_PQN; command -q pacman; and set -g _RPT_PQ (command pacman -Q 2>/dev/null); set -q _RPT_PQ[1]; and set -g _RPT_PQN (string replace -r -- ' .*$' '' $_RPT_PQ); end # no pacman: an empty cache, not an Unknown-command trace per call
+    if not set -q -g _RPT_PQ; set -g _RPT_PQ; set -g _RPT_PQN; set -g _RPT_PQ_OK false; command -q pacman; and set -g _RPT_PQ (command pacman -Q 2>/dev/null); and set -g _RPT_PQ_OK true; set -q _RPT_PQ[1]; and set -g _RPT_PQN (string replace -r -- ' .*$' '' $_RPT_PQ); end # no pacman: an empty cache, not an Unknown-command trace per call
     set -l i (contains -i -- "$p" $_RPT_PQN); or return 1
     string replace -r -- '^\S+ ' '' $_RPT_PQ[$i]
 end
@@ -3077,15 +3069,15 @@ function _rpt_prof_env --description "_rpt_sec_profile sub: ENV_VARS against the
     printf '</tbody></table></div>\n'; test "$bus" = true; and _rpt_cov 'Session environment' $ok (count $ENV_VARS)
 end
 function _rpt_prof_pkgs --description "_rpt_sec_profile sub: PKGS_ADD, EXPECTED_VULKAN_PKGS, and PKGS_DEL against pacman -Q"
-    set -l ok 0; set -l n 0
+    set -l ok 0; set -l n 0; _rpt_pkgver pacman >/dev/null; set -l pq $_RPT_PQ_OK # the ledger skips packages on a failed query
     printf '<h3>Packages</h3><div class="tw"><table><thead><tr><th>Package</th><th>Role</th><th>Installed</th><th>State</th></tr></thead><tbody>\n'
     for r in add:$PKGS_ADD vulkan:$EXPECTED_VULKAN_PKGS remove:$PKGS_DEL
         set -l rp (string split -m1 ':' -- $r); set -l v (_rpt_pkgver $rp[2]); set -l st missing; set n (math $n + 1)
-        if test "$rp[1]" = remove; set st removed; test -n "$v"; and set st 'still installed'; else if test -n "$v"; set st present; end
+        if test "$pq" != true; set st unreadable; else if test "$rp[1]" = remove; set st removed; test -n "$v"; and set st 'still installed'; else if test -n "$v"; set st present; end
         contains -- "$st" present removed; and set ok (math $ok + 1)
         _rpt_tr "<code>"(_rpt_esc "$rp[2]")"</code>" $rp[1] (_rpt_esc "$v") (_rpt_state_html $st)
     end
-    printf '</tbody></table></div>\n'; _rpt_cov Packages $ok $n
+    printf '</tbody></table></div>\n'; test "$pq" = true; and _rpt_cov Packages $ok $n
 end
 function _rpt_prof_units --description "_rpt_sec_profile sub: EXPECTED_SERVICES and MASK against systemctl show"
     set -l ok 0; set -l n 0
@@ -3192,7 +3184,7 @@ function _rpt_render --description "_rpt_write sub: Parse the run log, render ev
 end
 function _rpt_erase --description "_rpt_write sub: Erase every report global"
     set --erase _RPT_ARGV _RPT_GRP _RPT_GPH _RPT_LVL _RPT_RGI _RPT_SUB _RPT_MSG _RPT_SUM _RPT_ETS _RPT_EAR _RPT_ETX _RPT_T0 _RPT_PGI _RPT_PPH _RPT_PSB
-    set --erase _RPT_TOK _RPT_TWA _RPT_TFA _RPT_TIN _RPT_COV _RPT_GEN _RPT_PQ _RPT_PQN; return 0
+    set --erase _RPT_TOK _RPT_TWA _RPT_TFA _RPT_TIN _RPT_COV _RPT_GEN _RPT_PQ _RPT_PQN _RPT_PQ_OK; return 0
 end
 function _rpt_write --description "Write the --report HTML beside this run's JSONL, then erase the report globals"; _rpt_render $argv; _rpt_erase; return 0; end
 
@@ -3275,18 +3267,18 @@ set -l _ORIG_ARGV $argv
 argparse --name=(command basename -- (status filename)) $_RY_ARGPARSE_SPEC -- $argv 2>/dev/null
 set -l _argparse_rc $status
 if test "$_argparse_rc" -ne 0
-    set -l _ap_msg (begin; argparse --name=(command basename -- (status filename)) $_RY_ARGPARSE_SPEC -- $_ORIG_ARGV 2>&1 >/dev/null; end) # re-parse in a cmdsub block for the message: no /tmp file
-    set -q _ap_msg[1]; and set _ap_msg (printf '%s\n' $_ap_msg[1..3] | string replace -ra '\e\[[0-9;]*[a-zA-Z]' '' | string join -- '; ' | string trim --)
-    test -n "$_ap_msg"; or set _ap_msg "Invalid arguments: $_ORIG_ARGV"
+    set -l _ap_msg (begin; argparse --name=(command basename -- (status filename)) $_RY_ARGPARSE_SPEC -- (string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?' $_ORIG_ARGV) 2>&1 >/dev/null; end) # re-parse in a cmdsub block for the message: no /tmp file
+    set -q _ap_msg[1]; and set _ap_msg (printf '%s\n' $_ap_msg[1..3] | string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?' | string join -- '; ' | string trim --)
+    test -n "$_ap_msg"; or set _ap_msg "Invalid arguments: "(string join ' ' -- (string escape -- $_ORIG_ARGV | string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?'))
     echo "[ERR] $_ap_msg" >&2
     _ry_show_help >&2
     _pre_dispatch_exit $EXIT_USAGE
 end
-if set -q _flag_help; _ry_show_help; _pre_dispatch_exit $EXIT_OK; end
-if set -q _flag_version; echo "v$VERSION"; _pre_dispatch_exit $EXIT_OK; end
+if set -q _flag_help; _ry_show_help; or _pre_dispatch_exit $EXIT_FAIL; _pre_dispatch_exit $EXIT_OK; end
+if set -q _flag_version; echo "v$VERSION"; or _pre_dispatch_exit $EXIT_FAIL; _pre_dispatch_exit $EXIT_OK; end
 set -q _flag_check; and set -g MODE check; set -q _flag_report; and set -g MODE report # default is verify (set above)
 set --erase _RY_ARGV_CHECK_ONLY # MODE is authoritative past this point
-if test (count $argv) -gt 0; echo "[ERR] Unexpected positional argument(s): "(string join ' ' -- (string escape -- $argv)) >&2; _ry_show_help >&2; _pre_dispatch_exit $EXIT_USAGE; end
+if test (count $argv) -gt 0; echo "[ERR] Unexpected positional argument(s): "(string join ' ' -- (string escape -- $argv | string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?')) >&2; _ry_show_help >&2; _pre_dispatch_exit $EXIT_USAGE; end
 test "$MODE" != check; and set -g QUIET false
 
 # ── MAIN: LOG RENAME + 0600 CREATE + JSONL HEADER ──
