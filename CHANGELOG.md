@@ -3,126 +3,26 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.255.0
+7.256.0
 -------
 
-  - cli: a root run escapes each leftover argument whole, so an embedded
-    newline no longer splits the message
-  - cli: argument errors print control characters escaped or as ?, C1 and
-    raw bytes included
-  - cli: -h or -v ending in a newline is an unknown option (exit 2), not help
-  - preflight: an embedded value ending in a newline (governor, country,
-    count, kernel or HOOKS token) is refused
-  - preflight: a relative HOME takes the passwd entry, and a relative passwd
-    entry exits 3, instead of resolving under the current directory
-  - preflight: a HOME holding a control character takes the passwd entry; one
-    there exits 3, so a newline or escape never reaches printed lines
-  - preflight: the root UUID takes findmnt's first match, so a mount stacked
-    on / no longer leaves it unresolved
-  - preflight: sudo uncached with no TTY prints one ERR that names the TTY
-  - preflight: the --check hardware override hint names the script as
-    invoked, not ./ry-verify.fish
-  - verify: presets behind an x-only /etc/mkinitcpio.d are read as root too,
-    and hidden presets are skipped as mkinitcpio skips them
-  - verify: a HOOKS or MODULES token no longer reads as present inside a
-    hyphenated neighbor (systemd-tool for systemd)
-  - verify: COMPRESSION and its options match as whole tokens, so zstdmt no
-    longer reads as zstd and a quoted option no longer reads missing
-  - verify: the hook existence check strips quotes and reads a HOOKS line
-    without parentheses
-  - verify: a missing BINARIES= or FILES= line FAILs naming the line, not an
-    empty found value
-  - verify: a whole-line check FAILs a trailing # comment in files whose
-    parser keeps it in the value (systemd, sysctl, NM, BlueZ, environment.d)
-  - verify: a udev rule with a trailing # comment reads as dropped, as udev
-    drops it
-  - verify: an initramfs array still open at EOF reads as empty, not as an
-    earlier assignment
-  - verify: LINUX_OPTIONS reads as bash reads it: indented or single-quoted
-    counts, and a repeated line WARNs and uses the last
-  - verify: an unlistable /etc/modprobe.d WARNs that the 60-ry-* sweep was
-    skipped instead of reporting none
-  - verify: a GPU DPM mismatch counts one FAIL per card, its dmesg hint no
-    longer a WARN; an unreadable level WARNs instead of FAILing empty
-  - verify: an unreadable cpufreq attribute or amdgpu parameter WARNs, not a
-    FAIL with an empty value
-  - verify: a masked unit activating, reloading or refreshing FAILs as active
-  - verify: bool module parameters accept every kstrtobool spelling, such as
-    on/off and true/false
-  - verify: key=value rows read each key as its parser does: last assignment,
-    blanks at =, its section, continued lines, quotes, sysctl key forms
-  - verify: MangoHud lines end at the first #, as MangoHud reads them
-  - verify: a HOOKS line continued with a trailing backslash no longer reads
-    the backslash as a hook; a HOOKS+=() or MODULES+=() line appends
-  - verify: fstab mount points decode and resolve as mount reads them, so
-    \040, extra slashes, backslashes, symlinks and .. no longer hide a mount
-  - verify: the live fstab check no longer reads OK when /etc/fstab carries
-    no managed option to compare
-  - verify: loader entries are listed as systemd-boot does, hidden files
-    skipped and .conf matched in any case
-  - verify: a $BOOT holding only efi or chainload entries FAILs, as
-    ry-install's sanity check does
-  - verify: an unresolvable $BOOT counts once, as the boot entries WARN, not
-    also as an ERR
-  - verify: IgnorePkg and ParallelDownloads come from pacman-conf, so an
-    Include= file counts; a ParallelDownloads of 1 no longer reads as unset
-  - verify: a MASK unit removed while running FAILs as running, not INFO not
-    installed
-  - verify: a masked unit still running FAILs once, in the runtime check,
-    not also in the static one
-  - verify: an expected unit reloading or refreshing counts as active
-  - verify: the kernel parameter scan reads dmesg when the journal lacks the
-    boot lines, and WARNs instead of OK when neither holds them
-  - verify: a failed iw reg get reads as unqueryable, not a wrong country
-    with a remedy that fails the same way
-  - verify: with NetworkManager down, the Wi-Fi rows say nmcli failed instead
-    of reporting the P2P device unlisted
-  - verify: an unreadable /proc/cmdline WARNs once instead of FAILing every
-    kernel token
-  - verify: the live fstab check reads the first mount of a stacked target;
-    an fstab hidden by a lapsed sudo cache names the lapse, not perms
-  - verify: the root filesystem row takes findmnt's first entry, so a mount
-    stacked on / no longer repeats the type
-  - verify: stray names and symlinked-dir targets print control characters
-    as ?; a newline in a name no longer reads as two strays
-  - verify: a HOME under /etc or /boot no longer reads the user files as
-    system files (sudo, stray scan, report scope)
-  - verify: the NetworkManager connection count skips the files keyfile
-    ignores (hidden, ~ backups, temp, .pem, .der)
-  - verify: drop-in, preset and stale 60-ry-* names are listed NUL-safe, so a
-    newline no longer splits one file in two; control characters print as ?
-  - check: a masked unit activating, reloading or refreshing counts as drift;
-    an expected unit reloading or refreshing does not
-  - check: a unit no re-run installs reads as not installed, as the ledger
-    WARNs it, not drift; a system file not owned by root:root is drift
-  - report: a signal before the report tmpfile is tracked no longer strands
-    it in the log tree
-  - report: a masked unit activating, reloading or refreshing grades masked,
-    active, as the ledger FAILs it
-  - report: a MASK unit removed while running grades not installed, active,
-    as the ledger FAILs it
-  - report: the Root filesystem cell takes findmnt's first entry
-  - report: a failed pacman -Q grades packages unreadable, as the ledger
-    skips them, not missing or removed; so does an unreadable /proc/cmdline
-  - logging: preset _config values log MKINITCPIO_PRESET_CONFIG
-  - logging: VERIFY_STATIC_SUDO_LAPSE names probe=read or probe=size; a
-    hardware refusal logs HARDWARE_*_REFUSED
-  - readme: Requirements names the ESP at /boot (no XBOOTLDR)
-  - readme: exit 3 names failed config validation; --check compares system
-    file owners
-  - readme: a startup gate or uncached sudo stops before the summaries; only
-    a run past argument parsing writes a JSONL log
-  - readme: the coverage chart drops the Packages bar when pacman -Q fails,
-    and the Kernel parameters live bar when /proc/cmdline cannot be read
+  - preflight: WP_BLUEZ_ROLES entries must be PipeWire role names;
+    WP_BLUEZ_ROLES:4 is a drift tripwire
+  - verify: check the WirePlumber bluez5.roles drop-in; WARN on other config
+    in WirePlumber's search path that sets bluez5.roles
+  - verify: WARN when a connected Bluetooth card offers an HFP/HSP profile or
+    its profile list is unreadable (pactl); no user bus WARNs
+  - report: the embedded keys table lists WP_BLUEZ_ROLES
+  - readme: 18 managed files; Checks and Troubleshooting cover the WirePlumber
+    roles; _RY_BLUEZ_ROLES carries no pin
 
 
-7.246.0 - 7.252.0
+7.246.0 - 7.255.0
 -----------------
 
   - env: 7.248.0 expect 0x3434/0x0b00 (Keychron Q0 HE) in
     SDL_GAMECONTROLLER_IGNORE_DEVICES
-  - configuration: 7.248.0 udev expects the Xbox Wireless Controller libinput
-    ignore
+  - configuration: 7.248.0 expect the Xbox Wireless Controller libinput ignore
   - configuration: 7.251.0 the 60-ry-modules.conf header no longer claims
     module options, matching ry-install
   - guard: 7.250.0 internal state inherited from the environment or
@@ -148,12 +48,29 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     takes over, keeps the exit code instead of 128+N
   - cli: 7.252.0 an unexpected positional argument prints escaped; an empty
     one reads ''
+  - cli: 7.254.0 a root run escapes each leftover argument whole, so an
+    embedded newline no longer splits the message
+  - cli: 7.254.0 argument errors print control characters escaped or as ?, C1
+    and raw bytes included
+  - cli: 7.254.0 -h or -v ending in a newline is an unknown option (exit 2),
+    not help
   - preflight: 7.247.0 MKINITCPIO_MODULES and MKINITCPIO_HOOKS tokens are
     charset-checked
   - preflight: 7.252.0 a HOME that normalizes to empty or a non-directory
     names the value set in its exit-3 error
   - preflight: 7.252.0 the CPUPOWER_GOVERNOR refusal names the ry-install
     check whose domain it enforces
+  - preflight: 7.254.0 an embedded value ending in a newline (governor,
+    country, count, kernel or HOOKS token) is refused
+  - preflight: 7.254.0 a relative HOME takes the passwd entry, and a relative
+    passwd entry exits 3, instead of resolving under the current directory
+  - preflight: 7.254.0 the root UUID takes findmnt's first match, so a mount
+    stacked on / no longer leaves it unresolved
+  - preflight: 7.255.0 a HOME with a control character takes the passwd entry,
+    and one there exits 3: no newline or escape reaches output
+  - preflight: 7.255.0 sudo uncached with no TTY prints one ERR naming the TTY
+  - preflight: 7.255.0 the --check hardware override hint names the script as
+    invoked, not ./ry-verify.fish
   - check: 7.247.0 a masked MASK unit that is still running counts as drift
   - check: 7.250.0 CHECK_UNIT_DRIFT records for an inactive or not-enabled
     unit name the expected state
@@ -166,6 +83,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     enables, logs CONFD_UNIT_NOT_ENABLED, not drift no re-run clears
   - check: 7.252.0 with no sudo binary, an unlistable modprobe.d no longer
     writes to stderr
+  - check: 7.255.0 a masked unit activating, reloading or refreshing counts as
+    drift; an expected unit reloading or refreshing does not
+  - check: 7.255.0 a unit no re-run installs reads as not installed, as the
+    ledger WARNs it, not drift; a system file not owned by root:root is drift
   - verify: 7.247.0 a running MASK unit that is not masked is named as such;
     the nftables policy-drop FAIL names the restart
   - verify: 7.247.0 efi and chainload loader entries are skipped; a stale
@@ -193,8 +114,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     /etc/NetworkManager and without a .nmconnection suffix
   - verify: 7.250.0 a HOOKS build script behind a 0700 /etc/initcpio/install
     no longer reads as missing
-  - verify: 7.250.0 a MISSING row with a descriptive label names the expected
-    line
+  - verify: 7.250.0 a MISSING row with a label names the expected line
   - verify: 7.251.0 a 0700 mkinitcpio.conf.d or sdboot-manage.conf.d is listed
     as root, not skipped with a WARN
   - verify: 7.251.0 the mkinitcpio preset scan skips an empty _config and a
@@ -211,16 +131,94 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     as root; a custom config several presets name is listed once
   - verify: 7.252.0 an empty .ry.bak reports only for the boot files and fstab
     ry-install backs up
-  - verify: 7.252.0 a drop-in directory it cannot list names the cause in its
-    WARN
+  - verify: 7.252.0 a drop-in directory it cannot list names the cause
   - verify: 7.252.0 a linux boot entry with no options line FAILs as missing
     every KERNEL_PARAMS token, not a WARN
+  - verify: 7.254.0 presets behind an x-only /etc/mkinitcpio.d are read as
+    root too, and hidden presets are skipped as mkinitcpio skips them
+  - verify: 7.254.0 a HOOKS or MODULES token no longer reads as present inside
+    a hyphenated neighbor (systemd-tool for systemd)
+  - verify: 7.254.0 COMPRESSION and its options match as whole tokens, so
+    zstdmt no longer reads as zstd and a quoted option no longer reads missing
+  - verify: 7.254.0 the hook existence check strips quotes and reads a HOOKS
+    line without parentheses
+  - verify: 7.254.0 a missing BINARIES= or FILES= line FAILs naming the line,
+    not an empty found value
+  - verify: 7.254.0 a whole-line check FAILs a trailing # comment where the
+    parser keeps it in the value (systemd, sysctl, NM, BlueZ, environment.d)
+  - verify: 7.254.0 an initramfs array still open at EOF reads as empty, not
+    as an earlier assignment
+  - verify: 7.254.0 an unlistable /etc/modprobe.d WARNs that the 60-ry-* sweep
+    was skipped instead of reporting none
+  - verify: 7.254.0 a GPU DPM mismatch counts one FAIL per card, its dmesg
+    hint no longer a WARN; an unreadable level WARNs instead of FAILing empty
+  - verify: 7.254.0 bool module parameters accept every kstrtobool spelling,
+    such as on/off and true/false
+  - verify: 7.254.0 - 7.255.0 LINUX_OPTIONS reads as bash reads it: indented
+    or single-quoted counts, and a repeated line WARNs and uses the last
+  - verify: 7.254.0 - 7.255.0 an unreadable cpufreq attribute or amdgpu
+    parameter WARNs, not a FAIL with an empty value
+  - verify: 7.254.0 - 7.255.0 a masked unit activating, reloading or
+    refreshing FAILs as active
+  - verify: 7.254.0 - 7.255.0 fstab mount points decode and resolve as mount
+    does: \040, extra slashes, backslashes, symlinks and .. hide no mount
+  - verify: 7.255.0 a udev rule with a trailing # comment reads as dropped, as
+    udev drops it
+  - verify: 7.255.0 key=value rows read keys as their parser does: last
+    assignment, blanks at =, section, continued lines, quotes, sysctl forms
+  - verify: 7.255.0 MangoHud lines end at the first #, as MangoHud reads them
+  - verify: 7.255.0 a HOOKS line continued with a trailing backslash no longer
+    reads the backslash as a hook; a HOOKS+=() or MODULES+=() line appends
+  - verify: 7.255.0 the live fstab check no longer reads OK when /etc/fstab
+    carries no managed option to compare
+  - verify: 7.255.0 loader entries are listed as systemd-boot does, hidden
+    files skipped and .conf matched in any case
+  - verify: 7.255.0 a $BOOT holding only efi or chainload entries FAILs, as
+    ry-install's sanity check does
+  - verify: 7.255.0 an unresolvable $BOOT counts once, as the boot entries
+    WARN, not also as an ERR
+  - verify: 7.255.0 IgnorePkg and ParallelDownloads come from pacman-conf, so
+    an Include= file counts; a ParallelDownloads of 1 no longer reads as unset
+  - verify: 7.255.0 a MASK unit removed while running FAILs as running, not
+    INFO not installed
+  - verify: 7.255.0 a masked unit still running FAILs once, in the runtime
+    check, not also in the static one
+  - verify: 7.255.0 an expected unit reloading or refreshing counts as active
+  - verify: 7.255.0 the kernel parameter scan reads dmesg when the journal
+    lacks the boot lines, and WARNs instead of OK when neither holds them
+  - verify: 7.255.0 a failed iw reg get reads as unqueryable, not a wrong
+    country with a remedy that fails the same way
+  - verify: 7.255.0 with NetworkManager down, the Wi-Fi rows say nmcli failed
+    instead of reporting the P2P device unlisted
+  - verify: 7.255.0 an unreadable /proc/cmdline WARNs once instead of FAILing
+    every kernel token
+  - verify: 7.255.0 the live fstab check reads the first mount of a stacked
+    target; an fstab hidden by a lapsed sudo cache names the lapse, not perms
+  - verify: 7.255.0 the root filesystem row takes findmnt's first entry, so a
+    mount stacked on / no longer repeats the type
+  - verify: 7.255.0 stray names and symlinked-dir targets print control
+    characters as ?; a newline in a name no longer reads as two strays
+  - verify: 7.255.0 a HOME under /etc or /boot no longer reads the user files
+    as system files (sudo, stray scan, report scope)
+  - verify: 7.255.0 the NetworkManager connection count skips the files
+    keyfile ignores (hidden, ~ backups, temp, .pem, .der)
+  - verify: 7.255.0 drop-in, preset and stale 60-ry-* names list NUL-safe, so
+    a newline splits no name; control characters print as ?
   - report: 7.247.0 an empty action list no longer claims a clean run the
     counts contradict; the UUID fallback calls an unreadable copy unreadable
   - report: 7.247.0 the counts ring follows the print palette; the sysctl
     coverage bar is named Kernel tunables
   - report: 7.249.0 a run failed only by generators no longer opens its
     verdict with '0 failed check(s)'
+  - report: 7.254.0 a signal before the report tmpfile is tracked no longer
+    strands it in the log tree
+  - report: 7.254.0 - 7.255.0 a failed pacman -Q or unreadable /proc/cmdline
+    grades its rows unreadable, as the ledger skips them
+  - report: 7.255.0 a masked unit activating, reloading or refreshing grades
+    masked, active, as the ledger FAILs it
+  - report: 7.255.0 a MASK unit removed while running grades not installed,
+    active, as the ledger FAILs it
+  - report: 7.255.0 the Root filesystem cell takes findmnt's first entry
   - logging: 7.247.0 a failed date leaves the header ts empty instead of
     breaking its JSON
   - logging: 7.250.0 closing log-file lines are skipped once stderr is gone
@@ -228,6 +226,9 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     so a concurrent run's early exit cannot remove that dir
   - logging: 7.251.0 the hardware gate logs HARDWARE_MATCH with the CPU
   - logging: 7.252.0 the root UUID gate logs ROOT_UUID_OK
+  - logging: 7.254.0 preset _config values log MKINITCPIO_PRESET_CONFIG
+  - logging: 7.255.0 VERIFY_STATIC_SUDO_LAPSE names probe=read or probe=size;
+    a hardware refusal logs HARDWARE_*_REFUSED
 
 
 7.235.0 - 7.245.0
@@ -245,8 +246,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     exits 3 instead of failing later checks
   - preflight: 7.243.0 the dual-stack warning says to edit the nftables
     generator in both scripts
-  - preflight: 7.245.0 a sudo -n -v that passes yet leaves sudo -n unusable
-    exits 3
+  - preflight: 7.245.0 sudo -n -v passing with sudo -n unusable exits 3
   - check: 7.243.0 --check stays silent when id(1) is missing; on a full disk
     it keeps fish's write errors off stderr
   - check: 7.243.0 a sudo lapse while sizing a file or probing nftables
@@ -254,8 +254,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - check: 7.245.0 the --check root guard reads one flag
   - verify: 7.235.0 the missing Vulkan package hint reads pacman -Syu --needed
     instead of a partial-upgrade -S
-  - verify: 7.240.0 an ext4 fstab row carrying nolazytime FAILs as a pending
-    rewrite
+  - verify: 7.240.0 an ext4 row with nolazytime FAILs as a pending rewrite
   - verify: 7.241.0 the nftables policy-drop FAIL names systemctl restart;
     sdboot-manage.conf keys check in emission order
   - verify: 7.243.0 mkinitcpio.conf.d drop-ins, dotfiles included, warn as
@@ -278,8 +277,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     plasma-powerdevil.service, which has its own row
   - verify: 7.243.0 permission OK rows no longer print after a sudo lapse
     skipped files; the rule count reads unknown when nft did not run
-  - verify: 7.243.0 a stop at the runtime gate keeps the gate rows in the
-    totals
+  - verify: 7.243.0 a stop at the runtime gate keeps its rows in the totals
   - verify: 7.245.0 sysctl keys and values are trimmed as the generator writes
     them; the ICMPv6 check matches the whole rule
   - verify: 7.245.0 a symlinked loader/entries directory is listed; each
@@ -301,8 +299,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     unreadable and draws no coverage bar for them
   - report: 7.245.0 a 0600 /etc/kernel/cmdline is read with sudo -n; the
     System source list names /usr/lib/modules
-  - report: 7.245.0 a size probe blocked by a sudo lapse grades no sudo, not
-    differs
+  - report: 7.245.0 a size probe blocked by a sudo lapse grades no sudo
   - logging: 7.241.0 a signal between the log create and its header no longer
     leaves a footer-only JSONL; a child SIGKILL at cleanup is logged
   - logging: 7.243.0 a JSONL string ending in a newline keeps it; a run whose
@@ -349,10 +346,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     own rules; an unreadable expected unit warns instead of failing
   - verify: 7.224.0 WirePlumber rule checked in file and via pactl, P2P device
     unmanaged, more parser rejections caught, live fstab vs fstab options
-  - verify: 7.229.0 drop the WirePlumber soft-mixer checks (rule file and
-    pactl)
-  - verify: 7.229.0 list stray files beside managed files, package files by
-    owner
+  - verify: 7.229.0 drop the WirePlumber soft-mixer checks (file and pactl)
+  - verify: 7.229.0 list strays beside managed files, package files by owner
   - verify: 7.230.0 stray-sibling match drops the ? wildcard; the stray OK row
     prints only after a full sweep
   - verify: 7.231.0 an unreadable sdboot-manage conf.d directory warns instead
@@ -376,8 +371,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.233.0 a symlinked parent dir of a managed file is checked at its
     target; loader.conf on an automounted ESP keeps its vfat perms skip
   - verify: 7.233.0 ESP autodetect reads the topmost non-autofs mount
-  - verify: 7.233.0 with no user bus, the skipped ENV_VARS and user-unit
-    checks warn
+  - verify: 7.233.0 no user bus: skipped ENV_VARS and user-unit checks warn
   - verify: 7.234.0 a token present only in a mkinitcpio.conf comment no
     longer reads as present; repeated BLS options lines combine
   - verify: 7.234.0 HOOKS presence uses the initcpio install dirs only
@@ -462,16 +456,14 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 
   - kernel: 7.123.0 - 7.129.0 add mt7925e.disable_aspm=1 and
     kernel.nmi_watchdog=0
-  - dns: 7.123.0 - 7.129.0 pin upstreams in resolved and the NM global-dns
-    section
+  - dns: 7.123.0 - 7.129.0 pin upstreams in resolved and NM global-dns
   - env: 7.123.0 - 7.129.0 FSR4_UPGRADE -> PROTON_FSR4_UPGRADE; drop
     VKD3D_CONFIG
   - perf: 7.130.0 - 7.131.1 governor and EPP performance, GPU DPM level high
   - configuration: 7.137.0 - 7.138.0 drop the dormant RY_REMOTE_PLAY_PORTS
     nftables gate
   - services: 7.118.0 - 7.122.0 mask ufw instead of removing
-  - verify: 7.100.0 - 7.107.3 SHA256 static checksum, installed vs generated
-    bytes
+  - verify: 7.100.0 - 7.107.3 SHA256 checksum, installed vs generated bytes
   - check: 7.135.0 - 7.136.1 record 60-ry-* drop-ins and masked units absent
     from MASK
 

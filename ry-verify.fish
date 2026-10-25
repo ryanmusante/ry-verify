@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.255.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.256.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.255.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.256.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t # config.fish job control or IFS would steer this run
@@ -11,7 +11,7 @@ set -l _ry_irx '^_(?:(?:RY|PROG|RPT|KCONFIG)_[A-Z0-9_]*|flag_[A-Za-z0-9_]+|CLEAN
 for _iv in (set -g -n | string match -r -- $_ry_irx); set --erase -g $_iv; end; set --erase _iv # inherited internal state never steers a run
 set -g QUIET true; set -g MODE bootstrap; set -gu LOG_FILE ""; set -gu LOG_DIR ""; set -gu _RY_HOME_NEW false; set -gu _RY_LOGROOT_NEW false; set -gu _RY_LOGDIR_NEW false # pinned pre-argparse (signal footers); inherited paths never ours
 set -g _RY_TS_FMT '+%Y-%m-%dT%H:%M:%S.%3N%z'
-set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro — Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 17
+set -g PROFILE_NAME gtr9_pro; set -g PROFILE_DESC "Beelink GTR9 Pro — Ryzen AI Max+ 395 / Radeon 8060S"; set -g _RY_MANAGED_FILE_COUNT 18
 set -g -- _RY_ARGPARSE_SPEC --exclusive=verify,check,report h/help v/version verify check report # single option-spec source (root guard + main argparse)
 
 # ── STARTUP SIGNAL STUB (until _cleanup is defined) ──
@@ -409,7 +409,7 @@ set -g SYSTEM_DESTINATIONS \
     "/etc/systemd/system/NetworkManager-dispatcher.service.d/logging.conf" "/etc/NetworkManager/conf.d/99-cachyos-nm.conf" \
     "/etc/iw-regdomain" "/etc/bluetooth/main.conf" "/etc/nftables.conf" "/etc/default/cpupower-service.conf" \
     "/etc/sysctl.d/95-ry-overrides.conf" "/etc/udev/rules.d/99-ry-perf.rules" "/etc/modprobe.d/60-ry-modules.conf"
-set -g USER_DESTINATIONS "$HOME/.config/environment.d/10-environment.conf" "$HOME/.config/MangoHud/MangoHud.conf"
+set -g USER_DESTINATIONS "$HOME/.config/environment.d/10-environment.conf" "$HOME/.config/MangoHud/MangoHud.conf" "$HOME/.config/wireplumber/wireplumber.conf.d/51-ry-bluez-roles.conf"
 set -l _ry_dst_count (count $SYSTEM_DESTINATIONS $USER_DESTINATIONS)
 if test "$_ry_dst_count" -ne "$_RY_MANAGED_FILE_COUNT"; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] _RY_MANAGED_FILE_COUNT drift: declared=$_RY_MANAGED_FILE_COUNT computed=$_ry_dst_count" >&2; _ry_exit $EXIT_PREFLIGHT; end
 set --erase _ry_dst_count
@@ -431,6 +431,8 @@ set -g LOGIND_IGNORE_KEYS HandlePowerKey HandlePowerKeyLongPress HandleSuspendKe
 set -g NM_WIFI_BACKEND wpa_supplicant; set -g NM_WIFI_POWERSAVE 2; set -g NM_LOG_LEVEL WARN # Wi-Fi PS off: MT7925/mt76 PS in software causes latency spikes
 set -g CPUPOWER_GOVERNOR powersave # CPPC floor at min; EPP performance steers the firmware
 set -g BT_AUTO_ENABLE true; set -g BT_FAST_CONNECTABLE true; set -g BT_RECONNECT_ATTEMPTS 3 # adapter auto-power-on; paired-sink reconnect retries
+set -g WP_BLUEZ_ROLES a2dp_sink a2dp_source bap_sink bap_source # WirePlumber bluez5.roles; no hfp_*/hsp_*: no headset profile
+set -g _RY_BLUEZ_ROLES hsp_hs hsp_ag hfp_hf hfp_ag a2dp_sink a2dp_source bap_sink bap_source bap_bcast_sink bap_bcast_source asha_sink # role names PipeWire parses
 set -g GPU_DPM_LEVEL high # gfx1151 dpm; high pins clocks, gating stays active
 set -g _RY_DPM_LEVELS auto low high manual profile_standard profile_min_sclk profile_min_mclk profile_peak perf_determinism # power_dpm_force_performance_level accepted set
 set -g EPP_PREFERENCE performance; set -g _RY_EPP_LEVELS default performance balance_performance balance_power power # accepted set; udev-pinned per CPU; blocked if dynamic_epp on
@@ -489,6 +491,7 @@ function _ir_validate_counts --description "Refuse to run when array counts drif
         MKINITCPIO_HOOKS:11 \
         MKINITCPIO_MODULES:1 \
         LOGIND_IGNORE_KEYS:8 \
+        WP_BLUEZ_ROLES:4 \
         ENV_VARS:12 \
         SYSCTL_VALUES:9 \
         PKGS_ADD:18 \
@@ -500,7 +503,7 @@ function _ir_validate_counts --description "Refuse to run when array counts drif
         _RY_BOOT_CRITICAL_DSTS:4 \
         _RY_BACKUP_TARGETS:4 \
         SYSTEM_DESTINATIONS:15 \
-        USER_DESTINATIONS:2 \
+        USER_DESTINATIONS:3 \
         MKINITCPIO_COMPRESSION_OPTIONS:1 # drift tripwires; sync arrays + docs on change
     for _kv in $_expect
         set -l _parts (string split -m1 ':' -- "$_kv"); set -l _name $_parts[1]; set -l _want $_parts[2]; set -l _got (count $$_name)
@@ -522,6 +525,9 @@ function _ir_validate_keys --description "Refuse to run on out-of-domain embedde
     if string match -qr '^(AA|Q[M-Z]|X[A-Z]|ZZ)\z' -- "$COUNTRY"; _err_loud "COUNTRY '$COUNTRY' is in the ISO-3166-1 user-assigned/reserved range (AA, QM-QZ, XA-XZ, ZZ) — not a real country code; would silently fall back to world regdomain; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     if not contains -- "$GPU_DPM_LEVEL" $_RY_DPM_LEVELS; _err_loud "GPU_DPM_LEVEL must be one of "(string join '|' -- $_RY_DPM_LEVELS)" (got: '$GPU_DPM_LEVEL') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
     if not contains -- "$EPP_PREFERENCE" $_RY_EPP_LEVELS; _err_loud "EPP_PREFERENCE must be one of "(string join '|' -- $_RY_EPP_LEVELS)" (got: '$EPP_PREFERENCE') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
+    for _r in $WP_BLUEZ_ROLES # spliced unquoted into SPA-JSON
+        if not contains -- "$_r" $_RY_BLUEZ_ROLES; _err_loud "WP_BLUEZ_ROLES entries must be among "(string join '|' -- $_RY_BLUEZ_ROLES)" (got: '$_r') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    end
     if not string match -qr '^[a-z][a-z0-9_-]*\z' -- "$CPUPOWER_GOVERNOR"; _err_loud "CPUPOWER_GOVERNOR must match ^[a-z][a-z0-9_-]*\\z (got: '$CPUPOWER_GOVERNOR') — refuse to run (the domain ry-install's _grep_cpupower_entry accepts)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     if contains -- /etc/nftables.conf $SYSTEM_DESTINATIONS; and not contains -- ipv6.disable=1 $KERNEL_PARAMS # base ICMPv6 is accepted; service rules are not
         _warn "Dual-stack: the ruleset accepts only the ICMPv6 base set — add service-specific IPv6 rules to _content__etc_nftables.conf in both scripts and re-run ry-install (a hand edit to /etc/nftables.conf reads as MISMATCH)"
@@ -712,7 +718,7 @@ function _content__etc_modprobe.d_60-ry-modules.conf --description "Generate con
     end
 end
 
-# ── CONTENT GENERATORS: USER ($HOME dotfiles; environment.d + MangoHud) ──
+# ── CONTENT GENERATORS: USER ($HOME dotfiles; environment.d + MangoHud + WirePlumber) ──
 function _content_HOME_.config_environment.d_10-environment.conf --description "Generate content for ~/.config/environment.d/10-environment.conf"
     printf '%s\n' "# ry-install: session environment for systemd --user services and graphical sessions (managed file, do not edit by hand)"
     set -l _printed 0; set -g _RY_ENVD_BAD_ENTRIES
@@ -750,6 +756,14 @@ function _content_HOME_.config_MangoHud_MangoHud.conf --description "Generate co
         "no_small_font" \
         "alpha=0.8" \
         "background_alpha=0.4"
+end
+function _content_HOME_.config_wireplumber_wireplumber.conf.d_51-ry-bluez-roles.conf --description "Generate content for the WirePlumber bluez5.roles drop-in (no HFP/HSP role)"
+    printf '%s\n' \
+        "# ry-install: WirePlumber Bluetooth audio roles (managed file, do not edit by hand)" \
+        "# no hfp_*/hsp_* role: no headset profile to drop to when an app opens a microphone" \
+        "monitor.bluez.properties = {" \
+        "  bluez5.roles = [ $WP_BLUEZ_ROLES ]" \
+        "}"
 end
 
 # ── CONTENT DISPATCH (_ry_get_file_content; fn name derived via _content_fn_for) ──
@@ -1425,7 +1439,7 @@ function _vsb_entries --description "_verify_static_boot sub: \$BOOT entries enu
 end
 function _verify_static_boot --description "Verify loader.conf, sdboot-manage and mkinitcpio (+ drop-ins), kernel cmdline, boot entries"; _echo "BOOT CONFIGURATION"; _vsb_loader; _vsb_sdboot; _vsb_sdboot_dropins; _vsb_cmdline; _vsb_mkinitcpio; _vsb_mkinitcpio_dropins; _vsb_entries; end
 
-# ── VERIFY-STATIC: SYSTEM + USER (drop-ins, regdom, BT, cpupower, nft; env.d, MangoHud) ──
+# ── VERIFY-STATIC: SYSTEM (drop-ins, regdom, BT, cpupower, nft) ──
 function _vss_logind --description "_verify_static_system sub: logind.conf.d keys"
     _echo "── logind.conf ──"
     _chk_file /etc/systemd/logind.conf.d/99-cachyos-logind.conf; or return 0
@@ -1507,7 +1521,33 @@ function _verify_static_system --description "Verify resolved, logind, NM, regdo
     _vss_modprobe
     _vss_nft
 end
-function _verify_static_user --description "Verify environment.d ENV_VARS and the MangoHud HUD config"
+
+# ── VERIFY-STATIC: USER (environment.d, MangoHud, WirePlumber roles + other-config sweep) ──
+function _vsu_wireplumber --description "_verify_static_user sub: bluez5.roles drop-in + other WirePlumber config that sets the key"
+    _echo "── WirePlumber (Bluetooth roles) ──"
+    set -l _f "$HOME/.config/wireplumber/wireplumber.conf.d/51-ry-bluez-roles.conf"
+    if _chk_file "$_f"
+        _chk_grep "$_f" "monitor.bluez.properties = {" "monitor.bluez.properties block" line inline
+        _chk_grep "$_f" "bluez5.roles = [ $WP_BLUEZ_ROLES ]" "bluez5.roles (no hfp_*/hsp_*)" line inline
+    end
+    set -l _main; set -l _seen; set -l _cand # WirePlumber's config dirs, highest priority first
+    for _d in $HOME/.config/wireplumber /etc/xdg/wireplumber /etc/wireplumber /usr/local/share/wireplumber /usr/share/wireplumber
+        test -z "$_main"; and test -f "$_d/wireplumber.conf"; and set _main "$_d/wireplumber.conf" # only the first one loads
+        for _c in $_d/wireplumber.conf.d/*.conf
+            test -f "$_c"; or continue
+            set -l _n (path basename -- "$_c"); contains -- "$_n" $_seen; and continue # a higher dir's name shadows it
+            set -a _seen "$_n"; test "$_c" = "$_f"; or set -a _cand "$_c"
+        end
+    end
+    set -l _others # arrays concatenate across files: another list adds its roles
+    for _c in $_main $_cand
+        command awk '{ sub(/#.*/, "") } /bluez5\.roles|override\.monitor\.bluez\.properties/ { f = 1; exit } END { exit !f }' "$_c" 2>/dev/null; and set -a _others "$_c"
+    end
+    for _o in $_others; _warn "  "(string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?' "$_o")": also sets bluez5.roles or overrides monitor.bluez.properties — its roles add to ours; a later override replaces them"; end
+    set -q _others[1]; or _ok "  No other WirePlumber config sets bluez5.roles"
+    _log "WP_ROLES_SWEEP: others="(count $_others)
+end
+function _verify_static_user --description "Verify environment.d ENV_VARS, the MangoHud HUD config, and the WirePlumber roles drop-in"
     _echo "USER CONFIGURATION"; _echo "── environment.d ──"
     if _chk_file "$HOME/.config/environment.d/10-environment.conf"
         for exp in $ENV_VARS; _chk_grep "$HOME/.config/environment.d/10-environment.conf" "$exp" "" env; end
@@ -1519,6 +1559,7 @@ function _verify_static_user --description "Verify environment.d ENV_VARS and th
             _chk_grep "$HOME/.config/MangoHud/MangoHud.conf" "$_hud" "" kv hash
         end
     end
+    _vsu_wireplumber
 end
 
 # ── VERIFY-STATIC: PACKAGES + SERVICES + SYNTAX ──
@@ -2530,9 +2571,35 @@ function _vre_regdom --description "_verify_runtime_env sub: Wireless regulatory
         _warn "  regdom: country $COUNTRY not active — sudo iw reg set $COUNTRY (persists via /etc/iw-regdomain → cachyos-iw-set-regdomain)"
     end
 end
+function _vre_bluez_roles --description "_verify_runtime_env sub: no HFP/HSP profile on a connected Bluetooth card (pactl)"
+    _echo "── Bluetooth audio roles ──"
+    if not command -q pactl; _info "  Bluetooth roles: pactl(1) absent — cannot query (expected no HFP/HSP profile)"; return 0; end
+    if not _has_user_bus_active; _warn "  Bluetooth roles: skipped (no active user-bus — log in graphically or enable-linger to verify)"; return 0; end # unverifiable warns, as the ENV_VARS skip does
+    set -l _out (command env LC_ALL=C pactl list cards 2>/dev/null); set -l _rc $status
+    if test "$_rc" -ne 0; _warn "  Bluetooth roles: pactl list cards failed (rc=$_rc) — audio server unreachable"; return 0; end
+    set -l _card; set -l _sec; set -l _bt; set -l _pr; set -l _hs
+    for _l in $_out # sections one tab deep, profile lines two under Profiles
+        if string match -qr -- '^\tName: ' "$_l"; set _card (string sub -s 8 -- "$_l"); set _sec; string match -q -- 'bluez_card.*' "$_card"; and set -a _bt "$_card"; continue; end
+        string match -qr -- '^\t[^\t]' "$_l"; and set _sec (string split -m1 ':' -- (string sub -s 2 -- "$_l"))[1]
+        test "$_sec" = Profiles; and string match -q -- 'bluez_card.*' "$_card"; and string match -qr -- '^\t\t[^\t]' "$_l"; or continue
+        set -a _pr "$_card"; string match -qr -- '^\t\theadset[-_]' "$_l"; and set -a _hs "$_card" # headset-*: HSP/HFP
+    end
+    if not set -q _bt[1]; _info "  Bluetooth roles: no Bluetooth audio device connected — profile check skipped"; return 0; end
+    for _c in $_bt
+        set -l _cd (string replace -ra -- '[\x00-\x1f\x7f-\x9f\x{f680}-\x{f6ff}]' '?' "$_c")
+        if contains -- "$_c" $_hs
+            _warn "  $_cd: HFP/HSP profile offered — bluez5.roles not applied (systemctl --user restart wireplumber.service; see the WirePlumber sweep)"
+        else if not contains -- "$_c" $_pr
+            _warn "  $_cd: profile list unreadable in pactl list cards — HFP/HSP state unknown"
+        else
+            _ok "  $_cd: no HFP/HSP profile (bluez5.roles applied)"
+        end
+    end
+    _log "BLUEZ_ROLES_RUNTIME: cards="(count $_bt)" headset="(count $_hs)
+end
 
 # ── VERIFY-RUNTIME: ENV ORCHESTRATOR (_verify_runtime_env) ──
-function _verify_runtime_env --description "Verify ENV_VARS, sysctl, fstab, ntsync and regdom runtime"; _vre_envvars; _vre_sysctl_runtime; _vre_fstab; _vre_fstab_live; _vre_ntsync; _vre_regdom; end
+function _verify_runtime_env --description "Verify ENV_VARS, sysctl, fstab, ntsync, regdom and Bluetooth roles runtime"; _vre_envvars; _vre_sysctl_runtime; _vre_fstab; _vre_fstab_live; _vre_ntsync; _vre_regdom; _vre_bluez_roles; end
 
 # ── VERIFY-RUNTIME: SESSION + PERMS ──
 function _vrs_nm_perms --description "_verify_runtime_session sub: NetworkManager system-connections perms (0600 root:root)"
@@ -3137,7 +3204,7 @@ function _rpt_prof_keys --description "_rpt_sec_profile sub: Embedded bootloader
     printf '<h3>Embedded keys</h3><div class="tw"><table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>\n'
     for k in LOADER_DEFAULT LOADER_TIMEOUT LOADER_CONSOLE_MODE LOADER_EDITOR SDBOOT_DEFAULT_ENTRY SDBOOT_OVERWRITE SDBOOT_REMOVE_EXISTING SDBOOT_REMOVE_OBSOLETE \
         MKINITCPIO_MODULES MKINITCPIO_HOOKS MKINITCPIO_COMPRESSION MKINITCPIO_COMPRESSION_OPTIONS RESOLVED_MDNS RESOLVED_LLMNR NM_DISPATCHER_LOGLEVELMAX COUNTRY \
-        LOGIND_IGNORE_KEYS NM_WIFI_BACKEND NM_WIFI_POWERSAVE NM_LOG_LEVEL CPUPOWER_GOVERNOR BT_AUTO_ENABLE BT_FAST_CONNECTABLE BT_RECONNECT_ATTEMPTS GPU_DPM_LEVEL \
+        LOGIND_IGNORE_KEYS NM_WIFI_BACKEND NM_WIFI_POWERSAVE NM_LOG_LEVEL CPUPOWER_GOVERNOR BT_AUTO_ENABLE BT_FAST_CONNECTABLE BT_RECONNECT_ATTEMPTS WP_BLUEZ_ROLES GPU_DPM_LEVEL \
         EPP_PREFERENCE EXPECTED_SCALING_DRIVER BLACKLIST_AMDXDNA
         set -l v (_rpt_esc $$k); test -n "$v"; or set v unset; _rpt_tr "<code>$k</code>" "<code>$v</code>"
     end
