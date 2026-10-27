@@ -3,21 +3,27 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.256.0
+7.257.0
 -------
 
-  - preflight: WP_BLUEZ_ROLES entries must be PipeWire role names;
-    WP_BLUEZ_ROLES:4 is a drift tripwire
-  - verify: check the WirePlumber bluez5.roles drop-in; WARN on other config
-    in WirePlumber's search path that sets bluez5.roles
-  - verify: WARN when a connected Bluetooth card offers an HFP/HSP profile or
-    its profile list is unreadable (pactl); no user bus WARNs
-  - report: the embedded keys table lists WP_BLUEZ_ROLES
-  - readme: 18 managed files; Checks and Troubleshooting cover the WirePlumber
-    roles; _RY_BLUEZ_ROLES carries no pin
+  - configuration: with an hfp_*/hsp_* role in WP_BLUEZ_ROLES, the expected
+    drop-in comment no longer says there is none, matching ry-install
+  - check: CHECK_MODE_DRIFT names the mode as 0666, not 666, like expected=
+  - verify: root=UUID= in /etc/kernel/cmdline must be a whole token
+  - verify: a multi-line KEY+=( ... ) in mkinitcpio config is appended, not
+    dropped, so a populated FILES or BINARIES no longer reads as empty
+  - verify: an fstab ext4 scan that fails WARNs rather than reading as no
+    ext4 entries
+  - verify: an hfp_*/hsp_* role in WP_BLUEZ_ROLES skips the headset-profile
+    check; its OK row no longer claims bluez5.roles applied
+  - verify: a sudo lapse no longer adds a "No installed files" or "No parent
+    directories" WARN; a blank ufw state reads unknown
+  - logging: BLUEZ_ROLES_RUNTIME headset= counts cards, not profile lines
+  - readme: an override. prefix in other WirePlumber config is a remedy
+    target; the pactl check row names the WP_BLUEZ_ROLES exception
 
 
-7.246.0 - 7.255.0
+7.246.0 - 7.256.0
 -----------------
 
   - env: 7.248.0 expect 0x3434/0x0b00 (Keychron Q0 HE) in
@@ -71,6 +77,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - preflight: 7.255.0 sudo uncached with no TTY prints one ERR naming the TTY
   - preflight: 7.255.0 the --check hardware override hint names the script as
     invoked, not ./ry-verify.fish
+  - preflight: 7.256.0 WP_BLUEZ_ROLES entries must be PipeWire role names;
+    WP_BLUEZ_ROLES:4 is a drift tripwire
   - check: 7.247.0 a masked MASK unit that is still running counts as drift
   - check: 7.250.0 CHECK_UNIT_DRIFT records for an inactive or not-enabled
     unit name the expected state
@@ -204,6 +212,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     keyfile ignores (hidden, ~ backups, temp, .pem, .der)
   - verify: 7.255.0 drop-in, preset and stale 60-ry-* names list NUL-safe, so
     a newline splits no name; control characters print as ?
+  - verify: 7.256.0 check the WirePlumber bluez5.roles drop-in; WARN on other
+    config in WirePlumber's search path that sets bluez5.roles
+  - verify: 7.256.0 WARN when a connected Bluetooth card offers an HFP/HSP
+    profile or its profile list is unreadable (pactl); no user bus WARNs
   - report: 7.247.0 an empty action list no longer claims a clean run the
     counts contradict; the UUID fallback calls an unreadable copy unreadable
   - report: 7.247.0 the counts ring follows the print palette; the sysctl
@@ -219,6 +231,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - report: 7.255.0 a MASK unit removed while running grades not installed,
     active, as the ledger FAILs it
   - report: 7.255.0 the Root filesystem cell takes findmnt's first entry
+  - report: 7.256.0 the embedded keys table lists WP_BLUEZ_ROLES
   - logging: 7.247.0 a failed date leaves the header ts empty instead of
     breaking its JSON
   - logging: 7.250.0 closing log-file lines are skipped once stderr is gone

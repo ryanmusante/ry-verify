@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.256.0** · [Changelog](CHANGELOG.md)
+**Version 7.257.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -75,7 +75,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Runtime › Module state | module parameters, NVMe I/O scheduler, blacklists |
 | Runtime › Service state | `conf.d`-implied and `EXPECTED_SERVICES` units, live nftables input policy drop and IPv4 ping accept, `MASK` units inactive, user-scope units, firewall posture |
 | Runtime › Wi-Fi state | Wi-Fi interface and connection, NetworkManager effective backend (`NetworkManager --print-config`), unmanaged Wi-Fi P2P device |
-| Runtime › Environment state | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain, no HFP/HSP profile on a connected Bluetooth card (`pactl`) |
+| Runtime › Environment state | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain, no HFP/HSP profile on a connected Bluetooth card (`pactl`) unless `WP_BLUEZ_ROLES` adds one |
 | Runtime › File permissions | NetworkManager system-connections perms, installed file modes, parent directories of managed files (a symlinked directory is checked at its target) |
 
 ## Report
@@ -93,7 +93,11 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 A report that cannot be written prints `[ERR] Report not written` and turns an otherwise clean exit into `1`.
 
-Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `no sudo`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled (for `nftables.service`, a live ruleset) warn; a unit to mask that is `not installed` is neutral; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. A file whose generator needs the unresolved root UUID is compared under the UUID its installed copy carries. With no user bus, the ledger warns once for each check it skips — session `ENV_VARS`, user units, and Bluetooth roles — and the report marks every `ENV_VARS` row `no user bus`; a failed `systemctl --user show-environment` warns once and marks them `unreadable`. The unit table grades the unit file; whether an enabled unit is running is a row in the ledger's `Runtime › Service state` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither. The Session environment bar is left out when the session environment cannot be read, the Packages bar when `pacman -Q` fails, and the Kernel parameters live bar when `/proc/cmdline` cannot be read.
+Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `no sudo`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled (for `nftables.service`, a live ruleset) warn; a unit to mask that is `not installed` is neutral; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. A file whose generator needs the unresolved root UUID is compared under the UUID its installed copy carries.
+
+With no user bus, the ledger warns once for each check it skips — session `ENV_VARS`, user units, and Bluetooth roles — and the report marks every `ENV_VARS` row `no user bus`; a failed `systemctl --user show-environment` warns once and marks them `unreadable`.
+
+The unit table grades the unit file; whether an enabled unit is running is a row in the ledger's `Runtime › Service state` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither. The Session environment bar is left out when the session environment cannot be read, the Packages bar when `pacman -Q` fails, and the Kernel parameters live bar when `/proc/cmdline` cannot be read.
 
 ## Safety and Reliability
 
@@ -125,7 +129,7 @@ Firmware is not checked — the assumed ceiling and the per-setting walkthrough 
 
 **Masked unit not in `MASK` reported** — `sudo systemctl unmask <unit>` if an earlier `MASK` masked it; leave distro and hand-made masks alone.
 
-**Other WirePlumber config sets `bluez5.roles`** — WirePlumber merges it with the profile's drop-in: its roles add to the profile's, and a later `override.monitor.bluez.properties` replaces them; drop the key from that file, then `systemctl --user restart wireplumber.service`.
+**Other WirePlumber config sets `bluez5.roles`** — WirePlumber merges it with the profile's drop-in: its roles add to the profile's, and a later `override.monitor.bluez.properties` replaces them; drop the key, or that `override.` prefix, from that file, then `systemctl --user restart wireplumber.service`.
 
 **Stray file reported** — neither the profile nor a package owns it (package files print as `Package file:`); merge or delete a `.pacnew` sibling, and remove anything else once nothing uses it.
 
