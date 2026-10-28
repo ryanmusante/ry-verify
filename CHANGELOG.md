@@ -10,15 +10,37 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     drop-in comment no longer says there is none, matching ry-install
   - check: CHECK_MODE_DRIFT names the mode as 0666, not 666, like expected=
   - verify: root=UUID= in /etc/kernel/cmdline must be a whole token
+  - verify: an empty, readable /etc/kernel/cmdline FAILs even after a sudo
+    lapse, not a WARN blaming the lapse
   - verify: a multi-line KEY+=( ... ) in mkinitcpio config is appended, not
     dropped, so a populated FILES or BINARIES no longer reads as empty
-  - verify: an fstab ext4 scan that fails WARNs rather than reading as no
-    ext4 entries
+  - verify: a bracketed line in a sectionless file no longer hides a later
+    override of a managed key (sysctl, env, loader, sdboot, MangoHud)
+  - verify: a sudo lapse at the ParallelDownloads read is named as such
+    (PACMAN_CONF_SUDO_LAPSE), not as a pacman-conf failure
+  - verify: a failed fstab scan (ext4 or malformed rows) WARNs in both fstab
+    checks rather than reading as nothing found
   - verify: an hfp_*/hsp_* role in WP_BLUEZ_ROLES skips the headset-profile
     check; its OK row no longer claims bluez5.roles applied
+  - verify: with an hfp_*/hsp_* role in WP_BLUEZ_ROLES, the drop-in's
+    bluez5.roles row no longer says there is none
   - verify: a sudo lapse no longer adds a "No installed files" or "No parent
     directories" WARN; a blank ufw state reads unknown
+  - verify: each linux boot entry's kernel and initrd must exist non-empty
+    in $BOOT; a FAIL names the file and the command that restores it
+  - verify: a sudo lapse at the HOOKS check WARNs per hook instead of
+    FAILing it NOT FOUND
+  - verify: a session variable set to an empty value FAILs as differing (in
+    the report too), not a NOT SET WARN advising a re-login
+  - report: a kernel token deployed but not live reads deployed, not live;
+    pending reboot assumed the boot entries carry it
+  - report: a run stopped at the sudo gate counts and lists one FAIL; the
+    gate's second line is now that row's hint
   - logging: BLUEZ_ROLES_RUNTIME headset= counts cards, not profile lines
+  - logging: a footer written on a signal counts every section's rows, not
+    only the section in progress
+  - logging: a non-UTF-8 byte in a logged or reported string becomes U+FFFD,
+    so the JSONL and the report stay valid UTF-8
   - readme: an override. prefix in other WirePlumber config is a remedy
     target; the pactl check row names the WP_BLUEZ_ROLES exception
 
@@ -213,7 +235,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.255.0 drop-in, preset and stale 60-ry-* names list NUL-safe, so
     a newline splits no name; control characters print as ?
   - verify: 7.256.0 check the WirePlumber bluez5.roles drop-in; WARN on other
-    config in WirePlumber's search path that sets bluez5.roles
+    config that sets bluez5.roles or overrides monitor.bluez.properties
   - verify: 7.256.0 WARN when a connected Bluetooth card offers an HFP/HSP
     profile or its profile list is unreadable (pactl); no user bus WARNs
   - report: 7.247.0 an empty action list no longer claims a clean run the

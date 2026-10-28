@@ -24,7 +24,7 @@ function _cleanup_startup --on-signal INT --on-signal TERM --on-signal HUP --on-
     test -n "$LOG_DIR"; and _ry_rm_log # the claimed, still-empty log
     test -n "$LOG_DIR"; and _ry_rm_new_dirs # startup logs nothing: only its empty dirs go
     string match -qr '^[A-Z]+$' -- "$_n"; and exec /bin/sh -c "kill -$_n \$\$ 2>/dev/null; exit $_x" # silent in every mode: --check must stay quiet
-    functions -e _cleanup_startup; exit $_x # fallback: fish exits with the interrupted job's status, not N
+    functions -e _cleanup_startup; exit $_x # fallback: fish exits with the interrupted job's status, not 128+N
 end
 
 # ── HELP TEXT ──
@@ -104,7 +104,7 @@ set --erase _ry_path_new _ry_p
 command -q id; or begin; test "$_RY_ARGV_CHECK_ONLY" != true; and echo "[ERR] GNU coreutils id(1) required (resolves UID before privilege checks)" >&2; exit $EXIT_PREFLIGHT; end # first external command
 set -g _MY_UID (command id -u)
 
-# ── BAIL PRIMITIVES: _RY_EXIT + _SET_EXIT + HANDLER ERASE + LOG/DIR REMOVAL + ROOT USAGE ──
+# ── BAIL PRIMITIVES: _ry_exit + _set_exit + HANDLER ERASE + LOG/DIR REMOVAL + ROOT USAGE ──
 function _ry_erase_handlers --description "Erase signal/exit handler functions"; functions -e _cleanup_startup _cleanup _cleanup_on_exit 2>/dev/null; end
 function _ry_rm_new_dirs --description "Remove the empty log dirs and ~/ry-install this run created"
     set -l _d # deepest first: rmdir takes its operands in order
@@ -324,7 +324,7 @@ function _dc_kill_children --description "_dc_settle sub: Reap child PIDs (TERM 
         command sleep 0.1 </dev/null 2>/dev/null
     end
     command -q pgrep; and test (count (command pgrep -P "$fish_pid" 2>/dev/null)) -eq 0; and return 0 # no children: skip KILL
-    not set -q _FOOTER_WRITTEN; and functions -q _log; and _log "CLEANUP_CHILDREN_KILL: children of pid $fish_pid outlived the SIGTERM grace (or pgrep is absent) — sending SIGKILL"
+    not set -q _FOOTER_WRITTEN; and _log "CLEANUP_CHILDREN_KILL: children of pid $fish_pid outlived the SIGTERM grace (or pgrep is absent) — sending SIGKILL"
     command pkill -KILL -P "$fish_pid" 2>/dev/null
 end
 
@@ -343,13 +343,23 @@ set -g _RY_DO_CLEANUP_OURS true # _ry_exit runs _do_cleanup only once it is this
 
 # ── VERIFY COUNTERS + TEARDOWN + SIGNAL/EXIT HANDLERS ──
 set -g VERIFY_OK 0; set -g VERIFY_FAIL 0; set -g VERIFY_WARN 0; set -g VERIFY_GEN_FAIL 0
+function _vt_reset --description "Zero VERIFY_* for a new section; _RY_VT_CARRY keeps the dropped rows for a signal footer"
+    set -q _RY_VT_CARRY[4]; or set -g _RY_VT_CARRY 0 0 0 0
+    set -g _RY_VT_CARRY (math $_RY_VT_CARRY[1] + $VERIFY_OK) (math $_RY_VT_CARRY[2] + $VERIFY_FAIL) (math $_RY_VT_CARRY[3] + $VERIFY_WARN) (math $_RY_VT_CARRY[4] + $VERIFY_GEN_FAIL)
+    set -g VERIFY_OK 0; set -g VERIFY_FAIL 0; set -g VERIFY_WARN 0; set -g VERIFY_GEN_FAIL 0
+end
+function _vt_fold --description "_teardown sub: Fold the section-reset carry back into VERIFY_* before a signal footer"
+    set -q _RY_VT_CARRY[4]; or return 0
+    set -g VERIFY_OK (math $VERIFY_OK + $_RY_VT_CARRY[1]); set -g VERIFY_FAIL (math $VERIFY_FAIL + $_RY_VT_CARRY[2])
+    set -g VERIFY_WARN (math $VERIFY_WARN + $_RY_VT_CARRY[3]); set -g VERIFY_GEN_FAIL (math $VERIFY_GEN_FAIL + $_RY_VT_CARRY[4]); set --erase _RY_VT_CARRY
+end
 function _teardown --argument-names mode --description "Unified cleanup: footer, resources"
     set -l _code 0 # validate argv[2] numeric before footer
     test (count $argv) -ge 2; and string match -qr '^\d+$' -- "$argv[2]"; and set _code $argv[2]
     switch "$mode"
         case signal
             _dc_settle # reap and tmpfile records precede the footer
-            _write_footer "$_code" interrupted; _do_cleanup
+            _vt_fold; _write_footer "$_code" interrupted; _do_cleanup
         case exit
             _dc_settle # its records precede the footer
             _write_footer "$_code" ""; _do_cleanup
@@ -374,12 +384,12 @@ function _cleanup --on-signal INT --on-signal TERM --on-signal HUP --on-signal A
         string match -q "$_sig_name:*" -- $_sm; and set _sig_exit (string split ':' -- $_sm)[2]; and break
     end
     if test -z "$_sig_exit"
-        functions -q _log; and _log "CLEANUP_UNKNOWN_SIGNAL: argv[1]='$argv[1]' fallback_exit=130"; set _sig_exit 130
+        _log "CLEANUP_UNKNOWN_SIGNAL: argv[1]='$argv[1]' fallback_exit=130"; set _sig_exit 130
     end
     _teardown signal $_sig_exit
     set -q _RY_HEADER_WRITTEN; or set -q _RY_LOG_WRITTEN; or begin; _ry_rm_log; _ry_rm_new_dirs; end # nothing logged: its empty log and dirs go
     string match -qr '^[A-Z]+$' -- "$_sig_name"; and exec /bin/sh -c "kill -$_sig_name \$\$ 2>/dev/null; exit $_sig_exit" # fish swallows handler exit status: sh re-raises 128+N
-    _ry_erase_handlers; exit $_sig_exit # fallback: fish exits with the interrupted job's status, not N
+    _ry_erase_handlers; exit $_sig_exit # fallback: fish exits with the interrupted job's status, not 128+N
 end
 functions -e _cleanup_startup # _cleanup now owns INT/TERM/HUP/ABRT
 function _cleanup_on_exit --on-event fish_exit --description "Exit handler: ensure cleanup runs on fish_exit"
@@ -877,7 +887,7 @@ function _installed_bytes --argument-names dst --description "Raw bytes of insta
         test -r "$dst"; or return 1
         set _bytes (command cat -- "$dst" 2>/dev/null | string collect --no-trim-newlines --allow-empty); set -l _ps $pipestatus; test "$_ps[1]" -eq 0; or return 1
     end
-    printf '%s' "$_bytes" # bare printf; pipe injects newline
+    printf '%s' "$_bytes" # bare printf: an added newline would break the byte compare
     return 0
 end
 function _installed_size_is --argument-names dst bytes --description "True when dst's size (stat -L) equals the byte length of the bytes argument"
@@ -886,15 +896,16 @@ function _installed_size_is --argument-names dst bytes --description "True when 
 end
 
 # ── JSON ESCAPE ──
-function _json_str --description "Escape a string for safe JSON embedding (RFC 8259 mandatory + DEL)"
+function _json_str --description "Escape a string for safe JSON embedding (RFC 8259 mandatory + DEL; a raw byte becomes U+FFFD)"
     set -l s $argv[1]
-    if not string match -qr -- '[\x00-\x1f"\x5c\x7f]' "$s"; printf '%s' "$s"; return 0; end # fast path: no escape needed (\x5c = backslash)
+    if not string match -qr -- '[\x00-\x1f"\x5c\x7f\x{f680}-\x{f6ff}]' "$s"; printf '%s' "$s"; return 0; end # fast path: no escape needed (\x5c = backslash)
     set s "$s"x # sentinel: string collect would drop trailing newlines
     set s (string replace -ar -- '\x5c' '\x5c\x5c' "$s" | string collect) # backslash first; \x5c literals avoid grammar desync
     set s (string replace -ar -- '"' '\\\\"' "$s" | string collect); set s (string replace -ar -- '\n' '\\\\n' "$s" | string collect)
     set s (string replace -ar -- '\r' '\\\\r' "$s" | string collect); set s (string replace -ar -- '\t' '\\\\t' "$s" | string collect)
     set s (string replace -ar -- '\x08' '\\\\b' "$s" | string collect); set s (string replace -ar -- '\f' '\\\\f' "$s" | string collect)
     for _hex in 01 02 03 04 05 06 07 0b 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f 7f; set s (string replace -ar -- '\x'$_hex '\\\\u00'$_hex "$s" | string collect); end # NUL omitted: fish strings can't hold NUL
+    set s (string replace -ar -- '[\x{f680}-\x{f6ff}]' \uFFFD "$s" | string collect) # a raw non-UTF-8 byte: U+FFFD keeps the line UTF-8
     printf '%s' (string replace -r -- 'x$' '' "$s") # drop the sentinel
     return 0
 end
@@ -1080,14 +1091,14 @@ end
 
 # ── CHECK HELPERS: GREP/TOKEN (sudo-aware file-content assertions) ──
 function _chk_grep --argument-names file pattern label match cmt sec --description "Check a file for a token: a line, a word, or a key's value as its parser reads it"
-    test -z "$label"; and set label "$pattern"; _log "CHECK_GREP: file=$file pattern=$pattern"; set -l use_sudo false
-    string match -q '/boot/*' -- "$file"; and set use_sudo true
+    test -z "$label"; and set label "$pattern"; _log "CHECK_GREP: file=$file pattern=$pattern"
+    set -l use_sudo false; string match -q '/boot/*' -- "$file"; and set use_sudo true
     if test "$use_sudo" = false; and not test -r "$file"; and _is_system_dst "$file"; set use_sudo true; end # sudo read avoids false DENIED on perms drift
     _cg_access_ok "$file" "$label" $use_sudo; or return 1
     set -l _grep_flags -wF
     contains -- "$match" line kv sd env sysctl ws sh; and set _grep_flags -xF # KEY=value: -w lets KEY=a,b satisfy KEY=a
     set -l _cg_awk '{ sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") } /^#/ { next } NF { print; f=1 } END { exit f ? 0 : 1 }' # whole-line # comments only; exit 1 = no content line
-    set -l _cg_av # awk vars: S sep, B blanks at it, Q quotes, K sysctl key, W section
+    set -l _cg_av # awk vars: S sep, B blanks, C joins, Q quotes, K sysctl, W section
     switch "$match"
         case kv; set _cg_av -v S== -v B=1 # keyfiles: NetworkManager, BlueZ, MangoHud
         case sd; set _cg_av -v S== -v B=1 -v C=1 # systemd: a trailing \ joins over comments
@@ -1096,7 +1107,8 @@ function _chk_grep --argument-names file pattern label match cmt sec --descripti
         case ws; set _cg_av -v 'S= ' -v B=1 # loader.conf: key, blanks, value
         case sh; set _cg_av -v S== -v B=0 -v Q=1 # bash: blanks at = make no assignment
     end
-    set -q _cg_av[1]; and set -a _cg_av -v "W=$sec"; and set _cg_awk '{ sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") } /^#/ { next } /^\[.*\]$/ { s = $0; next }
+    set -q _cg_av[1]; and set -a _cg_av -v "W=$sec"; and set _cg_awk '{ sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") } /^#/ { next }
+W != "" && /^\[.*\]$/ { s = $0; next }
 NF { f=1; if (W != "" && s != "[" W "]") next; i=(S == "=" ? index($0, "=") : match($0, /[[:space:]]/)); k=(i ? substr($0, 1, i-1) : $0); v=(i ? substr($0, i+1) : ""); if (B) { sub(/[[:space:]]+$/, "", k); sub(/^[[:space:]]+/, "", v) }; if (Q && v ~ /^(".*"|\047.*\047)$/) v = substr(v, 2, length(v) - 2); if (K)
 { sub(/^-/, "", k); if (k ~ /^[^.]*\//) { gsub(/\./, "\001", k); gsub(/\//, ".", k); gsub(/\001/, "/", k) } }; a[s SUBSEP k]=(i ? k S v : k) } END { for (x in a) print a[x]; exit f ? 0 : 1 }' # per section, each key's last assignment wins
     if test "$cmt" = inline; or begin; not contains -- "$match" line kv sd env sysctl ws sh; and test "$cmt" != udev; end; set _cg_awk '{ sub(/[[:space:]]+#.*$/, "") } '$_cg_awk; end # word checks, bash, nft: a trailing # comment too
@@ -1132,18 +1144,22 @@ function _chk_token_in --argument-names line token label opt --description "Veri
 end
 
 # ── MKINITCPIO HOOK VALIDATORS ──
-function _mkinitcpio_hook_exists --argument-names hook --description "True iff a HOOKS entry has a build script in an initcpio install dir"
+function _mkinitcpio_hook_exists --argument-names hook --description "Find a HOOKS entry's build script in an initcpio install dir (0 found, 1 absent, 2 sudo lapsed)"
     test -z "$hook"; and return 1
     for _d in /etc/initcpio/install /usr/lib/initcpio/install; test -f "$_d/$hook"; and return 0; end # this user first: no sudo exec per hook
+    sudo -n true 2>/dev/null; or return 2 # lapsed: no verdict either way
     for _d in /etc/initcpio/install /usr/lib/initcpio/install; sudo -n test -f "$_d/$hook" 2>/dev/null; and return 0; end # mkinitcpio reads them as root
     return 1
 end
-function _vmh_existence_only --description "_ry_validate_mkinitcpio_hooks sub: Existence-only path: emit _ok/_fail per hook"
+function _vmh_existence_only --description "_ry_validate_mkinitcpio_hooks sub: Existence-only path: one _ok, _warn or _fail row per hook"
     set -l errors 0
     for hook in $argv
         test -z "$hook"; and continue
-        if _mkinitcpio_hook_exists "$hook"
+        _mkinitcpio_hook_exists "$hook"; set -l _he $status
+        if test "$_he" -eq 0
             _ok "  $hook: exists"
+        else if test "$_he" -eq 2
+            _warn "  $hook: cannot check (sudo cache lapsed)"; set errors (math $errors + 1)
         else
             _fail "  $hook: NOT FOUND"; set errors (math $errors + 1)
         end
@@ -1260,7 +1276,7 @@ function _vsb_cmdline --description "_verify_static_boot sub: cmdline KERNEL_PAR
     set -l cmdline_content (command cat -- /etc/kernel/cmdline 2>/dev/null)
     test -z "$cmdline_content"; and set cmdline_content (sudo -n cat -- /etc/kernel/cmdline 2>/dev/null)
     if test -z "$cmdline_content"
-        if not sudo -n true 2>/dev/null; _warn "  /etc/kernel/cmdline: sudo cache lapsed — cannot determine content"; return 0; end
+        if not test -r /etc/kernel/cmdline; and not sudo -n true 2>/dev/null; _warn "  /etc/kernel/cmdline: sudo cache lapsed — cannot determine content"; return 0; end
         _fail "  /etc/kernel/cmdline: empty or unreadable"; return 0
     end
     for param in $KERNEL_PARAMS
@@ -1345,6 +1361,26 @@ function _vsb_entry_options --description "_vsb_entries sub: Assert each non-fal
         end
     end
 end
+function _vsb_entry_images --argument-names boot --description "_vsb_entries sub: Each linux entry's kernel and initrd files exist, non-empty, in \$BOOT"
+    for _e in $argv[2..]
+        set -l _n (command basename -- "$_e")
+        set -l _ls (_as true grep -E '^[[:space:]]*(linux|initrd)[[:space:]]' -- "$_e" 2>/dev/null); set -l _grc $status # 2: a read error
+        set -l _kl (string match -rg -- '^\s*linux\s+(.*\S)' $_ls)[1]
+        if test -z "$_kl" # no linux key: an efi or chainload entry, or unreadable
+            test "$_grc" -le 1; and sudo -n true 2>/dev/null; or _warn "  $_n: unreadable (sudo lapse or read error) — boot images unverified"; continue
+        end
+        set -l _ir (string match -rg -- '^\s*initrd\s+(.*\S)' $_ls); set -l _gone # BLS: one path per initrd line, as ry-install's sanity check
+        for _p in $_kl $_ir; sudo -n test -s "$boot/"(string replace -r -- '^/+' '' "$_p") 2>/dev/null; or set -a _gone "$_p"; end
+        if not set -q _gone[1]; _ok "  $_n: kernel and "(count $_ir)" initrd image(s) present"; continue; end
+        sudo -n true 2>/dev/null; or begin; _warn "  $_n: boot images unverified (sudo cache lapsed)"; continue; end
+        _fail "  $_n: missing or empty: $_gone"; set -l _fx "Run: sudo mkinitcpio -P"; set -l _pb (string replace -r -- '^(.*/)?vmlinuz-' '' "$_kl")
+        if contains -- "$_kl" $_gone # its package restores the kernel, and its hooks the initramfs
+            set _fx "Reinstall the package that provides $_kl"
+            test "$_pb" != "$_kl"; and command -q pacman; and command pacman -Qq -- "$_pb" >/dev/null 2>&1; and set _fx "Run: sudo pacman -S "(string escape -- "$_pb")
+        end
+        _info "  ↳ System may not boot! $_fx"
+    end
+end
 function _vsb_entries --description "_verify_static_boot sub: \$BOOT entries enumeration + count check"
     _echo "── Boot entries ──"; set -l _boot (_resolve_boot_path)
     if test -z "$_boot"; _warn "  Boot entries: cannot resolve \$BOOT path (bootctl/findmnt failed) — skipping"; return 0; end
@@ -1359,13 +1395,13 @@ function _vsb_entries --description "_verify_static_boot sub: \$BOOT entries enu
         _warn "  Boot entries: sudo cache lapsed — cannot enumerate $_boot/loader/entries"; return 0
     end
     if test "$_entries_pipe_ok" = false
-        _warn "  Boot entries: cannot enumerate $_boot/loader/entries (sudo lapsed or read error)"
+        _warn "  Boot entries: cannot enumerate $_boot/loader/entries (sudo lapse or read error)"
     else if test "$_entries_dir_probed" = false
         _fail "  Boot entries: $_boot/loader/entries/ does not exist"; _info "  ↳ System may not boot! Run: sudo sdboot-manage gen"
     else if test "$entry_count" -gt 0; and test "$_lx" -eq 0 # efi or chainload only, as ry-install's sanity check fails
         _fail "  Boot entries: $entry_count found, none with a linux line"; _info "  ↳ System may not boot! Run: sudo sdboot-manage gen"
     else if test "$entry_count" -gt 0
-        _ok "  Boot entries: $entry_count found"; _vsb_entry_options $_entries
+        _ok "  Boot entries: $entry_count found"; _vsb_entry_options $_entries; _vsb_entry_images "$_boot" $_entries
     else
         _fail "  Boot entries: NONE in $_boot/loader/entries/"; _info "  ↳ System may not boot! Run: sudo sdboot-manage gen"
     end
@@ -1530,7 +1566,10 @@ function _vsp_pacman_conf --description "_verify_static_packages sub: Inspect Ig
     end
     if set -q ignore_lines[1]; _ok "  IgnorePkg = $ignore_lines"; else; _info "  No IgnorePkg set"; end
     set -l parallel (_as $_pc_sudo pacman-conf --config /etc/pacman.conf ParallelDownloads 2>/dev/null); set -l _pl_rc $status
-    if test "$_pl_rc" -ne 0; _warn "  /etc/pacman.conf: pacman-conf failed (rc=$_pl_rc) — ParallelDownloads check skipped"; _log "PACMAN_CONF_READ_FAIL: pacman-conf ParallelDownloads rc=$_pl_rc"; return 0; end
+    if test "$_pl_rc" -ne 0
+        if test "$_pc_sudo" = true; and not sudo -n true 2>/dev/null; _warn "  /etc/pacman.conf: sudo cache lapsed during read — inspection skipped"; _log "PACMAN_CONF_SUDO_LAPSE: ParallelDownloads read"; return 0; end
+        _warn "  /etc/pacman.conf: pacman-conf failed (rc=$_pl_rc) — ParallelDownloads check skipped"; _log "PACMAN_CONF_READ_FAIL: pacman-conf ParallelDownloads rc=$_pl_rc"; return 0
+    end
     if test "$parallel" -gt 1 2>/dev/null
         _ok "  ParallelDownloads = $parallel"
     else
@@ -1539,7 +1578,7 @@ function _vsp_pacman_conf --description "_verify_static_packages sub: Inspect Ig
 end
 function _verify_static_packages --description "Verify PKGS_ADD, PKGS_DEL, pacman.conf"
     _echo "PACKAGES"; set -l _installed_pkgs
-    if not command -q pacman; _warn "  pacman not found, skipping package verification"; return 0; end
+    if not command -q pacman; _warn "  pacman not found — skipping package verification"; return 0; end
     set _installed_pkgs (command pacman -Qq 2>/dev/null); set -l _qq_rc $status # -Q takes no db.lck: a failure is a local-db read error
     if test "$_qq_rc" -ne 0; _warn "  pacman -Qq failed (rc=$_qq_rc, local database read error) — skipping package verification"; _log "VERIFY_PKGS_QQ_FAIL: pacman -Qq rc=$_qq_rc"; _vsp_pacman_conf; return 0; end
     _vsp_required $_installed_pkgs; _vsp_removed $_installed_pkgs; _vsp_pacman_conf
@@ -1557,7 +1596,7 @@ function _verify_static_services --description "Verify masked services state"
         if test "$_rec[3]" = ERR_NO_DATA
             _warn "  $_svc: systemctl state unavailable (absent or no running manager) — cannot verify mask state"
         else if test "$_rec[1]" = not-found
-            _info "  $_svc: unit not found (may not be installed)"
+            _info "  $_svc: not installed"
         else if test "$_rec[3]" = masked
             _ok "  $_svc: masked"
         else
@@ -1648,7 +1687,7 @@ function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recove
         set _present (math $_present + 1); test -s "$_cand"; or set -a _empty "$_cand"
     end
     if test "$_present" -eq 0
-        _info "  No $_RY_BACKUP_SUFFIX copies (no run has rewritten a boot file or fstab, or they were removed by hand)"
+        _info "  No $_RY_BACKUP_SUFFIX copies (no run has rewritten a boot file or fstab, the copy failed, or they were removed by hand)"
     else if test (count $_empty) -gt 0
         _fail "  $_RY_BACKUP_SUFFIX: "(count $_empty)" of $_present empty — unusable for recovery: $_empty"
     else
@@ -1709,16 +1748,16 @@ end
 function _ry_verify_static --description "Verify installed configs: boot, system, user, packages, services, syntax, checksums"
     _log_section "STATIC VERIFICATION START"
     _ensure_sudo_cached; or begin
-        _err_loud_cont "sudo required for verification"; _log_section "STATIC VERIFICATION END"; return $EXIT_PREFLIGHT
+        _info "  ↳ sudo required for verification"; _log_section "STATIC VERIFICATION END"; return $EXIT_PREFLIGHT # the report shows it under the counted ERR
     end
-    set -g VERIFY_OK 0; set -g VERIFY_FAIL 0; set -g VERIFY_WARN 0; set -g VERIFY_GEN_FAIL 0; _info "Static verification (config files)..."; _verify_static_boot
+    _vt_reset; _info "Static verification (config files)..."; _verify_static_boot
     _verify_static_system; _verify_static_user; _verify_static_packages; _verify_static_services; _verify_static_syntax; _verify_static_checksum
     _log_section "STATIC VERIFICATION END"; _verify_summary
 end
 
 # ── --CHECK MODE: DRIFT FLAG + FILES PHASE + CMDLINE PHASE + EXPECTED UNITS ──
 function _check_drift --argument-names key detail --description "Set the check-mode drift flag and record the cause"; set -g _RY_CHECK_DRIFT 1; _log "$key: $detail"; end
-function _check_phase_files --description "Check-mode phase: file content byte compare + symlink and mode drift"
+function _check_phase_files --description "Check-mode phase: file content byte compare + symlink, mode and owner drift"
     for dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS
         set -l _mp 0644; set -l _ms true; contains -- "$dst" $USER_DESTINATIONS; and set _mp 0600; and set _ms false
         _is_symlink "$dst" $_ms; and _check_drift CHECK_SYMLINK_DRIFT "dst=$dst"
@@ -1868,7 +1907,7 @@ end
 # ── VERIFY-RUNTIME: KERNEL CMDLINE + PARAM ACCEPTANCE + GPU + CPU ──
 function _vrk_cmdline --description "_verify_runtime_kparams sub: /proc/cmdline token check"
     _echo "KERNEL CMDLINE"
-    set -l cmdline (command cat -- /proc/cmdline 2>/dev/null); or begin; _warn "  /proc/cmdline unreadable — live kernel tokens unverified"; return 0; end # --check exits 3 on it
+    set -l cmdline (command cat -- /proc/cmdline 2>/dev/null); or begin; _warn "  /proc/cmdline unreadable — live kernel tokens unverified"; return 0; end # --check exits 3 on it, 10 if drift was already found
     for param in $KERNEL_PARAMS
         set -l _param_re (string escape --style=regex -- "$param")
         if string match -qr -- "(^|\s)$_param_re(\s|\$)" "$cmdline"
@@ -2300,7 +2339,7 @@ function _vre_envvars --description "_verify_runtime_env sub: ENV_VARS via syste
         if test -n "$_user_env"; set -l _vn_re (string escape --style=regex -- $var_name); set actual (printf '%s\n' $_user_env | string match -rg -- "^"$_vn_re"=(.*)"); set actual (_sysd_env_value "$actual"); end # special values come $'…'-quoted
         if test "$actual" = "$expected"
             _ok "  $var_name=$actual"
-        else if test -n "$actual"
+        else if string match -qr -- "^"(string escape --style=regex -- $var_name)"=" $_user_env # set, even empty: it differs, not NOT SET
             _fail "  $var_name=$actual (expected: $expected)"
         else
             _warn "  $var_name: NOT SET in current session (re-login or systemctl --user daemon-reload)"
@@ -2330,43 +2369,44 @@ function _vre_fstab --description "_verify_runtime_env sub: fstab ext4 entries h
     test -n "$_rootfs"; and _info "  Root filesystem: $_rootfs"; set -l _fstab_ext4; set -l _fstab_malformed; set -l _scan_rc 0
     if test -r /etc/fstab
         set _fstab_ext4 (command awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null); set _scan_rc $status
-        set _fstab_malformed (command awk "$_RY_AWK_EXT4_MALFORMED_FILTER" /etc/fstab 2>/dev/null)
+        set _fstab_malformed (command awk "$_RY_AWK_EXT4_MALFORMED_FILTER" /etc/fstab 2>/dev/null); or set _scan_rc $status
     else if sudo -n test -r /etc/fstab 2>/dev/null
         set _fstab_ext4 (sudo -n awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null); set _scan_rc $status
-        set _fstab_malformed (sudo -n awk "$_RY_AWK_EXT4_MALFORMED_FILTER" /etc/fstab 2>/dev/null)
+        set _fstab_malformed (sudo -n awk "$_RY_AWK_EXT4_MALFORMED_FILTER" /etc/fstab 2>/dev/null); or set _scan_rc $status
     else
         set -l _why "not readable (even via sudo)"; sudo -n true 2>/dev/null; or set _why "not user-readable and the sudo cache lapsed"; _warn "  /etc/fstab $_why — skipping mount-option check"; return 0
     end
     if test "$_scan_rc" -ne 0; _warn "  /etc/fstab: ext4 scan failed (awk rc=$_scan_rc) — skipping mount-option check"; return 0; end # empty must not read as no ext4 entries
-    for _ml in $_fstab_malformed; _warn "  /etc/fstab: ext4-like entry with too few fields (review manually): $_ml"; end
+    for _ml in $_fstab_malformed; _warn "  /etc/fstab: ext4-like entry with too few fields — ry-install leaves it untouched; review manually: $_ml"; end
     if test -z "$_fstab_ext4"; _info "  No ext4 entries in /etc/fstab"; return 0; end
     set -l _fstab_ok true
     for _fl in $_fstab_ext4
         set -l _opts (printf '%s\n' "$_fl" | command awk '{ print $4 }')
-        if string match -qr '^[0-9]+$' -- "$_opts"; _warn "  /etc/fstab: ext4 entry with a digits-only options field (column absent?) — ry-install leaves it untouched, review manually: $_fl"; set _fstab_ok false; continue; end # mirrors ry-install's malformed skip
+        if string match -qr '^[0-9]+$' -- "$_opts"; _warn "  /etc/fstab: ext4 entry with a digits-only options field (column absent?) — ry-install leaves it untouched; review manually: $_fl"; set _fstab_ok false; continue; end # mirrors ry-install's malformed skip
         for _tok in noatime lazytime commit=10 # boundary avoids lazytime matching nolazytime
             set -l _re (string escape --style=regex -- "$_tok")
             if not string match -qr '(^|,)'$_re'(,|$)' -- "$_opts"; _fail "  ext4 entry missing $_tok: $_fl"; set _fstab_ok false; end
         end
-        for _conflict in defaults relatime atime strictatime nolazytime # installer strips these; presence = rewrite pending
+        for _conflict in defaults relatime atime strictatime nolazytime # ry-install strips these; presence = rewrite pending
             set -l _cre (string escape --style=regex -- "$_conflict")
-            if string match -qr '(^|,)'$_cre'(,|$)' -- "$_opts"; _fail "  ext4 entry has $_conflict (installer removes it — rewrite pending): $_fl"; set _fstab_ok false; end
+            if string match -qr '(^|,)'$_cre'(,|$)' -- "$_opts"; _fail "  ext4 entry has $_conflict (ry-install removes it — rewrite pending): $_fl"; set _fstab_ok false; end
         end
-        if test (count (string match -ra -- '(?:^|,)commit=' "$_opts")) -gt 1; _fail "  ext4 entry has more than one commit= (installer keeps one — rewrite pending): $_fl"; set _fstab_ok false; end
+        if test (count (string match -ra -- '(?:^|,)commit=' "$_opts")) -gt 1; _fail "  ext4 entry has more than one commit= (ry-install keeps one — rewrite pending): $_fl"; set _fstab_ok false; end
     end
     test "$_fstab_ok" = true; and _ok "  ext4 entries ("(count $_fstab_ext4)"): noatime,lazytime,commit=10 present"
 end
 function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mounts carry the fstab options"
     _echo "── fstab options applied live ──"; set -l _rows (command findmnt -rn -t ext4 -o TARGET,OPTIONS 2>/dev/null)
     if test (count $_rows) -eq 0; _info "  No ext4 filesystem mounted"; return 0; end
-    set -l _fstab_mps
+    set -l _fstab_mps; set -l _scan_rc 0
     if test -r /etc/fstab
-        set _fstab_mps (command awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 " " $4 }')
+        set _fstab_mps (command awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 " " $4 }'); set _scan_rc $pipestatus[1]
     else if sudo -n test -r /etc/fstab 2>/dev/null
-        set _fstab_mps (sudo -n awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 " " $4 }')
+        set _fstab_mps (sudo -n awk "$_RY_AWK_EXT4_FILTER" /etc/fstab 2>/dev/null | command awk '{ print $2 " " $4 }'); set _scan_rc $pipestatus[1]
     else
         set -l _why "not readable (even via sudo)"; sudo -n true 2>/dev/null; or set _why "not user-readable and the sudo cache lapsed"; _warn "  /etc/fstab $_why — live mount options unverified"; return 0
     end
+    if test "$_scan_rc" -ne 0; _warn "  /etc/fstab: ext4 scan failed (awk rc=$_scan_rc) — live mount options unverified"; return 0; end # as _vre_fstab
     set -l _fstab_paths; set -l _fstab_opts # fstab escapes \040, findmnt -r \x20; mount resolves the target
     for _m in $_fstab_mps; set -l _mo (string split -m1 ' ' -- "$_m"); set -l _p (printf '%b' (string replace -ra -- '\\\\(?![0-7]{3})' '\\\\\\\\' "$_mo[1]" | string replace -ra -- '\\\\([0-7]{3})' '\\\\0$1') | string collect); set -a _fstab_paths (path resolve -- "$_p" | string collect); set -a _fstab_opts "$_mo[2]"; end
     set -l _pending; set -l _checked 0; set -l _skipped 0; set -l _cmp 0; set -l _seen
@@ -2570,9 +2610,9 @@ function _verify_runtime_session --description "Verify NM connection perms, inst
 function _ry_verify_runtime --description "Verify runtime kernel params, services, environment, and session/permissions"
     _log_section "RUNTIME VERIFICATION START"
     _ensure_sudo_cached; or begin
-        _err_loud_cont "sudo required for verification"; _log_section "RUNTIME VERIFICATION END"; return $EXIT_PREFLIGHT
+        _info "  ↳ sudo required for verification"; _log_section "RUNTIME VERIFICATION END"; return $EXIT_PREFLIGHT # the report shows it under the counted ERR
     end
-    set -g VERIFY_OK 0; set -g VERIFY_FAIL 0; set -g VERIFY_WARN 0; set -g VERIFY_GEN_FAIL 0; _info "Runtime verification (live system state)..."; _verify_runtime_kparams
+    _vt_reset; _info "Runtime verification (live system state)..."; _verify_runtime_kparams
     _verify_runtime_services; _verify_runtime_env; _verify_runtime_session; _log_section "RUNTIME VERIFICATION END"; _verify_summary
 end
 function _ry_verify_all --description "Verify both: static configs + runtime state"
@@ -2583,11 +2623,12 @@ function _ry_verify_all --description "Verify both: static configs + runtime sta
     _ry_verify_runtime; set -l _rc_r $status
     if test "$_rc_r" -eq "$EXIT_PREFLIGHT"
         set -g VERIFY_OK (math $VERIFY_OK + $_i_ok); set -g VERIFY_FAIL (math $VERIFY_FAIL + $_i_fail); set -g VERIFY_WARN (math $VERIFY_WARN + $_i_warn); set -g VERIFY_GEN_FAIL (math $VERIFY_GEN_FAIL + $_i_gen) # static + gate rows + startup
+        set --erase _RY_VT_CARRY
         test "$_rc_s" -ne 0; and return $_rc_s # static FAIL outranks runtime preflight bail
         return $_rc_r
     end
     set -g VERIFY_OK (math $VERIFY_OK + $_s_ok); set -g VERIFY_FAIL (math $VERIFY_FAIL + $_s_fail); set -g VERIFY_WARN (math $VERIFY_WARN + $_s_warn)
-    set -g VERIFY_GEN_FAIL (math $VERIFY_GEN_FAIL + $_s_gen); set -l _vt_lvl OK
+    set -g VERIFY_GEN_FAIL (math $VERIFY_GEN_FAIL + $_s_gen); set --erase _RY_VT_CARRY; set -l _vt_lvl OK
     if test "$VERIFY_FAIL" -gt 0; or test "$VERIFY_GEN_FAIL" -gt 0
         set _vt_lvl FAIL
     else if test "$VERIFY_WARN" -gt 0
@@ -2602,14 +2643,14 @@ function _ry_verify_all --description "Verify both: static configs + runtime sta
 end
 
 # ── REPORT: LOG PARSE + HTML ESCAPE (the run's own JSONL feeds sections 1, 2, 5, 6) ──
-function _rpt_jhtml --argument-names s --description "Decode a JSON-escaped log string straight to HTML-safe text; control escapes become U+FFFD"
+function _rpt_jhtml --argument-names s --description "Decode a JSON-escaped log string to HTML-safe text; newline/tab kept, other controls U+FFFD"
     set -l h (string replace -a -- '&' '&amp;' "$s" | string replace -a -- '<' '&lt;' | string replace -a -- '>' '&gt;' | string replace -a -- '\\\\' \x1e)
     set h (string replace -a -- '\\"' '&quot;' "$h" | string replace -a -- '\\n' '&#10;' | string replace -a -- '\\t' '&#9;')
     string replace -ra -- '\\\\(?:[rbf]|u00(?:[01][0-9a-f]|7f))' \uFFFD "$h" | string replace -a -- \x1e '\\'
 end
-function _rpt_esc --description "HTML-escape argv as one text run; newlines become &#10;, controls U+FFFD"
+function _rpt_esc --description "HTML-escape argv as one text run: newline &#10;, tab kept, other controls and raw bytes U+FFFD"
     string join -- ' ' $argv | string replace -a -- '&' '&amp;' | string replace -a -- '<' '&lt;' | string replace -a -- '>' '&gt;' | string replace -a -- '"' '&quot;' \
-        | string replace -ra -- '[\x01-\x08\x0b-\x1f\x7f]' \uFFFD | string join -- '&#10;'
+        | string replace -ra -- '[\x01-\x08\x0b-\x1f\x7f\x{f680}-\x{f6ff}]' \uFFFD | string join -- '&#10;'
 end
 function _rpt_cap --argument-names s --description "Sentence-case an upper-case log heading"; string join -- '' (string sub -l 1 -- "$s") (string lower -- (string sub -s 2 -- "$s")) | string replace -- Wifi Wi-Fi; end
 function _rpt_glabel --argument-names g --description "Phase and name of ledger group g"; printf '%s › %s' "$_RPT_GPH[$g]" "$_RPT_GRP[$g]"; end
@@ -2969,7 +3010,7 @@ function _rpt_prof_kparams --description "_rpt_sec_profile sub: KERNEL_PARAMS in
     for p in $KERNEL_PARAMS
         set -l re (string escape --style=regex -- "$p"); set -l d no; set -l l no; set -l st missing; set -l e (_rpt_esc "$p")
         string match -qr -- "(^|\s)$re(\s|\$)" "$dep"; and set d yes; string match -qr -- "(^|\s)$re(\s|\$)" "$live"; and set l yes
-        if test "$lrc" -ne 0; set st unreadable; else if test "$l" = yes; set st active; set ok (math $ok + 1); else if test "$d" = yes; set st 'pending reboot'; end
+        if test "$lrc" -ne 0; set st unreadable; else if test "$l" = yes; set st active; set ok (math $ok + 1); else if test "$d" = yes; set st 'deployed, not live'; end
         _rpt_tr "<code>$e</code>" $d $l (_rpt_state_html $st)
     end
     printf '</tbody></table></div>\n'; test "$lrc" -eq 0; and _rpt_cov 'Kernel parameters live' $ok (count $KERNEL_PARAMS) # unreadable: no bar, as ENV_VARS
@@ -2990,7 +3031,7 @@ function _rpt_prof_env --description "_rpt_sec_profile sub: ENV_VARS against the
     for e in $ENV_VARS
         set -l kv (string split -m1 '=' -- "$e"); set -l re (string escape --style=regex -- "$kv[1]"); set -l lv (string match -rg -- "^$re=(.*)\$" $ue)[1]; set -l st differs
         set lv (_sysd_env_value "$lv")
-        if test "$bus" = false; set st 'no user bus'; else if test "$bus" = failed; set st unreadable; else if test "$lv" = "$kv[2]"; set st match; set ok (math $ok + 1); else if test -z "$lv"; set st 'not set'; end
+        if test "$bus" = false; set st 'no user bus'; else if test "$bus" = failed; set st unreadable; else if test "$lv" = "$kv[2]"; set st match; set ok (math $ok + 1); else if not string match -qr -- "^$re=" $ue; set st 'not set'; end
         set -l k (_rpt_esc "$kv[1]"); set -l a (_rpt_esc "$kv[2]"); set -l b (_rpt_esc "$lv"); _rpt_tr "<code>$k</code>" "<code>$a</code>" "<code>$b</code>" (_rpt_state_html $st)
     end
     printf '</tbody></table></div>\n'; test "$bus" = true; and _rpt_cov 'Session environment' $ok (count $ENV_VARS)
@@ -3012,7 +3053,8 @@ function _rpt_prof_units --description "_rpt_sec_profile sub: EXPECTED_SERVICES 
         set -l rp (string split -m1 ':' -- $r); set -l s (_unit_state_padded $rp[2]); set -l st 'not enabled'; set -l cls
         if test "$s[1]" = not-found; set st 'not installed'; test "$rp[1]" = mask; and set cls INFO; test "$rp[1]" = mask; and contains -- "$s[2]" active activating reloading refreshing; and set st 'not installed, active'; and set cls FAIL
         else if test "$rp[1]" = mask; set st 'not masked'; test "$s[3]" = masked; and set st masked; test "$st" = masked; and contains -- "$s[2]" active activating reloading refreshing; and set st 'masked, active'
-        else if test "$s[3]" = enabled; set st enabled; else if contains -- "$s[2]" active reloading refreshing; set st (_rpt_esc "$s[3]")', active'; set cls WARN # running but not persisted warns, as the ledger does
+        else if test "$s[3]" = enabled; set st enabled
+        else if contains -- "$s[2]" active reloading refreshing; set st (_rpt_esc "$s[3]")', active'; set cls WARN # running but not persisted warns, as the ledger does
         else if test "$rp[2]" = nftables.service; and _nft_input_drop_live; set st (_rpt_esc "$s[3]")', ruleset live'; set cls WARN; end # oneshot: a live ruleset is its running state
         test "$s[1]" = ERR_NO_DATA; and set st unreadable; and set cls; and set s — — —
         test "$cls" = INFO; or set n (math $n + 1); contains -- "$st" masked enabled; and set ok (math $ok + 1) # an absent MASK unit is the ledger's INFO row: neutral

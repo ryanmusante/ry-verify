@@ -17,7 +17,7 @@ sudo -v
 ./ry-verify.fish
 ```
 
-Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK`, `WARN`, `FAIL`, and `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totaling both, or `Combined (startup + static + runtime):` when startup warnings count too. A startup gate, or sudo uncached at either section, exits `3` before that section's summary and the Combined line; `--report` then prints `[INFO] Report: <path>`, unless a startup gate stopped the run — see [Exit Codes](#exit-codes).
+Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK`, `WARN`, `FAIL`, and `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totaling both, or `Combined (startup + static + runtime):` when startup warnings count too. A startup gate, or sudo uncached at either section, exits `3` (`1` when static checks already failed) before that section's summary and the Combined line; `--report` then prints `[INFO] Report: <path>`, unless a startup gate stopped the run — see [Exit Codes](#exit-codes).
 
 ## Requirements
 
@@ -63,9 +63,9 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 | Group | Scope |
 |---|---|
-| Static › Boot configuration | `loader.conf`, `sdboot-manage.conf`, `/etc/kernel/cmdline` (`KERNEL_PARAMS`, `root=UUID`, `rw`), `mkinitcpio.conf`, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins that outrank them, a mkinitcpio preset `_config`, `$BOOT` entries |
+| Static › Boot configuration | `loader.conf`, `sdboot-manage.conf`, `/etc/kernel/cmdline` (`KERNEL_PARAMS`, `root=UUID`, `rw`), `mkinitcpio.conf`, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins that outrank them, a mkinitcpio preset `_config`, `$BOOT` entries and each `linux` entry's kernel and `initrd` files |
 | Static › System configuration | resolved, logind, NetworkManager dispatcher logging, NetworkManager, `iw-regdomain`, bluetooth, `cpupower-service.conf`, sysctl drop-in, udev, modprobe plus the unmanaged `60-ry-*` sweep, nftables |
-| Static › User configuration | `environment.d` (`ENV_VARS`), MangoHud, WirePlumber `bluez5.roles`, plus any other config in WirePlumber's search path that sets it |
+| Static › User configuration | `environment.d` (`ENV_VARS`), MangoHud, WirePlumber `bluez5.roles`, plus any other config in WirePlumber's search path that sets it or overrides `monitor.bluez.properties` |
 | Static › Packages | `PKGS_ADD` and `EXPECTED_VULKAN_PKGS` present, `PKGS_DEL` absent, `pacman.conf` `IgnorePkg` and `ParallelDownloads` |
 | Static › Services | `MASK` unit state, plus admin-scope masks not in `MASK` |
 | Static › Syntax validation | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
@@ -103,7 +103,7 @@ The unit table grades the unit file; whether an enabled unit is running is a row
 
 **Read-only** — no mode takes a lock or writes outside its log tree, `~/ry-install/logs/`, kept `0700`; nothing lands in `/tmp`. A missing `~/ry-install` is created `0700` to hold the log tree; an existing one is never re-moded — a group- or world-writable one stops the run, exit `3`.
 
-**Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins each tool reads, a mkinitcpio preset `_config`, other WirePlumber config that sets `bluez5.roles`, and stray files beside managed files.
+**Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins each tool reads, a mkinitcpio preset `_config`, other WirePlumber config that sets `bluez5.roles` or overrides `monitor.bluez.properties`, and stray files beside managed files.
 
 ## Embedded Values
 
