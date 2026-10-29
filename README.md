@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.257.1** · [Changelog](CHANGELOG.md)
+**Version 7.258.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -59,7 +59,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Checks
 
-`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes and modes, system file owners, live `/proc/cmdline` tokens, unit states — and reports drift only. Groups carry the names the [Report](#report) ledger uses; the console prints each in capitals, `Wi-Fi state` as `WIFI STATE`.
+`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes and modes, system file owners, live `/proc/cmdline` tokens, unit states — and reports drift only; restarts ry-install still owes (`~/ry-install/pending-apply`) are not drift. Groups carry the names the [Report](#report) ledger uses; the console prints each in capitals, `Wi-Fi state` as `WIFI STATE`.
 
 | Group | Scope |
 |---|---|

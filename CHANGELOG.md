@@ -3,15 +3,61 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.257.1
+7.258.0
 -------
 
-  - preflight: an EXPECTED_VULKAN_PKGS member in PKGS_DEL or starting with a
-    dash refuses to run, as ry-install now installs the list
-  - readme: EXPECTED_VULKAN_PKGS is no longer listed as verify-only
+  - guard: a fish_read_limit set in config.fish or as a universal no longer
+    fails a large command output; it is pinned to the 100 MiB default
+  - preflight: true(1) and test(1), which every sudo -n probe runs, are
+    checked at startup (exit 3; --check stays silent)
+  - check: a sudo lapse at a managed file's mode or owner probe exits 3, no
+    verdict, rather than reading as no drift
+  - check: a content difference only in bytes after a NUL is logged
+    reason=size, not reason=content
+  - check: a MASK unit whose file is gone but which still runs is drift, as
+    ry-install now masks and stops it
+  - verify: /etc/iw-regdomain is read as /usr/lib/iw-set-regdomain reads it:
+    the first line starting COUNTRY=, its first two characters
+  - verify: a key line with no value no longer overrides an earlier assignment
+    where its parser skips it (loader.conf, systemd, env, sysctl.d, bash)
+  - verify: a NetworkManager or BlueZ file GKeyFile rejects FAILs its rows: a
+    stray line, a key before any [group], or a bad group or key name
+  - verify: a quoted loader.conf value is unquoted as systemd-boot reads it:
+    double quotes, and single quotes from systemd 260 on
+  - verify: a comment ending in \ no longer swallows the next line: a ; line
+    in systemd and env files, a trailing # comment in sdboot-manage.conf
+  - verify: a udev rule is read as udev reads it: \ lines are joined, and a
+    rule it cannot parse (text after a value, an unclosed string) is dropped
+  - verify: nftables.conf rows for invalid drop, established/related and
+    loopback accept, and the forward and output policies
+  - verify: nftables.conf rows for flush ruleset and the inet filter table;
+    without the flush a reload appends the rules again
+  - verify: a dangling /etc/fstab.ry.bak or /etc/fstab.ry.orig link is listed
+    as a stray
+  - verify: a boot entry's kernel or initrd that names a directory FAILs, as a
+    missing or empty one does
+  - verify: a sudo lapse at a system file's readability or access probe WARNs
+    as a lapse (check: exits 3), not a missing-file FAIL
+  - verify: one sudo lapse adds one WARN in the installed-file,
+    parent-directory, NetworkManager, checksum, stray and boot-entry checks
+  - verify: a parent directory FAIL for a wrong owner or a group/other write
+    names the chown or chmod go-w that fixes it
+  - verify: a set IgnorePkg reads INFO, not OK, as nothing is asserted
+  - report: an unresolvable $BOOT no longer adds an ERR action item under a
+    passing verdict; the resolver's line is INFO
+  - report: C1 control characters become U+FFFD, as other controls do
+  - report: the appendix says a missing cmdline body can mean the root UUID is
+    unresolved
+  - signals: a signal while a section's counts are carried or folded no longer
+    counts those rows twice in the JSONL footer
+  - logging: VERIFY_STATIC_MISMATCH for a difference only in bytes after a NUL
+    logs both byte counts, none if the size is unreadable
+  - logging: VERIFY_RESULT names its scope, static or runtime
+  - readme: --check leaves out restarts ry-install still owes
+    (~/ry-install/pending-apply)
 
 
-7.246.0 - 7.257.0
+7.246.0 - 7.257.1
 -----------------
 
   - env: 7.248.0 expect 0x3434/0x0b00 (Keychron Q0 HE) in
@@ -69,6 +115,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     invoked, not ./ry-verify.fish
   - preflight: 7.256.0 WP_BLUEZ_ROLES entries must be PipeWire role names;
     WP_BLUEZ_ROLES:4 is a drift tripwire
+  - preflight: 7.257.1 an EXPECTED_VULKAN_PKGS member in PKGS_DEL or starting
+    with a dash refuses to run, as ry-install now installs the list
   - check: 7.247.0 a masked MASK unit that is still running counts as drift
   - check: 7.250.0 CHECK_UNIT_DRIFT records for an inactive or not-enabled
     unit name the expected state
