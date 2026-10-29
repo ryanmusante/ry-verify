@@ -3,49 +3,15 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.257.0
+7.257.1
 -------
 
-  - configuration: with an hfp_*/hsp_* role in WP_BLUEZ_ROLES, the expected
-    drop-in comment no longer says there is none, matching ry-install
-  - check: CHECK_MODE_DRIFT names the mode as 0666, not 666, like expected=
-  - verify: root=UUID= in /etc/kernel/cmdline must be a whole token
-  - verify: an empty, readable /etc/kernel/cmdline FAILs even after a sudo
-    lapse, not a WARN blaming the lapse
-  - verify: a multi-line KEY+=( ... ) in mkinitcpio config is appended, not
-    dropped, so a populated FILES or BINARIES no longer reads as empty
-  - verify: a bracketed line in a sectionless file no longer hides a later
-    override of a managed key (sysctl, env, loader, sdboot, MangoHud)
-  - verify: a sudo lapse at the ParallelDownloads read is named as such
-    (PACMAN_CONF_SUDO_LAPSE), not as a pacman-conf failure
-  - verify: a failed fstab scan (ext4 or malformed rows) WARNs in both fstab
-    checks rather than reading as nothing found
-  - verify: an hfp_*/hsp_* role in WP_BLUEZ_ROLES skips the headset-profile
-    check; its OK row no longer claims bluez5.roles applied
-  - verify: with an hfp_*/hsp_* role in WP_BLUEZ_ROLES, the drop-in's
-    bluez5.roles row no longer says there is none
-  - verify: a sudo lapse no longer adds a "No installed files" or "No parent
-    directories" WARN; a blank ufw state reads unknown
-  - verify: each linux boot entry's kernel and initrd must exist non-empty
-    in $BOOT; a FAIL names the file and the command that restores it
-  - verify: a sudo lapse at the HOOKS check WARNs per hook instead of
-    FAILing it NOT FOUND
-  - verify: a session variable set to an empty value FAILs as differing (in
-    the report too), not a NOT SET WARN advising a re-login
-  - report: a kernel token deployed but not live reads deployed, not live;
-    pending reboot assumed the boot entries carry it
-  - report: a run stopped at the sudo gate counts and lists one FAIL; the
-    gate's second line is now that row's hint
-  - logging: BLUEZ_ROLES_RUNTIME headset= counts cards, not profile lines
-  - logging: a footer written on a signal counts every section's rows, not
-    only the section in progress
-  - logging: a non-UTF-8 byte in a logged or reported string becomes U+FFFD,
-    so the JSONL and the report stay valid UTF-8
-  - readme: an override. prefix in other WirePlumber config is a remedy
-    target; the pactl check row names the WP_BLUEZ_ROLES exception
+  - preflight: an EXPECTED_VULKAN_PKGS member in PKGS_DEL or starting with a
+    dash refuses to run, as ry-install now installs the list
+  - readme: EXPECTED_VULKAN_PKGS is no longer listed as verify-only
 
 
-7.246.0 - 7.256.0
+7.246.0 - 7.257.0
 -----------------
 
   - env: 7.248.0 expect 0x3434/0x0b00 (Keychron Q0 HE) in
@@ -53,6 +19,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - configuration: 7.248.0 expect the Xbox Wireless Controller libinput ignore
   - configuration: 7.251.0 the 60-ry-modules.conf header no longer claims
     module options, matching ry-install
+  - configuration: 7.257.0 with an hfp_*/hsp_* role in WP_BLUEZ_ROLES, the
+    expected drop-in comment no longer says there is none, matching ry-install
   - guard: 7.250.0 internal state inherited from the environment or
     config.fish is erased at startup
   - guard: 7.250.0 a fish universal named like internal state (the error names
@@ -117,6 +85,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     drift; an expected unit reloading or refreshing does not
   - check: 7.255.0 a unit no re-run installs reads as not installed, as the
     ledger WARNs it, not drift; a system file not owned by root:root is drift
+  - check: 7.257.0 CHECK_MODE_DRIFT names the mode as 0666, not 666, like
+    expected=
   - verify: 7.247.0 a running MASK unit that is not masked is named as such;
     the nftables policy-drop FAIL names the restart
   - verify: 7.247.0 efi and chainload loader entries are skipped; a stale
@@ -238,6 +208,29 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     config that sets bluez5.roles or overrides monitor.bluez.properties
   - verify: 7.256.0 WARN when a connected Bluetooth card offers an HFP/HSP
     profile or its profile list is unreadable (pactl); no user bus WARNs
+  - verify: 7.257.0 root=UUID= in /etc/kernel/cmdline must be a whole token
+  - verify: 7.257.0 an empty, readable /etc/kernel/cmdline FAILs even after a
+    sudo lapse, not a WARN blaming the lapse
+  - verify: 7.257.0 a multi-line KEY+=( ... ) in mkinitcpio config is
+    appended, so a populated FILES or BINARIES no longer reads as empty
+  - verify: 7.257.0 a bracketed line in a sectionless file no longer hides a
+    later override of a managed key (sysctl, env, loader, sdboot, MangoHud)
+  - verify: 7.257.0 a sudo lapse at the ParallelDownloads read is named as
+    such (PACMAN_CONF_SUDO_LAPSE), not as a pacman-conf failure
+  - verify: 7.257.0 a failed fstab scan (ext4 or malformed rows) WARNs in both
+    fstab checks rather than reading as nothing found
+  - verify: 7.257.0 an hfp_*/hsp_* role in WP_BLUEZ_ROLES skips the
+    headset-profile check; its OK row no longer claims bluez5.roles applied
+  - verify: 7.257.0 with an hfp_*/hsp_* role in WP_BLUEZ_ROLES, the drop-in's
+    bluez5.roles row no longer says there is none
+  - verify: 7.257.0 a sudo lapse no longer adds a "No installed files" or "No
+    parent directories" WARN; a blank ufw state reads unknown
+  - verify: 7.257.0 each linux boot entry's kernel and initrd must exist
+    non-empty in $BOOT; a FAIL names the file and the command that restores it
+  - verify: 7.257.0 a sudo lapse at the HOOKS check WARNs per hook instead of
+    FAILing it NOT FOUND
+  - verify: 7.257.0 a session variable set to an empty value FAILs as
+    differing (in the report too), not a NOT SET WARN advising a re-login
   - report: 7.247.0 an empty action list no longer claims a clean run the
     counts contradict; the UUID fallback calls an unreadable copy unreadable
   - report: 7.247.0 the counts ring follows the print palette; the sysctl
@@ -254,6 +247,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     active, as the ledger FAILs it
   - report: 7.255.0 the Root filesystem cell takes findmnt's first entry
   - report: 7.256.0 the embedded keys table lists WP_BLUEZ_ROLES
+  - report: 7.257.0 a kernel token deployed but not live reads deployed, not
+    live; pending reboot assumed the boot entries carry it
+  - report: 7.257.0 a run stopped at the sudo gate counts and lists one FAIL;
+    the gate's second line is now that row's hint
   - logging: 7.247.0 a failed date leaves the header ts empty instead of
     breaking its JSON
   - logging: 7.250.0 closing log-file lines are skipped once stderr is gone
@@ -264,6 +261,12 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - logging: 7.254.0 preset _config values log MKINITCPIO_PRESET_CONFIG
   - logging: 7.255.0 VERIFY_STATIC_SUDO_LAPSE names probe=read or probe=size;
     a hardware refusal logs HARDWARE_*_REFUSED
+  - logging: 7.257.0 BLUEZ_ROLES_RUNTIME headset= counts cards, not profile
+    lines
+  - logging: 7.257.0 a footer written on a signal counts every section's rows,
+    not only the section in progress
+  - logging: 7.257.0 a non-UTF-8 byte in a logged or reported string becomes
+    U+FFFD, so the JSONL and the report stay valid UTF-8
 
 
 7.235.0 - 7.245.0

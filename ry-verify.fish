@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.257.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.257.1 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.257.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.257.1"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t # config.fish job control or IFS would steer this run
@@ -449,7 +449,7 @@ set -g PKGS_ADD \
     nvme-cli cachyos-gaming-meta cachyos-gaming-applications cachyos-benchmarker lib32-mesa mkinitcpio-firmware fd sd dust procs \
     bottom htop lm_sensors rtkit realtime-privileges pipewire-jack nftables pacman-contrib # pacman-contrib: pactree + paccache
 set -g PKGS_DEL plymouth cachyos-plymouth-bootanimation cachyos-plymouth-theme breeze-plymouth plymouth-kcm micro cachyos-micro-settings cachy-update kdeconnect
-set -g EXPECTED_VULKAN_PKGS vulkan-radeon lib32-vulkan-radeon # chwd Vulkan drivers
+set -g EXPECTED_VULKAN_PKGS vulkan-radeon lib32-vulkan-radeon # chwd Vulkan drivers; -Syu targets pin the vulkan-driver provider
 
 # ── EMBEDDED DATA: UNITS (MASK / EXPECTED) + CPU MATCH ──
 set -g MASK ananicy-cpp.service power-profiles-daemon.service NetworkManager-wait-online.service avahi-daemon.service avahi-daemon.socket ufw.service \
@@ -554,6 +554,9 @@ function _ir_validate_sets --description "Refuse to run when add and remove sets
     for _p in $PKGS_ADD # phase 2 installs, phase 4 -Rns removes: verify would assert both
         if contains -- "$_p" $PKGS_DEL; _err_loud "'$_p' is in both PKGS_ADD and PKGS_DEL — phase 4 would remove what phase 2 installed; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
+    for _p in $EXPECTED_VULKAN_PKGS # phase 2 names them as -Syu targets too
+        if contains -- "$_p" $PKGS_DEL; _err_loud "'$_p' is in both EXPECTED_VULKAN_PKGS and PKGS_DEL — phase 4 would remove what phase 2 installed; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    end
     for _u in $EXPECTED_SERVICES # phase 4 masks before it enables: enable would fail
         if contains -- "$_u" $MASK; _err_loud "'$_u' is in both MASK and EXPECTED_SERVICES — phase 4 masks before it enables; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
@@ -600,7 +603,7 @@ function _init_runtime --description "Cache root UUID + CPU-model gate + validat
         _err_loud "_RY_BACKUP_TARGETS member '$_bt' uses a side-effecting content generator — the install-side post-write restore would mutate run state; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT
     end
     _ir_precompute_caches
-    for _pn in $PKGS_ADD $PKGS_DEL
+    for _pn in $PKGS_ADD $PKGS_DEL $EXPECTED_VULKAN_PKGS
         if string match -q -- '-*' "$_pn"; _err_loud "Package name starts with dash: '$_pn' — pacman would parse as flag; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
 end

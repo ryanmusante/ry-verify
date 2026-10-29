@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.257.0** · [Changelog](CHANGELOG.md)
+**Version 7.257.1** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -110,14 +110,13 @@ The unit table grades the unit file; whether an enabled unit is running is a row
 > [!CAUTION]
 > `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship in lockstep; clone both repos at the same version. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
 
-The length of each array among the shared tunables is a drift tripwire in `_ir_validate_counts` of both scripts — `KERNEL_PARAMS:15` among them; the verify-only `EXPECTED_VULKAN_PKGS` below is pinned, as `EXPECTED_VULKAN_PKGS:2`, in `ry-verify.fish` alone, and the accepted-value sets `_RY_DPM_LEVELS`, `_RY_EPP_LEVELS` and `_RY_BLUEZ_ROLES` carry no pin. Adding or dropping an element also means updating that `NAME:<n>` in each script that pins it; otherwise that script refuses to run with `NAME count drift` and exits `3`. A kernel token is one such element — see [ry-install](https://github.com/ryanmusante/ry-install)'s Kernel Parameter Notes.
+The length of each array among the shared tunables is a drift tripwire in `_ir_validate_counts` of both scripts — `KERNEL_PARAMS:15` among them; the accepted-value sets `_RY_DPM_LEVELS`, `_RY_EPP_LEVELS` and `_RY_BLUEZ_ROLES` carry no pin. Adding or dropping an element also means updating that `NAME:<n>` in each script that pins it; otherwise that script refuses to run with `NAME count drift` and exits `3`. A kernel token is one such element — see [ry-install](https://github.com/ryanmusante/ry-install)'s Kernel Parameter Notes.
 
-Value lists, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the two keys below exist only on the verify side.
+Value lists, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the key below exists only on the verify side.
 
 ### Verify-Only Keys
 
 - `EXPECTED_SCALING_DRIVER` = `amd-pstate-epp` — live scaling driver (Runtime › Hardware state)
-- `EXPECTED_VULKAN_PKGS` = `vulkan-radeon`, `lib32-vulkan-radeon` — presence, with `PKGS_ADD` (Static › Packages)
 
 ## BIOS
 
