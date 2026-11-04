@@ -3,6 +3,70 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.260.0
+-------
+
+  - guard: fish_read_limit is pinned to 1 GiB, the fish 4 default; 100 MiB,
+    the fish 3 default, cut fish 4's limit tenfold
+  - check: an empty /proc/cmdline that reads cleanly is drift in every token
+    (exit 10), as --verify FAILs them, not a probe failure (exit 3)
+  - verify: an ESP not mounted at /boot, an XBOOTLDR $BOOT or a non-vfat
+    /boot fallback FAILs the loader.conf section, as ry-install refuses them
+  - verify: a linux boot entry with no initrd line FAILs, as ry-install's
+    boot sanity now does: its kernel would boot without an initramfs
+  - verify: a boot entry path holding .. or a symlink out of $BOOT FAILs, as
+    ry-install's boot sanity does, not a file outside $BOOT read as present
+  - verify: an ESP holding only fallback entries FAILs: no entry carries
+    KERNEL_PARAMS for the next boot
+  - verify: boot entries are read as systemd-boot reads them: the last linux
+    line counts, and auto-* entries are skipped
+  - verify: /boot paths are probed only as root (file presence, per-path
+    fstype), as a 0700 ESP requires
+  - verify: a managed file, loader entry or entries listing that fails to
+    read with sudo valid FAILs, not a WARN blaming a possible lapse
+  - verify: an unlistable drop-in, preset, modprobe.d or NetworkManager
+    connections directory names a sudo lapse or a read error
+  - verify: /etc/kernel/cmdline reads empty or unreadable (with cat's rc),
+    not one message for both
+  - verify: with the root UUID unresolved, a missing or unreadable
+    /etc/kernel/cmdline FAILs, ledger and report, not as a skipped checksum
+  - verify: the mkinitcpio.conf amdgpu row follows MKINITCPIO_MODULES; a
+    tunable that drops amdgpu no longer FAILs a matching file
+  - verify: mkinitcpio.conf reads tell a sudo lapse (one WARN) and a failed
+    read (one FAIL) from a missing assignment
+  - verify: an empty mkinitcpio.conf HOOKS array FAILs under syntax
+    validation
+  - verify: a managed file reduced to its [section] header FAILs each key as
+    missing, not as a file with no non-comment lines
+  - verify: a user or group name holding a space no longer FAILs the file
+    owner check, nor a user name holding one the parent-directory check
+  - verify: a parent-directory owner FAIL quotes the owner in its chown
+    hint, so a name holding a space pastes as one argument
+  - verify: split_lock_detect=, read raw at boot, is INFO when an older
+    kernel lists it as unknown; other complaints are still counted
+  - verify: amd_pstate status is checked against the KERNEL_PARAMS
+    amd_pstate= value, and skipped when the token is absent
+  - verify: a kernel token already REJECTED or read raw gets no second WARN
+    as a quoted-value match
+  - report: with no sudo binary, system-file rows read no sudo, and the
+    report never tries to run sudo
+  - report: the kernel-parameter table shows a dash for an unreadable
+    kernel cmdline (Deployed) or /proc/cmdline (Live)
+  - report: a disabled nftables.service whose ruleset cannot be probed reads
+    no sudo (WARN), as the ledger grades it
+  - logging: an absent managed resolved drop-in logs RESOLVED_RUNTIME_SKIP
+  - logging: a raw split_lock_detect= read logs KPARAM_RAW_READ; an ESP
+    layout FAIL logs VERIFY_ESP_LAYOUT_FAIL
+  - logging: with the root UUID unresolved, a failed read logs
+    VERIFY_STATIC_READ_FAIL and a lapsed one VERIFY_STATIC_SUDO_LAPSE
+  - logging: a log dir moded to 0700 logs STATE_DIR_PERM_FIX, as ry-install
+    does, not LOG_DIR_PERM_FIX
+  - consistency: the GKeyFile rows read parsable, as the other parse
+    messages do
+  - readme: Exit Codes 3 lists the --check probes that reach no verdict;
+    Boot configuration lists the ESP layout row
+
+
 7.258.0
 -------
 
@@ -53,8 +117,6 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - logging: VERIFY_STATIC_MISMATCH for a difference only in bytes after a NUL
     logs both byte counts, none if the size is unreadable
   - logging: VERIFY_RESULT names its scope, static or runtime
-  - readme: --check leaves out restarts ry-install still owes
-    (~/ry-install/pending-apply)
 
 
 7.246.0 - 7.257.1
@@ -557,4 +619,4 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 7.99.1 and earlier
 ------------------
 
-  - initial profile for the Beelink GTR9 Pro
+  - profile: initial profile for the Beelink GTR9 Pro

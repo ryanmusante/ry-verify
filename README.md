@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.258.0** · [Changelog](CHANGELOG.md)
+**Version 7.260.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -43,7 +43,7 @@ Each run that passes argument parsing writes one JSONL log (`0600`) to `~/ry-ins
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
 | `1` | a `--verify` or `--report` mismatch, a report that could not be written, or `-h`/`-v` output that could not be written (stdout full, or closed under fish 3) |
 | `2` | bad arguments, root misuse — except a valid `--check` run as root, which exits `3` silently |
-| `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; failed config validation; an unusable HOME or log tree; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides); `--check` stays silent |
+| `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; failed config validation; an unusable HOME or log tree; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides), or a probe that reaches no verdict before any drift (a sudo lapse, an unreadable `/proc/cmdline`, a `systemctl` error); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
 ## Environment Overrides
@@ -63,7 +63,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 | Group | Scope |
 |---|---|
-| Static › Boot configuration | `loader.conf`, `sdboot-manage.conf`, `/etc/kernel/cmdline` (`KERNEL_PARAMS`, `root=UUID`, `rw`), `mkinitcpio.conf`, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins that outrank them, a mkinitcpio preset `_config`, `$BOOT` entries and each `linux` entry's kernel and `initrd` files |
+| Static › Boot configuration | the ESP layout (ESP at `/boot`, no XBOOTLDR), `loader.conf`, `sdboot-manage.conf`, `/etc/kernel/cmdline` (`KERNEL_PARAMS`, `root=UUID`, `rw`), `mkinitcpio.conf`, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins that outrank them, a mkinitcpio preset `_config`, `$BOOT` entries and each `linux` entry's kernel and `initrd` files |
 | Static › System configuration | resolved, logind, NetworkManager dispatcher logging, NetworkManager, `iw-regdomain`, bluetooth, `cpupower-service.conf`, sysctl drop-in, udev, modprobe plus the unmanaged `60-ry-*` sweep, nftables |
 | Static › User configuration | `environment.d` (`ENV_VARS`), MangoHud, WirePlumber `bluez5.roles`, plus any other config in WirePlumber's search path that sets it or overrides `monitor.bluez.properties` |
 | Static › Packages | `PKGS_ADD` and `EXPECTED_VULKAN_PKGS` present, `PKGS_DEL` absent, `pacman.conf` `IgnorePkg` and `ParallelDownloads` |
