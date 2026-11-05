@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.260.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.261.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$' (status filename); or status stack-trace | string match -q -- '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.260.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.261.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t; set -g fish_read_limit 1073741824 # config.fish job control, IFS or read limit would steer this run
@@ -467,7 +467,7 @@ set -g MASK ananicy-cpp.service power-profiles-daemon.service NetworkManager-wai
 set -g EXPECTED_SERVICES fstrim.timer NetworkManager.service cpupower.service nftables.service bluetooth.service # enabled in Phase 4
 set -g EXPECTED_CPU_MATCH "Ryzen AI Max"
 
-# ── RUNTIME INIT: ROOT UUID + INVARIANT VALIDATION + CACHE PRECOMPUTE ──
+# ── RUNTIME INIT: ROOT UUID + CACHE PRECOMPUTE ──
 function _ir_resolve_root_uuid --description "Cache root UUID into _ROOT_UUID"
     set -g _ROOT_UUID; set -l _fm_rc 127 # probe first: fish prints its own not-found error past 2>/dev/null
     command -q findmnt; and begin; set -g _ROOT_UUID (command findmnt -f -no UUID / 2>/dev/null); set _fm_rc $status; end
@@ -493,6 +493,8 @@ function _ir_precompute_caches --description "Precompute the Wi-Fi-backend cache
         if string match -q '*nm.conf' -- "$_d"; set -g _RY_PROFILE_USES_WIFI_BACKEND true; break; end
     end
 end
+
+# ── RUNTIME INIT: INVARIANT VALIDATION ──
 function _ir_validate_counts --description "Refuse to run when array counts drift from expected"
     set -l _expect \
         KERNEL_PARAMS:15 \
@@ -1334,7 +1336,7 @@ function _vsb_cmdline --description "_verify_static_boot sub: cmdline KERNEL_PAR
     string match -qr -- '(^|\s)rw(\s|$)' "$cmdline_content"; _chk_present $status rw "MISSING from /etc/kernel/cmdline"
 end
 
-# ── VERIFY-STATIC: BOOT (MKINITCPIO + DROP-INS + ENTRIES + ORCHESTRATOR) ──
+# ── VERIFY-STATIC: BOOT (MKINITCPIO + PRESETS + DROP-INS) ──
 function _vsb_mki_unread --argument-names rc --description "_vsb_mkinitcpio and _verify_static_syntax sub: One row for an unread conf (rc 2 = sudo lapse)"
     if test "$rc" -eq 2; _warn "  /etc/mkinitcpio.conf: sudo cache lapsed during read — remaining checks skipped"; else; _fail "  /etc/mkinitcpio.conf: unreadable (read error)"; end
 end
@@ -1390,6 +1392,8 @@ function _vsb_mkinitcpio_dropins --description "_verify_static_boot sub: conf.d 
     set -q _pc[1]; and not set -q _po[1]; and _info "  A mkinitcpio preset sets _config=/etc/mkinitcpio.conf: mkinitcpio -P passes -c, so that preset skips mkinitcpio.conf.d"
     set -q _pc[1]; and _log "MKINITCPIO_PRESET_CONFIG: "(path sort -u -- $_pc | string join -- ', ')" (mkinitcpio -P passes -c: mkinitcpio.conf.d skipped)"
 end
+
+# ── VERIFY-STATIC: BOOT (ENTRIES + ORCHESTRATOR) ──
 function _vsb_entry_options --description "_vsb_entries sub: Assert each non-fallback linux entry carries every KERNEL_PARAMS token"
     set -l _chk 0
     for _e in $argv
@@ -1703,7 +1707,7 @@ function _verify_static_syntax --description "Validate live mkinitcpio HOOKS pre
     end
 end
 
-# ── VERIFY-STATIC: CHECKSUM + BACKUPS + STRAYS + DRIVER (byte compare + _ry_verify_static) ──
+# ── VERIFY-STATIC: CHECKSUM (byte compare + UUID fallback + mismatch row) ──
 function _vsc_check_one --argument-names dst --description "_verify_static_checksum sub: Expected vs installed bytes of one destination; rc 2 = sudo lapse"
     set -l _sl false; _is_system_dst "$dst"; and set _sl true
     if _is_symlink "$dst" $_sl; _fail "  $dst: symlink — a managed destination must be a regular file"; _log "VERIFY_STATIC_SYMLINK: dst=$dst"; return 0; end
@@ -1769,6 +1773,8 @@ function _vsc_mismatch --argument-names dst sl expected actual note --descriptio
     _log "VERIFY_STATIC_MISMATCH: dst=$dst expected_content_sha=$_exp_sha actual_content_sha=$_act_sha expected_chars="(string length -- "$expected")" actual_chars="(string length -- "$actual")"$_szk"
     return 0
 end
+
+# ── VERIFY-STATIC: BACKUPS + STRAYS + DRIVER (_verify_static_checksum + _ry_verify_static) ──
 function _vsc_backups --description "_verify_static_checksum sub: .ry.bak recovery copies non-empty; live under _RY_BACKUP_DIR"
     _echo "── Recovery copies ──"; set -l _present 0; set -l _empty; set -l _odd
     for _dst in $_RY_BACKUP_TARGETS /etc/fstab # the only files ry-install backs up
@@ -1852,7 +1858,7 @@ function _ry_verify_static --description "Verify installed configs: boot, system
     _log_section "STATIC VERIFICATION END"; _verify_summary static
 end
 
-# ── --CHECK MODE: DRIFT FLAG + FILES PHASE + CMDLINE PHASE + EXPECTED UNITS ──
+# ── --check MODE: DRIFT FLAG + FILES PHASE + CMDLINE PHASE + EXPECTED UNITS ──
 function _check_drift --argument-names key detail --description "Set the check-mode drift flag and record the cause"; set -g _RY_CHECK_DRIFT 1; _log "$key: $detail"; end
 function _check_phase_files --description "Check-mode phase: file content byte compare + symlink, mode and owner drift"
     for dst in $SYSTEM_DESTINATIONS $USER_DESTINATIONS
@@ -1960,7 +1966,7 @@ function _ry_orphan_masked_units --description "Masked units absent from MASK (s
     return 0
 end
 
-# ── --CHECK MODE: ORPHAN RECORD + UNITS PHASE + ORCHESTRATOR (_ry_do_check) ──
+# ── --check MODE: ORPHAN RECORD + UNITS PHASE + ORCHESTRATOR (_ry_do_check) ──
 function _check_record_orphans --description "_ry_do_check sub: Record masked-unit leftovers a re-run cannot clear; never sets drift"
     set -l _orphan (_ry_orphan_masked_units); test (count $_orphan) -gt 0; and _log "MASK_ORPHAN: count="(count $_orphan)" units="(string join ',' -- $_orphan); return 0
 end
@@ -2432,7 +2438,7 @@ end
 # ── VERIFY-RUNTIME: SERVICES ORCHESTRATOR (_verify_runtime_services) ──
 function _verify_runtime_services --description "Verify system units, masked-unit inactivity, user units, firewall posture, and Wi-Fi runtime"; _echo "SERVICE STATE"; _vrsv_sys_units; _vrsv_masked_inactive; _vrsv_user_units; _vrsv_fw_posture; _vrsv_wifi; return 0; end
 
-# ── VERIFY-RUNTIME: ENVIRONMENT ──
+# ── VERIFY-RUNTIME: ENVIRONMENT (session ENV_VARS + live sysctl) ──
 function _sysd_env_value --description "_vre_envvars and _rpt_prof_env sub: Decode a show-environment value (\$'…' quoting)"
     string match -qr -- '^\$\'.*\'$' "$argv[1]"; or begin; printf '%s' "$argv[1]"; return 0; end
     string replace -r -- '^\$\'(.*)\'$' '$1' "$argv[1]" | string replace -ra -- '\\\\([\\\\\'])' '$1' | string collect # decodes \\ and \'; \n, \t stay escaped (no ENV_VARS value has them)
@@ -2471,6 +2477,8 @@ function _vre_sysctl_runtime --description "_verify_runtime_env sub: sysctl valu
         end
     end
 end
+
+# ── VERIFY-RUNTIME: ENVIRONMENT (fstab + live ext4 mounts) ──
 function _vre_fstab --description "_verify_runtime_env sub: fstab ext4 entries have noatime,lazytime,commit=10"
     _echo "── fstab mount options ──"
     set -l _rootfs (command findmnt -f -n -o FSTYPE / 2>/dev/null | string trim --) # first entry, as the root UUID probe
@@ -2544,6 +2552,8 @@ function _vre_fstab_live --description "_verify_runtime_env sub: Live ext4 mount
         _warn "  Written to fstab but not live: $_pending — sudo mount -o remount <target>, or reboot"; _log "FSTAB_REMOUNT_PENDING: "(string join ',' -- $_pending)
     end
 end
+
+# ── VERIFY-RUNTIME: ENVIRONMENT (ntsync + regdom + Bluetooth roles) ──
 function _vre_ntsync --description "_verify_runtime_env sub: ntsync state via _ntsync_state dispatch"
     _echo "── ntsync support ──"; set -l _ns (_ntsync_state)
     switch "$_ns"

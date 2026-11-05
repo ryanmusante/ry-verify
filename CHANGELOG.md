@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.261.0
+-------
+
+  - readme: the Results line counts WARN, FAIL and GEN_FAIL only when present
+  - changelog: fold 7.258.0 into 7.246.0 - 7.258.0; merge related bullets
+
+
 7.260.0
 -------
 
@@ -63,63 +70,9 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     does, not LOG_DIR_PERM_FIX
   - consistency: the GKeyFile rows read parsable, as the other parse
     messages do
-  - readme: Exit Codes 3 lists the --check probes that reach no verdict;
-    Boot configuration lists the ESP layout row
 
 
-7.258.0
--------
-
-  - guard: a fish_read_limit set in config.fish or as a universal no longer
-    fails a large command output; it is pinned to the 100 MiB default
-  - preflight: true(1) and test(1), which every sudo -n probe runs, are
-    checked at startup (exit 3; --check stays silent)
-  - check: a sudo lapse at a managed file's mode or owner probe exits 3, no
-    verdict, rather than reading as no drift
-  - check: a content difference only in bytes after a NUL is logged
-    reason=size, not reason=content
-  - check: a MASK unit whose file is gone but which still runs is drift, as
-    ry-install now masks and stops it
-  - verify: /etc/iw-regdomain is read as /usr/lib/iw-set-regdomain reads it:
-    the first line starting COUNTRY=, its first two characters
-  - verify: a key line with no value no longer overrides an earlier assignment
-    where its parser skips it (loader.conf, systemd, env, sysctl.d, bash)
-  - verify: a NetworkManager or BlueZ file GKeyFile rejects FAILs its rows: a
-    stray line, a key before any [group], or a bad group or key name
-  - verify: a quoted loader.conf value is unquoted as systemd-boot reads it:
-    double quotes, and single quotes from systemd 260 on
-  - verify: a comment ending in \ no longer swallows the next line: a ; line
-    in systemd and env files, a trailing # comment in sdboot-manage.conf
-  - verify: a udev rule is read as udev reads it: \ lines are joined, and a
-    rule it cannot parse (text after a value, an unclosed string) is dropped
-  - verify: nftables.conf rows for invalid drop, established/related and
-    loopback accept, and the forward and output policies
-  - verify: nftables.conf rows for flush ruleset and the inet filter table;
-    without the flush a reload appends the rules again
-  - verify: a dangling /etc/fstab.ry.bak or /etc/fstab.ry.orig link is listed
-    as a stray
-  - verify: a boot entry's kernel or initrd that names a directory FAILs, as a
-    missing or empty one does
-  - verify: a sudo lapse at a system file's readability or access probe WARNs
-    as a lapse (check: exits 3), not a missing-file FAIL
-  - verify: one sudo lapse adds one WARN in the installed-file,
-    parent-directory, NetworkManager, checksum, stray and boot-entry checks
-  - verify: a parent directory FAIL for a wrong owner or a group/other write
-    names the chown or chmod go-w that fixes it
-  - verify: a set IgnorePkg reads INFO, not OK, as nothing is asserted
-  - report: an unresolvable $BOOT no longer adds an ERR action item under a
-    passing verdict; the resolver's line is INFO
-  - report: C1 control characters become U+FFFD, as other controls do
-  - report: the appendix says a missing cmdline body can mean the root UUID is
-    unresolved
-  - signals: a signal while a section's counts are carried or folded no longer
-    counts those rows twice in the JSONL footer
-  - logging: VERIFY_STATIC_MISMATCH for a difference only in bytes after a NUL
-    logs both byte counts, none if the size is unreadable
-  - logging: VERIFY_RESULT names its scope, static or runtime
-
-
-7.246.0 - 7.257.1
+7.246.0 - 7.258.0
 -----------------
 
   - env: 7.248.0 expect 0x3434/0x0b00 (Keychron Q0 HE) in
@@ -138,7 +91,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - guard: 7.250.0 an early exit no longer runs a user's fish function named
     _do_cleanup; 7.251.0 nor one named _dc_settle or _write_footer
   - guard: 7.250.0 a config.fish job-control or IFS setting no longer steers a
-    run (command output read as one line)
+    run; 7.258.0 fish_read_limit is pinned to 100 MiB
   - guard: 7.250.0 a fish universal named like the tmpfile list or the
     boot-path, kernel-config or package cache is never read
   - guard: 7.250.0 a fish universal named _early_ch is no longer erased
@@ -146,14 +99,12 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     name steer the cmdline checks
   - signals: 7.250.0 a second signal while a startup signal is handled no
     longer exits 0 or 1, skipping the dir cleanup
-  - signals: 7.250.0 a signal in an early exit's final step keeps its exit
-    code; one during a signal teardown no longer turns 128+N into 0
-  - signals: 7.251.0 a signal during an early exit, before the main handler
-    takes over, keeps the exit code instead of 128+N
-  - cli: 7.252.0 an unexpected positional argument prints escaped; an empty
-    one reads ''
-  - cli: 7.254.0 a root run escapes each leftover argument whole, so an
-    embedded newline no longer splits the message
+  - signals: 7.250.0 a signal in an early exit's final step, 7.251.0 or before
+    the main handler takes over, keeps its exit code; teardown keeps 128+N
+  - signals: 7.258.0 a signal while a section's counts are carried or folded
+    no longer counts those rows twice in the JSONL footer
+  - cli: 7.252.0 an unexpected positional argument prints escaped, an empty
+    one as ''; 7.254.0 a root run escapes each leftover argument whole
   - cli: 7.254.0 argument errors print control characters escaped or as ?, C1
     and raw bytes included
   - cli: 7.254.0 -h or -v ending in a newline is an unknown option (exit 2),
@@ -166,12 +117,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     check whose domain it enforces
   - preflight: 7.254.0 an embedded value ending in a newline (governor,
     country, count, kernel or HOOKS token) is refused
-  - preflight: 7.254.0 a relative HOME takes the passwd entry, and a relative
-    passwd entry exits 3, instead of resolving under the current directory
+  - preflight: 7.254.0 a relative HOME, 7.255.0 or one with a control
+    character, takes the passwd entry; such a passwd entry exits 3
   - preflight: 7.254.0 the root UUID takes findmnt's first match, so a mount
     stacked on / no longer leaves it unresolved
-  - preflight: 7.255.0 a HOME with a control character takes the passwd entry,
-    and one there exits 3: no newline or escape reaches output
   - preflight: 7.255.0 sudo uncached with no TTY prints one ERR naming the TTY
   - preflight: 7.255.0 the --check hardware override hint names the script as
     invoked, not ./ry-verify.fish
@@ -179,24 +128,30 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     WP_BLUEZ_ROLES:4 is a drift tripwire
   - preflight: 7.257.1 an EXPECTED_VULKAN_PKGS member in PKGS_DEL or starting
     with a dash refuses to run, as ry-install now installs the list
-  - check: 7.247.0 a masked MASK unit that is still running counts as drift
-  - check: 7.250.0 CHECK_UNIT_DRIFT records for an inactive or not-enabled
-    unit name the expected state
+  - preflight: 7.258.0 true(1) and test(1), which every sudo -n probe runs,
+    are checked at startup (exit 3; --check stays silent)
+  - check: 7.247.0 a masked MASK unit still running is drift, 7.255.0 as is
+    one activating, reloading or refreshing; an expected unit reloading is not
+  - check: 7.250.0 CHECK_UNIT_DRIFT for an inactive or not-enabled unit names
+    the expected state; 7.251.0 a not-found one load=not-found expected=loaded
   - check: 7.250.0 a managed symlink behind a directory this user cannot
     traverse no longer records its link mode as drift
   - check: 7.251.0 nftables.service is probed for a live ruleset even when a
     RemainAfterExit drop-in keeps the unit active
-  - check: 7.251.0 a not-found unit records load=not-found expected=loaded
   - check: 7.252.0 a disabled systemd-resolved, which ry-install never
     enables, logs CONFD_UNIT_NOT_ENABLED, not drift no re-run clears
   - check: 7.252.0 with no sudo binary, an unlistable modprobe.d no longer
     writes to stderr
-  - check: 7.255.0 a masked unit activating, reloading or refreshing counts as
-    drift; an expected unit reloading or refreshing does not
   - check: 7.255.0 a unit no re-run installs reads as not installed, as the
     ledger WARNs it, not drift; a system file not owned by root:root is drift
   - check: 7.257.0 CHECK_MODE_DRIFT names the mode as 0666, not 666, like
     expected=
+  - check: 7.258.0 a sudo lapse at a managed file's mode or owner probe exits
+    3, no verdict, rather than reading as no drift
+  - check: 7.258.0 a content difference only in bytes after a NUL is logged
+    reason=size, not reason=content
+  - check: 7.258.0 a MASK unit whose file is gone but which still runs is
+    drift, as ry-install now masks and stops it
   - verify: 7.247.0 a running MASK unit that is not masked is named as such;
     the nftables policy-drop FAIL names the restart
   - verify: 7.247.0 efi and chainload loader entries are skipped; a stale
@@ -206,8 +161,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.247.0 a missing realpath no longer prints fish errors in the
     stray sweep; the MASK state check is one pass
   - verify: 7.249.0 CPU scaling driver, governor and EPP get one row each
-    across all policies, value shown; the repeated cpu0 rows are gone
-  - verify: 7.250.0 a failing CPU row names the expected value again
+    across all policies, value shown; 7.250.0 a failing one names the expected
   - verify: 7.250.0 the systemd-resolved check runs behind a directory this
     user cannot traverse and warns when a lapsed sudo hides its drop-in
   - verify: 7.250.0 a symlinked mkinitcpio.conf.d no longer warns about
@@ -215,28 +169,22 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.250.0 a mkinitcpio preset _config is reported: a WARN when it
     names another file, an INFO for mkinitcpio.conf (conf.d skipped)
   - verify: 7.250.0 a dangling link at a managed file's .ry.bak or .ry.orig
-    name is listed as a stray
-  - verify: 7.250.0 a directory at a .ry.bak name in ~/ry-install/backups is
-    warned about; the next backup there would fail
+    name is listed as a stray, 7.258.0 as is one at /etc/fstab's
+  - verify: 7.250.0 a directory at a .ry.bak name in ~/ry-install/backups
+    WARNs, 7.251.0 only for the boot files and fstab ry-install backs up
   - verify: 7.250.0 a stale 60-ry-* drop-in behind a 0700 /etc/modprobe.d is
     reported, and the stray sweep skips only reported ones
   - verify: 7.250.0 NetworkManager keyfile modes are checked behind a 0700
     /etc/NetworkManager and without a .nmconnection suffix
   - verify: 7.250.0 a HOOKS build script behind a 0700 /etc/initcpio/install
-    no longer reads as missing
+    no longer reads as missing; 7.251.0 sudo probes only unseen ones
   - verify: 7.250.0 a MISSING row with a label names the expected line
   - verify: 7.251.0 a 0700 mkinitcpio.conf.d or sdboot-manage.conf.d is listed
     as root, not skipped with a WARN
-  - verify: 7.251.0 the mkinitcpio preset scan skips an empty _config and a
-    trailing comment, and reads preset names with digits
-  - verify: 7.251.0 the preset INFO says only that preset skips
-    mkinitcpio.conf.d, no longer contradicting the drop-in WARN
-  - verify: 7.251.0 a directory at a .ry.bak name WARNs only for the boot
-    files and fstab that ry-install backs up
+  - verify: 7.251.0 the preset scan skips an empty _config or trailing
+    comment, reads names with digits; its INFO no longer contradicts the WARN
   - verify: 7.251.0 a lapsed sudo cache behind a 0700 /etc/NetworkManager
     WARNs, not an INFO that the connections directory is missing
-  - verify: 7.251.0 HOOKS build scripts are probed as this user first, with
-    sudo only for one this user cannot see
   - verify: 7.252.0 presets in a 0700 /etc/mkinitcpio.d or 0600 files are read
     as root; a custom config several presets name is listed once
   - verify: 7.252.0 an empty .ry.bak reports only for the boot files and fstab
@@ -246,10 +194,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     every KERNEL_PARAMS token, not a WARN
   - verify: 7.254.0 presets behind an x-only /etc/mkinitcpio.d are read as
     root too, and hidden presets are skipped as mkinitcpio skips them
-  - verify: 7.254.0 a HOOKS or MODULES token no longer reads as present inside
-    a hyphenated neighbor (systemd-tool for systemd)
-  - verify: 7.254.0 COMPRESSION and its options match as whole tokens, so
-    zstdmt no longer reads as zstd and a quoted option no longer reads missing
+  - verify: 7.254.0 HOOKS, MODULES, COMPRESSION and its options match as whole
+    tokens (systemd-tool is not systemd, zstdmt not zstd)
   - verify: 7.254.0 the hook existence check strips quotes and reads a HOOKS
     line without parentheses
   - verify: 7.254.0 a missing BINARIES= or FILES= line FAILs naming the line,
@@ -269,30 +215,26 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.254.0 - 7.255.0 an unreadable cpufreq attribute or amdgpu
     parameter WARNs, not a FAIL with an empty value
   - verify: 7.254.0 - 7.255.0 a masked unit activating, reloading or
-    refreshing FAILs as active
+    refreshing FAILs as active; 7.255.0 a running one FAILs once, at runtime
   - verify: 7.254.0 - 7.255.0 fstab mount points decode and resolve as mount
     does: \040, extra slashes, backslashes, symlinks and .. hide no mount
-  - verify: 7.255.0 a udev rule with a trailing # comment reads as dropped, as
-    udev drops it
+  - verify: 7.255.0 a udev rule with a trailing # comment reads as dropped;
+    7.258.0 \ lines are joined and an unparsable rule is dropped, as udev does
   - verify: 7.255.0 key=value rows read keys as their parser does: last
     assignment, blanks at =, section, continued lines, quotes, sysctl forms
   - verify: 7.255.0 MangoHud lines end at the first #, as MangoHud reads them
-  - verify: 7.255.0 a HOOKS line continued with a trailing backslash no longer
-    reads the backslash as a hook; a HOOKS+=() or MODULES+=() line appends
-  - verify: 7.255.0 the live fstab check no longer reads OK when /etc/fstab
-    carries no managed option to compare
-  - verify: 7.255.0 loader entries are listed as systemd-boot does, hidden
-    files skipped and .conf matched in any case
-  - verify: 7.255.0 a $BOOT holding only efi or chainload entries FAILs, as
-    ry-install's sanity check does
+  - verify: 7.255.0 a HOOKS line's trailing backslash is no hook and HOOKS+=()
+    or MODULES+=() appends; 7.257.0 so does a multi-line KEY+=( ... )
+  - verify: 7.255.0 the live fstab check reads a stacked target's first mount,
+    is not OK with no managed option to compare, and names a sudo lapse
+  - verify: 7.255.0 loader entries list as systemd-boot lists them (hidden
+    skipped, .conf any case); a $BOOT of only efi or chainload entries FAILs
   - verify: 7.255.0 an unresolvable $BOOT counts once, as the boot entries
     WARN, not also as an ERR
-  - verify: 7.255.0 IgnorePkg and ParallelDownloads come from pacman-conf, so
-    an Include= file counts; a ParallelDownloads of 1 no longer reads as unset
+  - verify: 7.255.0 IgnorePkg and ParallelDownloads come from pacman-conf
+    (Include= counts, 1 reads set); 7.258.0 a set IgnorePkg reads INFO
   - verify: 7.255.0 a MASK unit removed while running FAILs as running, not
     INFO not installed
-  - verify: 7.255.0 a masked unit still running FAILs once, in the runtime
-    check, not also in the static one
   - verify: 7.255.0 an expected unit reloading or refreshing counts as active
   - verify: 7.255.0 the kernel parameter scan reads dmesg when the journal
     lacks the boot lines, and WARNs instead of OK when neither holds them
@@ -302,27 +244,20 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     instead of reporting the P2P device unlisted
   - verify: 7.255.0 an unreadable /proc/cmdline WARNs once instead of FAILing
     every kernel token
-  - verify: 7.255.0 the live fstab check reads the first mount of a stacked
-    target; an fstab hidden by a lapsed sudo cache names the lapse, not perms
   - verify: 7.255.0 the root filesystem row takes findmnt's first entry, so a
     mount stacked on / no longer repeats the type
-  - verify: 7.255.0 stray names and symlinked-dir targets print control
-    characters as ?; a newline in a name no longer reads as two strays
+  - verify: 7.255.0 stray, drop-in, preset and stale 60-ry-* names list
+    NUL-safe and print control characters as ?, as symlinked-dir targets do
   - verify: 7.255.0 a HOME under /etc or /boot no longer reads the user files
     as system files (sudo, stray scan, report scope)
   - verify: 7.255.0 the NetworkManager connection count skips the files
     keyfile ignores (hidden, ~ backups, temp, .pem, .der)
-  - verify: 7.255.0 drop-in, preset and stale 60-ry-* names list NUL-safe, so
-    a newline splits no name; control characters print as ?
   - verify: 7.256.0 check the WirePlumber bluez5.roles drop-in; WARN on other
     config that sets bluez5.roles or overrides monitor.bluez.properties
   - verify: 7.256.0 WARN when a connected Bluetooth card offers an HFP/HSP
     profile or its profile list is unreadable (pactl); no user bus WARNs
-  - verify: 7.257.0 root=UUID= in /etc/kernel/cmdline must be a whole token
-  - verify: 7.257.0 an empty, readable /etc/kernel/cmdline FAILs even after a
-    sudo lapse, not a WARN blaming the lapse
-  - verify: 7.257.0 a multi-line KEY+=( ... ) in mkinitcpio config is
-    appended, so a populated FILES or BINARIES no longer reads as empty
+  - verify: 7.257.0 root=UUID= in /etc/kernel/cmdline must be a whole token;
+    an empty, readable file FAILs even after a sudo lapse
   - verify: 7.257.0 a bracketed line in a sectionless file no longer hides a
     later override of a managed key (sysctl, env, loader, sdboot, MangoHud)
   - verify: 7.257.0 a sudo lapse at the ParallelDownloads read is named as
@@ -330,17 +265,33 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.257.0 a failed fstab scan (ext4 or malformed rows) WARNs in both
     fstab checks rather than reading as nothing found
   - verify: 7.257.0 an hfp_*/hsp_* role in WP_BLUEZ_ROLES skips the
-    headset-profile check; its OK row no longer claims bluez5.roles applied
-  - verify: 7.257.0 with an hfp_*/hsp_* role in WP_BLUEZ_ROLES, the drop-in's
-    bluez5.roles row no longer says there is none
+    headset-profile check; no OK or drop-in row then misstates bluez5.roles
   - verify: 7.257.0 a sudo lapse no longer adds a "No installed files" or "No
     parent directories" WARN; a blank ufw state reads unknown
-  - verify: 7.257.0 each linux boot entry's kernel and initrd must exist
-    non-empty in $BOOT; a FAIL names the file and the command that restores it
+  - verify: 7.257.0 each linux entry's kernel and initrd must exist non-empty
+    in $BOOT, a FAIL naming the restore command; 7.258.0 a directory FAILs
   - verify: 7.257.0 a sudo lapse at the HOOKS check WARNs per hook instead of
     FAILing it NOT FOUND
   - verify: 7.257.0 a session variable set to an empty value FAILs as
     differing (in the report too), not a NOT SET WARN advising a re-login
+  - verify: 7.258.0 /etc/iw-regdomain is read as iw-set-regdomain reads it:
+    the first line starting COUNTRY=, its first two characters
+  - verify: 7.258.0 a key line with no value no longer overrides an earlier
+    assignment its parser skips (loader.conf, systemd, env, sysctl.d, bash)
+  - verify: 7.258.0 a NetworkManager or BlueZ file GKeyFile rejects FAILs its
+    rows: a stray line, a key before any [group], a bad group or key
+  - verify: 7.258.0 a quoted loader.conf value is unquoted as systemd-boot
+    reads it: double quotes, and single quotes from systemd 260 on
+  - verify: 7.258.0 a comment ending in \ no longer swallows the next line: a
+    ; line in systemd and env files, a # comment in sdboot-manage.conf
+  - verify: 7.258.0 nftables.conf rows for flush ruleset, the inet filter
+    table, invalid drop, established/related and loopback accept, all policies
+  - verify: 7.258.0 a sudo lapse at a system file's readability or access
+    probe WARNs as a lapse (check: exits 3), not a missing-file FAIL
+  - verify: 7.258.0 one sudo lapse adds one WARN in the installed-file,
+    parent-directory, NetworkManager, checksum, stray and boot-entry checks
+  - verify: 7.258.0 a parent directory FAIL for a wrong owner or a group/other
+    write names the chown or chmod go-w that fixes it
   - report: 7.247.0 an empty action list no longer claims a clean run the
     counts contradict; the UUID fallback calls an unreadable copy unreadable
   - report: 7.247.0 the counts ring follows the print palette; the sysctl
@@ -352,31 +303,33 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - report: 7.254.0 - 7.255.0 a failed pacman -Q or unreadable /proc/cmdline
     grades its rows unreadable, as the ledger skips them
   - report: 7.255.0 a masked unit activating, reloading or refreshing grades
-    masked, active, as the ledger FAILs it
-  - report: 7.255.0 a MASK unit removed while running grades not installed,
-    active, as the ledger FAILs it
+    masked, active, a MASK unit removed while running not installed, active
   - report: 7.255.0 the Root filesystem cell takes findmnt's first entry
   - report: 7.256.0 the embedded keys table lists WP_BLUEZ_ROLES
   - report: 7.257.0 a kernel token deployed but not live reads deployed, not
     live; pending reboot assumed the boot entries carry it
   - report: 7.257.0 a run stopped at the sudo gate counts and lists one FAIL;
     the gate's second line is now that row's hint
+  - report: 7.258.0 an unresolvable $BOOT no longer adds an ERR action item
+    under a passing verdict; the resolver's line is INFO
+  - report: 7.258.0 C1 control characters become U+FFFD, as other controls do
+  - report: 7.258.0 the appendix says a missing cmdline body can mean the root
+    UUID is unresolved
   - logging: 7.247.0 a failed date leaves the header ts empty instead of
     breaking its JSON
-  - logging: 7.250.0 closing log-file lines are skipped once stderr is gone
-  - logging: 7.250.0 the preflight log is created as soon as its dir exists,
-    so a concurrent run's early exit cannot remove that dir
-  - logging: 7.251.0 the hardware gate logs HARDWARE_MATCH with the CPU
-  - logging: 7.252.0 the root UUID gate logs ROOT_UUID_OK
+  - logging: 7.250.0 closing log-file lines are skipped once stderr is gone;
+    the preflight log is created as soon as its dir exists
+  - logging: 7.251.0 the hardware gate logs HARDWARE_MATCH with the CPU;
+    7.252.0 the root UUID gate logs ROOT_UUID_OK
   - logging: 7.254.0 preset _config values log MKINITCPIO_PRESET_CONFIG
   - logging: 7.255.0 VERIFY_STATIC_SUDO_LAPSE names probe=read or probe=size;
     a hardware refusal logs HARDWARE_*_REFUSED
   - logging: 7.257.0 BLUEZ_ROLES_RUNTIME headset= counts cards, not profile
-    lines
-  - logging: 7.257.0 a footer written on a signal counts every section's rows,
-    not only the section in progress
+    lines; a footer written on a signal counts every section's rows
   - logging: 7.257.0 a non-UTF-8 byte in a logged or reported string becomes
     U+FFFD, so the JSONL and the report stay valid UTF-8
+  - logging: 7.258.0 VERIFY_RESULT names its scope; VERIFY_STATIC_MISMATCH for
+    a post-NUL difference logs both byte counts, none if unreadable
 
 
 7.235.0 - 7.245.0
@@ -390,11 +343,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     its temp files in the log tree
   - signals: 7.245.0 drop the PIPE handler; it silenced a live terminal
   - preflight: 7.240.0 iommu=off counts as no IOMMU for amdxdna
-  - preflight: 7.243.0 a sudo -v that caches nothing (timestamp_timeout=0)
-    exits 3 instead of failing later checks
+  - preflight: 7.243.0 a sudo -v that caches nothing (timestamp_timeout=0),
+    7.245.0 or a passing sudo -n -v with sudo -n unusable, exits 3
   - preflight: 7.243.0 the dual-stack warning says to edit the nftables
     generator in both scripts
-  - preflight: 7.245.0 sudo -n -v passing with sudo -n unusable exits 3
   - check: 7.243.0 --check stays silent when id(1) is missing; on a full disk
     it keeps fish's write errors off stderr
   - check: 7.243.0 a sudo lapse while sizing a file or probing nftables
@@ -403,8 +355,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.235.0 the missing Vulkan package hint reads pacman -Syu --needed
     instead of a partial-upgrade -S
   - verify: 7.240.0 an ext4 row with nolazytime FAILs as a pending rewrite
-  - verify: 7.241.0 the nftables policy-drop FAIL names systemctl restart;
-    sdboot-manage.conf keys check in emission order
+  - verify: 7.241.0 the nftables policy-drop FAIL, 7.245.0 and the IPv4 ping
+    WARN, name systemctl restart; sdboot-manage.conf keys check in order
   - verify: 7.243.0 mkinitcpio.conf.d drop-ins, dotfiles included, warn as
     overriding HOOKS and MODULES
   - verify: 7.243.0 a sudo lapse on mkinitcpio.conf warns once instead of
@@ -436,7 +388,6 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     matched by its resolved path, not listed as stray
   - verify: 7.245.0 a mismatch under the root-UUID fallback logs both SHA256s;
     the orphan-mask readlink test stays silent
-  - verify: 7.245.0 the IPv4 ping WARN names systemctl restart
   - report: 7.243.0 an action item carries only the marked hint row logged
     after it; a not-enabled nftables.service with a live ruleset grades WARN
   - report: 7.243.0 section 4 checks a symlink first and compares a file
@@ -480,15 +431,14 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - cli: 7.233.0 --h, --he, --hel and --vers, --versi, --versio are honored
     before the root guard
   - cli: 7.233.0 --help describes RY_INSTALL_SKIP_HARDWARE_CHECK accurately
-  - cli: 7.234.0 -h and -v exit 1 on a full stdout (closed too, under fish 3)
+  - cli: 7.234.0 -h and -v exit 1 on a full stdout (closed too, under fish 3);
+    help alignment and the CPU-gate override hint match the code
   - cli: 7.234.0 --check stays silent on a non-numeric id -u; /tmp need not be
     writable
-  - cli: 7.234.0 help alignment and the CPU-gate override hint match the code
   - preflight: 7.233.0 a setgid $HOME or a symlinked ~/ry-install no longer
     fails the log-dir mode check
   - check: 7.233.0 a signal before argument parsing finishes no longer prints
-    'Caught SIGTERM' during --check
-  - check: 7.234.0 --check keeps fish's own log write errors off stderr
+    'Caught SIGTERM'; 7.234.0 --check keeps fish's log write errors off stderr
   - verify: 7.218.0 a sysctl or environment.d generator failure names entries
   - verify: 7.219.0 the nftables input-policy and IPv4-ping checks match their
     own rules; an unreadable expected unit warns instead of failing
@@ -512,8 +462,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.233.0 pacman -Qo and nmcli output is read under LC_ALL=C, so
     package files are not listed as Stray under a translated locale
   - verify: 7.233.0 the live IPv4-ping check needs an IPv4 icmp echo-request
-    accept rule, not the ICMPv6 one
-  - verify: 7.233.0 the policy-drop probe matches only the input hook line
+    accept, not ICMPv6's; the policy-drop probe matches only the input hook
   - verify: 7.233.0 a CPU attribute no policy exposes reads as not exposed;
     uniform rows count the policies read
   - verify: 7.233.0 a symlinked parent dir of a managed file is checked at its

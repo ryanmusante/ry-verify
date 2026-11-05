@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.260.0** · [Changelog](CHANGELOG.md)
+**Version 7.261.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
 
@@ -17,7 +17,7 @@ sudo -v
 ./ry-verify.fish
 ```
 
-Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK`, `WARN`, `FAIL`, and `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totaling both, or `Combined (startup + static + runtime):` when startup warnings count too. A startup gate, or sudo uncached at either section, exits `3` (`1` when static checks already failed) before that section's summary and the Combined line; `--report` then prints `[INFO] Report: <path>`, unless a startup gate stopped the run — see [Exit Codes](#exit-codes).
+Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK` and any `WARN`, `FAIL`, or `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totaling both, or `Combined (startup + static + runtime):` when startup warnings count too. A startup gate, or sudo uncached at either section, exits `3` (`1` when static checks already failed) before that section's summary and the Combined line; `--report` then prints `[INFO] Report: <path>`, unless a startup gate stopped the run — see [Exit Codes](#exit-codes).
 
 ## Requirements
 
@@ -42,7 +42,7 @@ Each run that passes argument parsing writes one JSONL log (`0600`) to `~/ry-ins
 |---|---|
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
 | `1` | a `--verify` or `--report` mismatch, a report that could not be written, or `-h`/`-v` output that could not be written (stdout full, or closed under fish 3) |
-| `2` | bad arguments, root misuse — except a valid `--check` run as root, which exits `3` silently |
+| `2` | bad arguments or root misuse — except a valid `--check` run as root, which exits `3` silently |
 | `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; failed config validation; an unusable HOME or log tree; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides), or a probe that reaches no verdict before any drift (a sudo lapse, an unreadable `/proc/cmdline`, a `systemctl` error); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
 
@@ -110,7 +110,7 @@ The unit table grades the unit file; whether an enabled unit is running is a row
 > [!CAUTION]
 > `ry-install.fish` and `ry-verify.fish` carry their shared tunables verbatim and ship in lockstep; clone both repos at the same version. A version mismatch leaves `ry-verify.fish` checking values `ry-install.fish` no longer deploys.
 
-The length of each array among the shared tunables is a drift tripwire in `_ir_validate_counts` of both scripts — `KERNEL_PARAMS:15` among them; the accepted-value sets `_RY_DPM_LEVELS`, `_RY_EPP_LEVELS` and `_RY_BLUEZ_ROLES` carry no pin. Adding or dropping an element also means updating that `NAME:<n>` in each script that pins it; otherwise that script refuses to run with `NAME count drift` and exits `3`. A kernel token is one such element — see [ry-install](https://github.com/ryanmusante/ry-install)'s Kernel Parameter Notes.
+The length of each array among the shared tunables is a drift tripwire in `_ir_validate_counts` of both scripts — `KERNEL_PARAMS:15` among them; the accepted-value sets `_RY_DPM_LEVELS`, `_RY_EPP_LEVELS`, and `_RY_BLUEZ_ROLES` carry no pin. Adding or dropping an element also means updating that `NAME:<n>` in each script that pins it; otherwise that script refuses to run with `NAME count drift` and exits `3`. A kernel token is one such element — see [ry-install](https://github.com/ryanmusante/ry-install)'s Kernel Parameter Notes.
 
 Value lists, package and unit sets, and tuning rationale live in [ry-install](https://github.com/ryanmusante/ry-install); the key below exists only on the verify side.
 
