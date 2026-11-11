@@ -1,8 +1,8 @@
 # ry-verify
 
-**Version 7.262.0** · [Changelog](CHANGELOG.md)
+**Version 7.264.0** · [Changelog](CHANGELOG.md)
 
-Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--report` adds an HTML report of the run, `--check` probes silently for drift.
+Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
 ## Quick Start
 
@@ -17,7 +17,7 @@ sudo -v
 ./ry-verify.fish
 ```
 
-Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK` and any `WARN`, `FAIL`, or `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totaling both, or `Combined (startup + static + runtime):` when startup warnings count too. A startup gate, or sudo uncached at either section, exits `3` (`1` when static checks already failed) before that section's summary and the Combined line; `--report` then prints `[INFO] Report: <path>`, unless a startup gate stopped the run — see [Exit Codes](#exit-codes).
+Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK` and any `WARN`, `FAIL`, or `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totaling both, or `Combined (startup + static + runtime):` when startup warnings count too. A startup gate, or sudo uncached at either section, exits `3` (`1` when static checks already failed) before that section's summary and the Combined line — see [Exit Codes](#exit-codes).
 
 ## Requirements
 
@@ -25,23 +25,23 @@ Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Resul
 |---|---|
 | OS | CachyOS (Arch-based), systemd-boot with BLS entries, the ESP mounted at `/boot` (no XBOOTLDR) |
 | Shell | fish 3.6 or newer, with its default `regex-easyesc` feature on |
-| Hardware | CPU matching `Ryzen AI Max` — on any other CPU `--verify` and `--report` warn and continue; `--check` exits `3` unless overridden via [Environment Overrides](#environment-overrides) |
+| Hardware | CPU matching `Ryzen AI Max` — on any other CPU `--verify` warns and continues; `--check` exits `3` unless overridden via [Environment Overrides](#environment-overrides) |
 | BIOS | flat 85 W ceiling, `TjMax = 90 °C` — see [BIOS](#bios) |
-| Privileges | normal user with sudo rights; `sudo -v` cached before the run — when it is not, `--verify` and `--report` prompt if stdin and stderr are both a TTY, and exit `3` otherwise, if the prompt fails, or if no credential ends up cached (`timestamp_timeout=0`); `--check` never prompts and exits `3` |
+| Privileges | normal user with sudo rights; `sudo -v` cached before the run — when it is not, `--verify` prompts if stdin and stderr are both a TTY, and exits `3` otherwise, if the prompt fails, or if no credential ends up cached (`timestamp_timeout=0`); `--check` never prompts and exits `3` |
 | Tools | GNU coreutils, `findmnt`, `awk`, `grep`, `find`, `pacman`, `systemctl` |
 
 ## Usage
 
-The bare invocation equals `--verify`; `--report` runs `--verify` and writes the [Report](#report); `--check` is the silent idempotency probe (the three are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and, like positional arguments, exits `2` here. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
+The bare invocation equals `--verify`; `--check` is the silent idempotency probe (the two are mutually exclusive). `--install-file` belongs to [ry-install](https://github.com/ryanmusante/ry-install) and, like positional arguments, exits `2` here. `--help` (`-h`) and `--version` (`-v`) are the only stdout output — every result goes to stderr.
 
-Each run that passes argument parsing writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl`, where `MODE` is `verify`, `check`, or `report`; `--report` adds `report-YYYYMMDD-HHMMSS±ZZZZ-PID.html` (`0600`) beside its log, same stem. A fresh install's `./ry-verify.fish --check` reports drift until reboot.
+Each run that passes argument parsing writes one JSONL log (`0600`) to `~/ry-install/logs/YYYY-MM-DD/MODE-YYYYMMDD-HHMMSS±ZZZZ-PID.jsonl`, where `MODE` is `verify` or `check`. A fresh install's `./ry-verify.fish --check` reports drift until reboot.
 
 ## Exit Codes
 
 | Code | Meaning |
 |---|---|
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
-| `1` | a `--verify` or `--report` mismatch, a report that could not be written, or `-h`/`-v` output that could not be written (stdout full, or closed under fish 3) |
+| `1` | a `--verify` mismatch, or `-h`/`-v` output that could not be written (stdout full, or closed under fish 3) |
 | `2` | bad arguments or root misuse — except a valid `--check` run as root, which exits `3` silently |
 | `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; failed config validation; an unusable HOME or log tree; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides), or a probe that reaches no verdict before any drift (a sudo lapse, an unreadable `/proc/cmdline`, a `systemctl` error); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
@@ -59,7 +59,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Checks
 
-`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes and modes, system file owners, live `/proc/cmdline` tokens, unit states — and reports drift only; restarts ry-install still owes (`~/ry-install/pending-apply`) are not drift. Groups carry the names the [Report](#report) ledger uses; the console prints each in capitals, `Wi-Fi state` as `WIFI STATE`.
+`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes and modes, system file owners, live `/proc/cmdline` tokens, unit states — and reports drift only; restarts ry-install still owes (`~/ry-install/pending-apply`) are not drift. The console prints each group name in capitals, `Wi-Fi state` as `WIFI STATE`.
 
 | Group | Scope |
 |---|---|
@@ -78,26 +78,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Runtime › Environment state | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain, no HFP/HSP profile on a connected Bluetooth card (`pactl`) unless `WP_BLUEZ_ROLES` adds one |
 | Runtime › File permissions | NetworkManager system-connections perms, installed file modes, parent directories of managed files (a symlinked directory is checked at its target) |
 
-## Report
-
-`--report` runs every `--verify` check (none when sudo is uncached: a `PREFLIGHT` report), then renders the run into one self-contained HTML file beside its JSONL log — no scripts, no network. Sections run from most to least urgent:
-
-| Section | Content |
-|---|---|
-| Verdict | `PASS`, `PASS-WITH-WARNINGS`, `FAIL`, or `PREFLIGHT`, a counts ring, the result lines, and run metadata |
-| Action items | every `FAIL`, then every `WARN`, with its group and any `↳` hint line logged directly after it |
-| System | host, firmware, OS, kernel, CPU scaling state and per-CPU clocks, GPU IDs and clocks, VRAM, GTT, RAM, swap, and storage meters, displays, key package versions |
-| Profile changes | the 18 [Managed Files](#managed-files) regenerated and compared byte for byte, `KERNEL_PARAMS` deployed and live, `SYSCTL_VALUES`, `ENV_VARS`, packages, units, embedded keys, and a coverage chart |
-| Verification ledger | a per-group chart, then every logged row, groups with a `FAIL` first, then groups with a `WARN` |
-| Appendix | every structured log event, each generated file body with its SHA-256, and the method |
-
-A report that cannot be written prints `[ERR] Report not written` and turns an otherwise clean exit into `1`.
-
-Profile-change states are graded as the ledger grades the same finding: `match`, `active`, `present`, `enabled`, `masked`, and `removed` pass; `not set`, `knob absent`, `unreadable`, `no sudo`, `still installed`, `no user bus`, `no root UUID`, a unit to enable that is `not installed`, and a unit running but not enabled (for `nftables.service`, a live ruleset) warn; a unit to mask that is `not installed` is neutral; everything else fails — a managed file that differs or cannot be read, a deployed kernel parameter not yet live, a masked unit still active. A file whose generator needs the unresolved root UUID is compared under the UUID its installed copy carries.
-
-With no user bus, the ledger warns once for each check it skips — session `ENV_VARS`, user units, and Bluetooth roles — and the report marks every `ENV_VARS` row `no user bus`; a failed `systemctl --user show-environment` warns once and marks them `unreadable`.
-
-The unit table grades the unit file; whether an enabled unit is running is a row in the ledger's `Runtime › Service state` group. The coverage chart counts passing rows out of graded rows; a neutral row counts toward neither. The Session environment bar is left out when the session environment cannot be read, the Packages bar when `pacman -Q` fails, and the Kernel parameters live bar when `/proc/cmdline` cannot be read.
+With no user bus, `--verify` warns once for each check it skips — session `ENV_VARS`, user units, and Bluetooth roles; a failed `systemctl --user show-environment` warns once.
 
 ## Safety and Reliability
 
@@ -131,8 +112,6 @@ Firmware is not checked — the assumed ceiling and the per-setting walkthrough 
 **Other WirePlumber config sets `bluez5.roles`** — WirePlumber merges it with the profile's drop-in: its roles add to the profile's, and a later `override.monitor.bluez.properties` replaces them; drop the key, or that `override.` prefix, from that file, then `systemctl --user restart wireplumber.service`.
 
 **Stray file reported** — neither the profile nor a package owns it (package files print as `Package file:`); merge or delete a `.pacnew` sibling, and remove anything else once nothing uses it.
-
-**Report not written** — `~/ry-install/logs/YYYY-MM-DD/` must accept a new file: check free space and the directory mode (`0700`). The JSONL log records `REPORT_WRITE_FAIL` with the reason.
 
 ## Contributing
 
