@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.264.0** · [Changelog](CHANGELOG.md)
+**Version 7.265.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -64,7 +64,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Group | Scope |
 |---|---|
 | Static › Boot configuration | the ESP layout (ESP at `/boot`, no XBOOTLDR), `loader.conf`, `sdboot-manage.conf`, `/etc/kernel/cmdline` (`KERNEL_PARAMS`, `root=UUID`, `rw`), `mkinitcpio.conf`, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins that outrank them, a mkinitcpio preset `_config`, `$BOOT` entries and each `linux` entry's kernel and `initrd` files |
-| Static › System configuration | resolved, logind, NetworkManager dispatcher logging, NetworkManager, `iw-regdomain`, bluetooth, `cpupower-service.conf`, sysctl drop-in, udev, modprobe plus the unmanaged `60-ry-*` sweep, nftables |
+| Static › System configuration | resolved, logind, NetworkManager dispatcher logging, NetworkManager, `iw-regdomain`, bluetooth, `cpupower-service.conf`, sysctl drop-in, udev, modprobe plus the unmanaged `60-ry-` sweep, nftables |
 | Static › User configuration | `environment.d` (`ENV_VARS`), MangoHud, WirePlumber `bluez5.roles`, plus any other config in WirePlumber's search path that sets it or overrides `monitor.bluez.properties` |
 | Static › Packages | `PKGS_ADD` and `EXPECTED_VULKAN_PKGS` present, `PKGS_DEL` absent, `pacman.conf` `IgnorePkg` and `ParallelDownloads` |
 | Static › Services | `MASK` unit state, plus admin-scope masks not in `MASK` |
@@ -84,7 +84,7 @@ With no user bus, `--verify` warns once for each check it skips — session `ENV
 
 **Read-only** — no mode takes a lock or writes outside its log tree, `~/ry-install/logs/`, kept `0700`; nothing lands in `/tmp`. A missing `~/ry-install` is created `0700` to hold the log tree; an existing one is never re-moded — a group- or world-writable one stops the run, exit `3`.
 
-**Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-*` drop-ins, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins each tool reads, a mkinitcpio preset `_config`, other WirePlumber config that sets `bluez5.roles` or overrides `monitor.bluez.properties`, and stray files beside managed files.
+**Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-` drop-ins, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins each tool reads, a mkinitcpio preset `_config`, other WirePlumber config that sets `bluez5.roles` or overrides `monitor.bluez.properties`, and stray files beside managed files.
 
 ## Embedded Values
 
@@ -105,13 +105,13 @@ Firmware is not checked — the assumed ceiling and the per-setting walkthrough 
 
 ## Troubleshooting
 
-**Unmanaged `60-ry-*` drop-in warned** — `pacman -Qo /etc/modprobe.d/*` to confirm ownership, then `sudo rm` the files left by earlier versions.
+**Unmanaged `60-ry-` drop-in warned** — `pacman -Qo /etc/modprobe.d/*` to confirm ownership, then `sudo rm` the files left by earlier versions.
 
 **Masked unit not in `MASK` reported** — `sudo systemctl unmask <unit>` if an earlier `MASK` masked it; leave distro and hand-made masks alone.
 
 **Other WirePlumber config sets `bluez5.roles`** — WirePlumber merges it with the profile's drop-in: its roles add to the profile's, and a later `override.monitor.bluez.properties` replaces them; drop the key, or that `override.` prefix, from that file, then `systemctl --user restart wireplumber.service`.
 
-**Stray file reported** — neither the profile nor a package owns it (package files print as `Package file:`); merge or delete a `.pacnew` sibling, and remove anything else once nothing uses it.
+**Stray file reported** — neither the profile nor a package owns it (package files print as `Package file:`). A `.pacnew` sibling is a package's newer default for a file the profile generates: delete it, and carry a wanted setting into the generator of both scripts — a merge into the managed file is drift the next install overwrites. Remove anything else once nothing uses it.
 
 ## Contributing
 
