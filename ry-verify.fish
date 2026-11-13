@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.265.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.266.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; status filename | string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$'; or status stack-trace | string match -q -- '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.265.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.266.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t; set -g fish_read_limit 1073741824 # config.fish job control, IFS or read limit would steer this run
@@ -971,10 +971,16 @@ function _chk_eq --argument-names label actual expected --description "Compare a
         _fail "  $label: $actual (expected: $expected)"
     end
 end
+function _chk_sysfs_read --argument-names path label --description "_chk_sysfs_match and _chk_sysfs_eq sub: Print a sysfs/proc value, as root where only root reads"
+    if not test -f "$path"; _log "CHECK_SYSFS_ABSENT: $label path=$path — skipped"; return 1; end
+    set -l _su false; test -r "$path"; or set _su true # a 0400 node, as processor.max_cstate
+    set -l _v (_as $_su cat -- "$path" 2>/dev/null | string trim --)
+    if test "$pipestatus[1]" -eq 0; printf '%s\n' "$_v"; return 0; end
+    if test "$_su" = true; and not sudo -n true 2>/dev/null; _warn "  $label: sudo cache lapsed — cannot read $path"; return 1; end
+    _warn "  $label: unreadable ($path)"; return 1
+end
 function _chk_sysfs_match --argument-names path regex label --description "Read sysfs/proc, regex-match value (missing path: no row, JSONL note only)"
-    if not test -f "$path"; _log "CHECK_SYSFS_ABSENT: $label path=$path — skipped"; return 0; end
-    set -l _v (command cat -- "$path" 2>/dev/null | string trim --)
-    if test "$pipestatus[1]" -ne 0; _warn "  $label: unreadable ($path)"; return 0; end
+    set -l _v (_chk_sysfs_read "$path" "$label"); or return 0 # no value: logged or warned there
     if string match -qr -- "$regex" "$_v"
         _ok "  $label: $_v"
     else
@@ -982,9 +988,7 @@ function _chk_sysfs_match --argument-names path regex label --description "Read 
     end
 end
 function _chk_sysfs_eq --argument-names path expected label --description "Read sysfs/proc, compare to expected (missing path: no row, JSONL note only)"
-    if not test -f "$path"; _log "CHECK_SYSFS_ABSENT: $label path=$path — skipped"; return 0; end
-    set -l _val (command cat -- "$path" 2>/dev/null | string trim --)
-    if test "$pipestatus[1]" -ne 0; _warn "  $label: unreadable ($path)"; return 0; end
+    set -l _val (_chk_sysfs_read "$path" "$label"); or return 0 # no value: logged or warned there
     _chk_eq "$label" "$_val" "$expected"
 end
 function _chk_perms --argument-names path expected_perms expected_owner use_sudo --description "Compare file mode+owner; refuses 4-digit modes (setuid/sgid/sticky); rc 2 = sudo lapse"
@@ -2085,7 +2089,7 @@ function _vrkm_param_assert --argument-names mp path want --description "_vrkm_m
     end
 end
 function _vrkm_module_params --description "_vrk_module_state sub: Tokens vs /sys/module + kernel.watchdog; expectations from KERNEL_PARAMS"
-    for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled btusb.enable_autosuspend mt7925e.disable_aspm pcie_aspm.policy ipv6.disable # sysfs-readable module_params among the managed tokens
+    for _mp in usbcore.autosuspend nvme_core.default_ps_max_latency_us zswap.enabled btusb.enable_autosuspend mt7925e.disable_aspm pcie_aspm.policy ipv6.disable processor.max_cstate # sysfs-readable module_params among the managed tokens
         set -l _want (_vrkm_kp_value "$_mp"); test -n "$_want"; or continue # token absent: nothing to assert
         set -l _path /sys/module/(string replace -a -- '-' '_' (string replace -r '\.[^.]*$' '' -- "$_mp"))/parameters/(string replace -r '^[^.]*\.' '' -- "$_mp")
         _vrkm_param_assert "$_mp" "$_path" "$_want"

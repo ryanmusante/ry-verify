@@ -3,17 +3,14 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.265.0
+7.266.0
 -------
 
-  - logging: every run logs the running kernel release as KERNEL_RELEASE
-  - readme: a .pacnew beside a managed file is deleted, not merged; the next
-    install overwrites a merged file
-  - changelog: fold the previous release into the range; one tag order in
-    every block; trim
+  - verify: processor.max_cstate is read back, as root: its sysfs node is
+    0400; a sudo lapse at that read WARNs as a lapse
 
 
-7.246.0 - 7.264.0
+7.246.0 - 7.265.0
 -----------------
 
   - env: 7.248.0 SDL_GAMECONTROLLER_IGNORE_DEVICES gains 0x3434/0x0b00 (Q0 HE)
@@ -241,6 +238,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     VERIFY_STATIC_READ_FAIL and a lapsed one VERIFY_STATIC_SUDO_LAPSE
   - logging: 7.260.0 a log dir moded to 0700 logs STATE_DIR_PERM_FIX; 7.264.0
     CHECK_UNIT_NOT_INSTALLED says --verify WARNs, not the ledger
+  - logging: 7.265.0 every run logs the running kernel release as
+    KERNEL_RELEASE
   - consistency: 7.260.0 the GKeyFile rows read parsable
   - consistency: 7.264.0 skip messages read user bus, not user-bus
   - consistency: 7.264.0 the static udev rows read NVMe scheduler and GPU DPM
