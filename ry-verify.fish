@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.266.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.267.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; status filename | string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$'; or status stack-trace | string match -q -- '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.266.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.267.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t; set -g fish_read_limit 1073741824 # config.fish job control, IFS or read limit would steer this run
@@ -303,7 +303,7 @@ function _dc_erase_globals --description "_do_cleanup sub: Erase cached globals"
 end
 function _dc_kill_children --description "_dc_settle sub: Reap child PIDs (TERM → bounded grace → KILL)"
     command -q pkill; or return 0
-    set -l _have_kids unknown # no children -> skip TERM/grace/KILL
+    set -l _have_kids unknown # no children → skip TERM/grace/KILL
     command -q pgrep; and begin
         test (count (command pgrep -P "$fish_pid" 2>/dev/null)) -gt 0; and set _have_kids yes; or set _have_kids no
     end
@@ -1759,7 +1759,7 @@ function _vsc_strays --description "_verify_static_checksum sub: Unmanaged files
             _warn "  $_d: cannot list (read error) — stray sweep skipped"; continue
         end
         set -l _own (for _x in $_all; test (string replace -r -- '/[^/]+$' '' "$_x") = "$_d"; and string replace -r -- '^.*/' '' "$_x"; end)
-        set -l _shared false; test "$_su" = true; and not string match -q -- '*.d' "$_d"; and set _shared true # non-.d system dirs (/etc, /boot/loader…): siblings only
+        set -l _shared false; test "$_su" = true; and not string match -q -- '*.d' "$_d"; and set _shared true # non-.d system dirs (/etc, /boot/loader...): siblings only
         for _n in $_names
             contains -- "$_n" $_own; and continue
             contains -- "$_d/$_n" $_all.ry.orig /etc/fstab.ry.orig $_RY_BACKUP_TARGETS$_RY_BACKUP_SUFFIX /etc/fstab$_RY_BACKUP_SUFFIX; and _as $_su test -f "$_d/$_n" 2>/dev/null; and continue # what _vsc_backups reports: those names, when they test -f
@@ -1857,8 +1857,9 @@ function _svc_chk_expected --description "_check_phase_units sub: EXPECTED_SERVI
                     _log "CHECK_NFT_UNPROBEABLE: nft(8) absent — live ruleset unverifiable, treating as drift (fail-closed)"
                     _check_drift CHECK_UNIT_DRIFT "unit=$unit reason=nft-absent"
                 else
-                    sudo -n true 2>/dev/null; or begin; _log "CHECK_PREFLIGHT: sudo lapse probing nftables"; return $EXIT_PREFLIGHT; end # a lapse is no ruleset verdict
-                    _nft_input_drop_live; or _check_drift CHECK_UNIT_DRIFT "unit=$unit reason=ruleset-not-live"
+                    _nft_input_drop_live; set -l _nl $status
+                    if test "$_nl" -eq 2; _log "CHECK_PREFLIGHT: sudo lapse probing nftables"; return $EXIT_PREFLIGHT; end # a lapse is no ruleset verdict
+                    test "$_nl" -eq 0; or _check_drift CHECK_UNIT_DRIFT "unit=$unit reason=ruleset-not-live"
                 end
             else
                 contains -- "$active" active reloading refreshing; or _check_drift CHECK_UNIT_DRIFT "unit=$unit active=$active expected=active" # RemainAfterExit oneshots read active
@@ -1933,7 +1934,7 @@ function _check_phase_units --description "Check-mode phase: EXPECTED_SERVICES +
     end
     return 0
 end
-function _ry_do_check --description "Silent idempotency probe" # ERR_NO_DATA->preflight unless drift confirmed
+function _ry_do_check --description "Silent idempotency probe" # ERR_NO_DATA → preflight unless drift confirmed
     _log_section "CHECK START"
     set -l _stale (_ry_stale_ry_dropins) # sudo -n only when modprobe.d is unlistable: runs before the gate
     test (count $_stale) -gt 0; and _log "MODPROBE_STALE_DROPIN: count="(count $_stale)" files="(string join ',' -- $_stale | string collect)
@@ -1973,16 +1974,16 @@ function _vrk_cmdline --description "_verify_runtime_kparams sub: /proc/cmdline 
     end
 end
 function _vrk_param_rejects --description "_verify_runtime_kparams sub: Kernel parser rejections naming a managed token"
-    _echo "── Kernel parameter acceptance ──"; set -l _krn
+    _echo "── Kernel parameter acceptance ──"; set -l _krn; set -l _dmn ""
     command -q journalctl; and set _krn (command journalctl -q -k -b 0 --no-pager -o cat 2>/dev/null) # -q: no '-- No entries --' line to read as kernel text
     if not string match -q -- '*Kernel command line:*' $_krn; and command -q dmesg # empty or rotated past boot: the ring buffer may hold it
-        set -l _dm (_as true dmesg 2>/dev/null); test -z "$_krn"; or string match -q -- '*Kernel command line:*' $_dm; and set _krn $_dm
+        set -l _dm (_as true dmesg 2>/dev/null); or sudo -n true 2>/dev/null; or set _dmn "; dmesg unread: sudo cache lapsed"; test -z "$_krn"; or string match -q -- '*Kernel command line:*' $_dm; and set _krn $_dm # a lapse is not an empty buffer
     end
     if test -z "$_krn"
-        _warn "  Kernel ring buffer unreadable (journalctl and dmesg both empty) — token acceptance unverified"; _log "KPARAM_REJECT_SCAN_SKIP: ring buffer unreadable"
+        set -l _why "journalctl and dmesg both empty"; test -n "$_dmn"; and set _why "journalctl empty$_dmn"; _warn "  Kernel ring buffer unreadable ($_why) — token acceptance unverified"; _log "KPARAM_REJECT_SCAN_SKIP: ring buffer unreadable$_dmn"
         return 0
     end
-    set -l _boot_seen true; string match -q -- '*Kernel command line:*' $_krn; or begin; set _boot_seen false; _warn "  Kernel log lacks the boot-time lines (rotated out) — a rejection at boot is unverified"; _log "KPARAM_REJECT_SCAN_PARTIAL: no 'Kernel command line:' line"; end
+    set -l _boot_seen true; string match -q -- '*Kernel command line:*' $_krn; or begin; set _boot_seen false; _warn "  Kernel log lacks the boot-time lines (rotated out$_dmn) — a rejection at boot is unverified"; _log "KPARAM_REJECT_SCAN_PARTIAL: no 'Kernel command line:' line$_dmn"; end
     set -l _susp (printf '%s\n' $_krn | command grep -iE -- 'unknown (option|parameter|kernel command line)|malformed early option|invalid (option|parameter)|(invalid|too large) for parameter' 2>/dev/null)
     if test -z "$_susp"; test "$_boot_seen" = true; and _ok "  No kernel parser rejections this boot ("(count $KERNEL_PARAMS)" tokens)"; return 0; end
     set -l _hit; set -l _maybe; set -l _raw; set -l _rawl 0 # _rawl: raw-read lines
@@ -2185,7 +2186,7 @@ function _vrsv_chk_active_enabled --argument-names label rec_str --description "
     end
 end
 function _vrsv_nft_assert_ping --description "_vrsv_chk_nftables sub: Assert live input chain accepts inbound IPv4 ping (warn-only)"
-    set -l _chain (_as true env LC_ALL=C nft list chain inet filter input 2>/dev/null)
+    set -l _chain (_as true env LC_ALL=C nft list chain inet filter input 2>/dev/null); or sudo -n true 2>/dev/null; or begin; _warn "  nftables: sudo cache lapsed — live IPv4 ping rule unverified"; return 0; end
     if string match -qr -- '(^|\s)icmp type (echo-request|\{[^}]*\becho-request\b[^}]*\})\s(.*\s)?accept(\s|$)' $_chain # per line: the icmpv6 rule's echo-request must not pass for IPv4
         _ok "  nftables: live IPv4 ping (echo-request) accept present"
     else
@@ -2196,15 +2197,18 @@ function _vrsv_chk_nftables --argument-names label rec_str --description "_vrsv_
     set -l rec (string split ':' -- "$rec_str")
     if test "$rec[1]" = not-found; _warn "  $label: not installed"; return 0; end
     if test "$rec[1]" = ERR_NO_DATA; _warn "  $label: systemctl state unavailable (absent or no running manager) — cannot verify"; return 0; end
-    set -l _nft_probe_ok false; command -q nft; and sudo -n true 2>/dev/null; and set _nft_probe_ok true
+    set -l _nft_probe_ok false; command -q nft; and sudo -n true 2>/dev/null; and set _nft_probe_ok true; set -l _nl 1 # _nl: the live-ruleset probe's rc
     if contains -- "$rec[2]" active reloading refreshing
         _vrsv_chk_active_enabled $label "$rec_str"
         if test "$_nft_probe_ok" = false # the inactive path reports the same gaps
             command -q nft; and _warn "  $label: active — sudo cache lapsed, live ruleset unverifiable"; or _warn "  $label: active but nft(8) absent — live ruleset unverifiable"
             return 0
         end
-        if _nft_input_drop_live # live ruleset asserted on both unit-state paths
+        _nft_input_drop_live; set _nl $status # live ruleset asserted on both unit-state paths
+        if test "$_nl" -eq 0
             _vrsv_nft_assert_ping
+        else if test "$_nl" -eq 2
+            _warn "  $label: active — sudo cache lapsed, live ruleset unverifiable"
         else
             _fail "  $label: active but no live inet/filter/input chain with policy drop (flushed or replaced — sudo systemctl restart $label)"
         end
@@ -2216,7 +2220,9 @@ function _vrsv_chk_nftables --argument-names label rec_str --description "_vrsv_
     if test "$_nft_probe_ok" = false
         _warn "  $label: $rec[2] — sudo cache lapsed, live ruleset unverifiable"; return 0
     end
-    if not _nft_input_drop_live
+    _nft_input_drop_live; set _nl $status
+    if test "$_nl" -eq 2; _warn "  $label: $rec[2] — sudo cache lapsed, live ruleset unverifiable"; return 0; end
+    if test "$_nl" -ne 0
         _fail "  $label: $rec[2] and no live inet/filter/input chain with policy drop (sudo systemctl restart $label)"; return 0
     end
     if test "$rec[2]" != inactive # the live ruleset predates a start that did not finish cleanly
@@ -2385,7 +2391,7 @@ end
 function _verify_runtime_services --description "Verify system units, masked-unit inactivity, user units, firewall posture, and Wi-Fi runtime"; _echo "SERVICE STATE"; _vrsv_sys_units; _vrsv_masked_inactive; _vrsv_user_units; _vrsv_fw_posture; _vrsv_wifi; return 0; end
 
 # ── VERIFY-RUNTIME: ENVIRONMENT (session ENV_VARS + live sysctl) ──
-function _sysd_env_value --description "_vre_envvars sub: Decode a show-environment value (\$'…' quoting)"
+function _sysd_env_value --description "_vre_envvars sub: Decode a show-environment value (\$'...' quoting)"
     string match -qr -- '^\$\'.*\'$' "$argv[1]"; or begin; printf '%s' "$argv[1]"; return 0; end
     string replace -r -- '^\$\'(.*)\'$' '$1' "$argv[1]" | string replace -ra -- '\\\\([\\\\\'])' '$1' | string collect # decodes \\ and \'; \n, \t stay escaped (no ENV_VARS value has them)
 end
@@ -2396,7 +2402,7 @@ function _vre_envvars --description "_verify_runtime_env sub: ENV_VARS via syste
     if test "$_se_rc" -ne 0; _warn "  ENV_VARS: systemctl --user show-environment failed (rc=$_se_rc) — session environment unverifiable"; return 0; end
     for exp in $ENV_VARS
         set -l _ev_parts (string split -m1 '=' -- "$exp"); set -l var_name $_ev_parts[1]; set -l expected $_ev_parts[2]; set -l actual ""
-        if test -n "$_user_env"; set -l _vn_re (string escape --style=regex -- $var_name); set actual (printf '%s\n' $_user_env | string match -rg -- "^"$_vn_re"=(.*)"); set actual (_sysd_env_value "$actual"); end # special values come $'…'-quoted
+        if test -n "$_user_env"; set -l _vn_re (string escape --style=regex -- $var_name); set actual (printf '%s\n' $_user_env | string match -rg -- "^"$_vn_re"=(.*)"); set actual (_sysd_env_value "$actual"); end # special values come $'...'-quoted
         if test "$actual" = "$expected"
             _ok "  $var_name=$actual"
         else if string match -qr -- "^"(string escape --style=regex -- $var_name)"=" $_user_env # set, even empty: it differs, not NOT SET
@@ -2711,7 +2717,7 @@ end
 
 # ── MISC HELPERS: PERM CHECK, USER BUS ──
 function _dir_group_or_world_writable --argument-names mode --description "True when octal mode has group or world write bit"
-    not string match -qr '^[0-7]+$' -- "$mode"; and return 0 # unparsable mode -> writable (fail-closed)
+    not string match -qr '^[0-7]+$' -- "$mode"; and return 0 # unparsable mode → writable (fail-closed)
     test (string length -- "$mode") -gt 3; and set mode (string sub -s -3 -- "$mode") # drop special-bits digit
     while test (string length -- "$mode") -lt 3; set mode "0$mode"; end # stat %a strips leading zeros
     set -l group_w (string sub -s 2 -l 1 -- "$mode"); set -l other_w (string sub -s 3 -l 1 -- "$mode"); set -l group_has_w (math "floor($group_w / 2) % 2"); set -l other_has_w (math "floor($other_w / 2) % 2")
@@ -2726,10 +2732,11 @@ function _has_user_bus_active --description "True iff user systemd manager is re
 end
 
 # ── FIREWALL PROBE: LIVE NFTABLES INPUT POLICY ──
-function _nft_input_drop_live --description "True when live inet/filter/input chain has policy drop"
-    command -q nft; or return 1; sudo -n true 2>/dev/null; or return 1
+function _nft_input_drop_live --description "True when live inet/filter/input chain has policy drop (rc 2: unprobed, sudo cache lapsed)"
+    command -q nft; or return 1; sudo -n true 2>/dev/null; or return 2
     set -l _in_chain (_as true env LC_ALL=C nft list chain inet filter input 2>/dev/null)
-    string match -qr -- '^\s*type filter hook input\b.*\spolicy drop;' $_in_chain # hook line only: a rule comment naming "policy drop" must not pass
+    string match -qr -- '^\s*type filter hook input\b.*\spolicy drop;' $_in_chain; and return 0 # hook line only: a rule comment naming "policy drop" must not pass
+    sudo -n true 2>/dev/null; or return 2; return 1 # a lapse at the read is no verdict
 end
 
 # ── BOOT PATH RESOLUTION (ESP + $BOOT via bootctl / findmnt) ──

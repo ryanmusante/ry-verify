@@ -3,14 +3,18 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.266.0
+7.267.0
 -------
 
-  - verify: processor.max_cstate is read back, as root: its sysfs node is
-    0400; a sudo lapse at that read WARNs as a lapse
+  - check: a sudo lapse at the nftables ruleset read exits 3, not 10 with a
+    ruleset-not-live drift record
+  - verify: a sudo lapse at the dmesg read is named in the ring buffer and
+    boot-line WARNs, not read as an empty buffer
+  - verify: a sudo lapse at the nftables ruleset read WARNs in the unit and
+    ping rows, not a FAIL for no live policy drop
 
 
-7.246.0 - 7.265.0
+7.246.0 - 7.266.0
 -----------------
 
   - env: 7.248.0 SDL_GAMECONTROLLER_IGNORE_DEVICES gains 0x3434/0x0b00 (Q0 HE)
@@ -215,6 +219,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     older kernel lists it as unknown; other complaints are still counted
   - verify: 7.260.0 amd_pstate status is checked against the KERNEL_PARAMS
     amd_pstate= value; a token REJECTED or read raw gets no second WARN
+  - verify: 7.266.0 processor.max_cstate is read back, as root: its sysfs node
+    is 0400; a sudo lapse at that read WARNs as a lapse
   - report: 7.247.0 - 7.260.0 HTML report fixes: action list, counts ring,
     state grades, keys table, tmpfile and sudo use
   - report: 7.264.0 drop --report and the HTML report; the flag is an unknown
