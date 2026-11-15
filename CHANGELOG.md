@@ -3,18 +3,14 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.267.0
+7.268.0
 -------
 
-  - check: a sudo lapse at the nftables ruleset read exits 3, not 10 with a
-    ruleset-not-live drift record
-  - verify: a sudo lapse at the dmesg read is named in the ring buffer and
-    boot-line WARNs, not read as an empty buffer
-  - verify: a sudo lapse at the nftables ruleset read WARNs in the unit and
-    ping rows, not a FAIL for no live policy drop
+  - changelog: lockstep release with ry-install 7.268.0, no functional change;
+    fold the previous release into the range
 
 
-7.246.0 - 7.266.0
+7.246.0 - 7.267.0
 -----------------
 
   - env: 7.248.0 SDL_GAMECONTROLLER_IGNORE_DEVICES gains 0x3434/0x0b00 (Q0 HE)
@@ -79,6 +75,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     3; a MASK unit whose file is gone but still runs is drift
   - check: 7.260.0 an empty /proc/cmdline that reads cleanly is drift in every
     token (exit 10), not a probe failure (exit 3)
+  - check: 7.267.0 a sudo lapse at the nftables ruleset read exits 3, not 10
+    with a ruleset-not-live drift record
   - verify: 7.247.0 a running MASK unit that is not masked is named as such;
     the nftables policy-drop FAIL names the restart
   - verify: 7.247.0 efi and chainload loader entries are skipped; a stale
@@ -221,6 +219,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     amd_pstate= value; a token REJECTED or read raw gets no second WARN
   - verify: 7.266.0 processor.max_cstate is read back, as root: its sysfs node
     is 0400; a sudo lapse at that read WARNs as a lapse
+  - verify: 7.267.0 a sudo lapse at the dmesg read is named in the ring buffer
+    and boot-line WARNs, not read as an empty buffer
+  - verify: 7.267.0 a sudo lapse at the nftables ruleset read WARNs in the
+    unit and ping rows, not a FAIL for no live policy drop
   - report: 7.247.0 - 7.260.0 HTML report fixes: action list, counts ring,
     state grades, keys table, tmpfile and sudo use
   - report: 7.264.0 drop --report and the HTML report; the flag is an unknown
