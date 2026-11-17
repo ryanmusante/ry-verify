@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.268.0** · [Changelog](CHANGELOG.md)
+**Version 7.269.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -41,7 +41,7 @@ Each run that passes argument parsing writes one JSONL log (`0600`) to `~/ry-ins
 | Code | Meaning |
 |---|---|
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
-| `1` | a `--verify` mismatch, or `-h`/`-v` output that could not be written (stdout full, or closed under fish 3) |
+| `1` | a `--verify` mismatch, or `-h`/`-v` output that could not be written (stdout full, a pipe closed by its reader, or stdout closed under fish 3) |
 | `2` | bad arguments or root misuse — except a valid `--check` run as root, which exits `3` silently |
 | `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; failed config validation; an unusable HOME or log tree; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides), or a probe that reaches no verdict before any drift (a sudo lapse, an unreadable `/proc/cmdline`, a `systemctl` error); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |
@@ -59,7 +59,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Checks
 
-`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes and modes, system file owners, live `/proc/cmdline` tokens, unit states — and reports drift only; restarts ry-install still owes (`~/ry-install/pending-apply`) are not drift. The console prints each group name in capitals, `Wi-Fi state` as `WIFI STATE`.
+`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes, modes and symlinks, system file owners, live `/proc/cmdline` tokens, unit states and the live nftables input policy — and reports drift only; restarts ry-install still owes (`~/ry-install/pending-apply`) are not drift. The console prints each group name in capitals, `Wi-Fi state` as `WIFI STATE`.
 
 | Group | Scope |
 |---|---|

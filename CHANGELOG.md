@@ -3,14 +3,14 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.268.0
+7.269.0
 -------
 
-  - changelog: lockstep release with ry-install 7.268.0, no functional change;
-    fold the previous release into the range
+  - preflight: a sudoers verifypw that lets sudo -v skip authentication now
+    prompts once through a command on a TTY instead of exiting 3
 
 
-7.246.0 - 7.267.0
+7.246.0 - 7.268.0
 -----------------
 
   - env: 7.248.0 SDL_GAMECONTROLLER_IGNORE_DEVICES gains 0x3434/0x0b00 (Q0 HE)
