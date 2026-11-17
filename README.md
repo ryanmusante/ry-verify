@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.269.0** · [Changelog](CHANGELOG.md)
+**Version 7.270.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -17,7 +17,7 @@ sudo -v
 ./ry-verify.fish
 ```
 
-Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK` and any `WARN`, `FAIL`, or `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totaling both, or `Combined (startup + static + runtime):` when startup warnings count too. A startup gate, or sudo uncached at either section, exits `3` (`1` when static checks already failed) before that section's summary and the Combined line — see [Exit Codes](#exit-codes).
+Each section, static then runtime, ends with `VERIFICATION SUMMARY` and a `Results:` line counting its own `OK` and any `WARN`, `FAIL`, or `GEN_FAIL`; the run closes with a `Combined (static + runtime):` line totaling both, or `Combined (startup + static + runtime):` when startup warnings count too. A startup gate exits `3` before either section runs; sudo uncached at either section exits `3` (`1` when static checks already failed) before that section's summary and the Combined line — see [Exit Codes](#exit-codes).
 
 ## Requirements
 
@@ -59,19 +59,19 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 
 ## Checks
 
-`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes, modes and symlinks, system file owners, live `/proc/cmdline` tokens, unit states and the live nftables input policy — and reports drift only; restarts ry-install still owes (`~/ry-install/pending-apply`) are not drift. The console prints each group name in capitals, `Wi-Fi state` as `WIFI STATE`.
+`--verify` runs the static groups first, then the runtime groups; `--check` runs the silent subset — managed file bytes, modes and symlinks, system file owners, live `/proc/cmdline` tokens, unit states, and the live nftables input policy — and reports drift only; restarts ry-install still owes (`~/ry-install/pending-apply`) are not drift. The console prints each group name in capitals, `Wi-Fi state` as `WIFI STATE`.
 
 | Group | Scope |
 |---|---|
 | Static › Boot configuration | the ESP layout (ESP at `/boot`, no XBOOTLDR), `loader.conf`, `sdboot-manage.conf`, `/etc/kernel/cmdline` (`KERNEL_PARAMS`, `root=UUID`, `rw`), `mkinitcpio.conf`, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins that outrank them, a mkinitcpio preset `_config`, `$BOOT` entries and each `linux` entry's kernel and `initrd` files |
-| Static › System configuration | resolved, logind, NetworkManager dispatcher logging, NetworkManager, `iw-regdomain`, bluetooth, `cpupower-service.conf`, sysctl drop-in, udev, modprobe plus the unmanaged `60-ry-` sweep, nftables |
+| Static › System configuration | resolved, logind, NetworkManager dispatcher logging, NetworkManager, `iw-regdomain`, Bluetooth, `cpupower-service.conf`, sysctl drop-in, udev, modprobe plus the unmanaged `60-ry-` sweep, nftables |
 | Static › User configuration | `environment.d` (`ENV_VARS`), MangoHud, WirePlumber `bluez5.roles`, plus any other config in WirePlumber's search path that sets it or overrides `monitor.bluez.properties` |
 | Static › Packages | `PKGS_ADD` and `EXPECTED_VULKAN_PKGS` present, `PKGS_DEL` absent, `pacman.conf` `IgnorePkg` and `ParallelDownloads` |
 | Static › Services | `MASK` unit state, plus admin-scope masks not in `MASK` |
 | Static › Syntax validation | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
 | Static › Checksum verification | installed bytes compared with generator output, a symlinked destination rejected rather than followed, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty, stray files beside managed files |
 | Runtime › Kernel cmdline | live `/proc/cmdline`, kernel parser rejections |
-| Runtime › Hardware state | GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER`, `amd_pstate` status, prefcore and `dynamic_epp`, and boost |
+| Runtime › Hardware state | GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER`, `amd_pstate` status, prefcore and `dynamic_epp`, boost |
 | Runtime › Module state | module parameters, NVMe I/O scheduler, blacklists |
 | Runtime › Service state | `conf.d`-implied and `EXPECTED_SERVICES` units, live nftables input policy drop and IPv4 ping accept, `MASK` units inactive, user-scope units, firewall posture |
 | Runtime › Wi-Fi state | Wi-Fi interface and connection, NetworkManager effective backend (`NetworkManager --print-config`), unmanaged Wi-Fi P2P device |

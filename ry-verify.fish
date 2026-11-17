@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.269.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.270.0 — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; status filename | string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$'; or status stack-trace | string match -q -- '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.269.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.270.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t; set -g fish_read_limit 1073741824 # config.fish job control, IFS or read limit would steer this run
@@ -1566,8 +1566,7 @@ function _vsp_required --description "_verify_static_packages sub: Check PKGS_AD
             if contains -- "$pkg" $argv
                 _ok "  $pkg: installed"
             else
-                _fail "  $pkg: NOT INSTALLED (DXVK/VKD3D-Proton requires this)"
-                _info "  ↳ Install missing: sudo pacman -Syu --needed $pkg"
+                _fail "  $pkg: NOT INSTALLED (DXVK/VKD3D-Proton requires this)"; _info "  ↳ Install missing: sudo pacman -Syu --needed $pkg"
             end
         end
     end

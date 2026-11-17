@@ -3,14 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.269.0
+7.270.0
 -------
 
-  - preflight: a sudoers verifypw that lets sudo -v skip authentication now
-    prompts once through a command on a TTY instead of exiting 3
+  - changelog: no behavior change; version tracks ry-install 7.270.0
 
 
-7.246.0 - 7.268.0
+7.246.0 - 7.269.0
 -----------------
 
   - env: 7.248.0 SDL_GAMECONTROLLER_IGNORE_DEVICES gains 0x3434/0x0b00 (Q0 HE)
@@ -57,6 +56,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     7.256.0 WP_BLUEZ_ROLES entries must be PipeWire role names
   - preflight: 7.257.1 an EXPECTED_VULKAN_PKGS member in PKGS_DEL or starting
     with a dash is refused; 7.258.0 true(1) and test(1) are checked at startup
+  - preflight: 7.269.0 a verifypw that lets sudo -v skip authentication
+    prompts once through a command on a TTY instead of exiting 3
   - check: 7.247.0 a masked MASK unit still running is drift, 7.255.0 as is
     one activating, reloading or refreshing; an expected unit reloading is not
   - check: 7.250.0 CHECK_UNIT_DRIFT for an inactive or not-enabled unit names
@@ -119,7 +120,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     parser keeps it in the value (systemd, sysctl, NM, BlueZ, environment.d)
   - verify: 7.254.0 an initramfs array still open at EOF reads as empty; an
     unlistable /etc/modprobe.d WARNs that the 60-ry-* sweep was skipped
-  - verify: 7.254.0 a GPU DPM mismatch counts one FAIL per card, an unreadable
+  - verify: 7.254.0 a GPU DPM mismatch counts one FAIL per card; an unreadable
     level WARNs; bool module params take any kstrtobool spelling
   - verify: 7.254.0 - 7.255.0 LINUX_OPTIONS reads as bash reads it: indented
     or single-quoted counts, and a repeated line WARNs and uses the last
@@ -185,7 +186,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     reads it: double quotes, and single quotes from systemd 260 on
   - verify: 7.258.0 a comment ending in \ no longer swallows the next line: a
     ; line in systemd and env files, a # comment in sdboot-manage.conf
-  - verify: 7.258.0 nftables.conf rows for flush ruleset, the inet filter
+  - verify: 7.258.0 new nftables.conf rows: flush ruleset, the inet filter
     table, invalid drop, established/related and loopback accept, all policies
   - verify: 7.258.0 a sudo lapse at a system file's readability or access
     probe WARNs as a lapse (check: exits 3)
