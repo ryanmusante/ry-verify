@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.271.0** · [Changelog](CHANGELOG.md)
+**Version 7.272.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -71,7 +71,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Static › Syntax validation | live `mkinitcpio.conf` `HOOKS` presence — ordering is not re-checked here |
 | Static › Checksum verification | installed bytes compared with generator output, a symlinked destination rejected rather than followed, root-UUID fallback compare, `.ry.bak` copies in `~/ry-install/backups/` non-empty, stray files beside managed files |
 | Runtime › Kernel cmdline | live `/proc/cmdline`, kernel parser rejections |
-| Runtime › Hardware state | GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER`, `amd_pstate` status, prefcore and `dynamic_epp`, boost |
+| Runtime › Hardware state | GPU DPM level, CPU governor, EPP, `EXPECTED_SCALING_DRIVER`, `amd_pstate` status, prefcore, `dynamic_epp` (7.1 and 7.2 kernels), boost |
 | Runtime › Module state | module parameters, NVMe I/O scheduler, blacklists |
 | Runtime › Service state | `conf.d`-implied and `EXPECTED_SERVICES` units, live nftables input policy drop and IPv4 ping accept, `MASK` units inactive, user-scope units, firewall posture |
 | Runtime › Wi-Fi state | Wi-Fi interface and connection, NetworkManager effective backend (`NetworkManager --print-config`), unmanaged Wi-Fi P2P device |

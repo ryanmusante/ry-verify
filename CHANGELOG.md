@@ -3,13 +3,14 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.271.0
+7.272.0
 -------
 
-  - changelog: no behavior change; version tracks ry-install 7.271.0
+  - readme: the Hardware state row limits dynamic_epp to 7.1 and 7.2 kernels
+  - changelog: no behavior change; version tracks ry-install 7.272.0
 
 
-7.246.0 - 7.270.0
+7.246.0 - 7.271.0
 -----------------
 
   - env: 7.248.0 SDL_GAMECONTROLLER_IGNORE_DEVICES gains 0x3434/0x0b00 (Q0 HE)
