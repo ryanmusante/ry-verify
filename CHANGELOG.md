@@ -3,14 +3,18 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.272.0
+7.273.0
 -------
 
-  - readme: the Hardware state row limits dynamic_epp to 7.1 and 7.2 kernels
-  - changelog: no behavior change; version tracks ry-install 7.272.0
+  - consistency: --help, the root refusal and the ESP fallback warning drop
+    sentence periods, as other messages do
+  - consistency: message lists of three take a serial comma; the masked-unit
+    FAIL reads stop it or reboot, as the removed-unit FAIL does
+  - consistency: the REJECTED token FAIL reads 'inert; drop or correct them';
+    the repeated-key WARN reads 'using the last', as LINUX_OPTIONS= does
 
 
-7.246.0 - 7.271.0
+7.246.0 - 7.272.0
 -----------------
 
   - env: 7.248.0 SDL_GAMECONTROLLER_IGNORE_DEVICES gains 0x3434/0x0b00 (Q0 HE)
@@ -246,7 +250,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     KPARAM_RAW_READ (raw split_lock_detect= read) and VERIFY_ESP_LAYOUT_FAIL
   - logging: 7.260.0 with the root UUID unresolved, a failed read logs
     VERIFY_STATIC_READ_FAIL and a lapsed one VERIFY_STATIC_SUDO_LAPSE
-  - logging: 7.260.0 a log dir moded to 0700 logs STATE_DIR_PERM_FIX; 7.264.0
+  - logging: 7.260.0 a log dir reset to 0700 logs STATE_DIR_PERM_FIX; 7.264.0
     CHECK_UNIT_NOT_INSTALLED says --verify WARNs, not the ledger
   - logging: 7.265.0 every run logs the running kernel release as
     KERNEL_RELEASE
@@ -329,7 +333,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - packages: 7.224.0 expect pipewire-jack installed
   - guard: 7.234.0 a sourced or piped run is refused under any locale; a
     startup signal exits 128+N silently; QUIT is no longer registered
-  - read-only: 7.233.0 no mode creates ~/ry-install/backups, re-modes
+  - read-only: 7.233.0 no mode creates ~/ry-install/backups, chmods
     ~/ry-install or writes to /tmp; a group- or world-writable one exits 3
   - cli: 7.233.0 --h, --he, --hel and --vers, --versi, --versio are honored
     before the root guard

@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.272.0** · [Changelog](CHANGELOG.md)
+**Version 7.273.0** · [Changelog](CHANGELOG.md)
 
 Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
 
@@ -82,7 +82,7 @@ With no user bus, `--verify` warns once for each check it skips — session `ENV
 
 ## Safety and Reliability
 
-**Read-only** — no mode takes a lock or writes outside its log tree, `~/ry-install/logs/`, kept `0700`; nothing lands in `/tmp`. A missing `~/ry-install` is created `0700` to hold the log tree; an existing one is never re-moded — a group- or world-writable one stops the run, exit `3`.
+**Read-only** — no mode takes a lock or writes outside its log tree, `~/ry-install/logs/`, kept `0700`; nothing lands in `/tmp`. A missing `~/ry-install` is created `0700` to hold the log tree; an existing one keeps its mode — a group- or world-writable one stops the run, exit `3`.
 
 **Unowned state** — `--verify` also reports state the profile does not own: orphaned admin-scope masks, unmanaged `60-ry-` drop-ins, the `sdboot-manage.conf.d` and `mkinitcpio.conf.d` drop-ins each tool reads, a mkinitcpio preset `_config`, other WirePlumber config that sets `bluez5.roles` or overrides `monitor.bluez.properties`, and stray files beside managed files.
 
