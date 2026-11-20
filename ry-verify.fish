@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.274.0 (2026-11-19) — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.275.0 (2026-11-19) — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; status filename | string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$'; or status stack-trace | string match -q -- '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.274.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.275.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t; set -g fish_read_limit 1073741824 # config.fish job control, IFS or read limit would steer this run
@@ -510,60 +510,60 @@ function _ir_validate_counts --description "Refuse to run when array counts drif
         MKINITCPIO_COMPRESSION_OPTIONS:1 # drift tripwires; sync arrays + docs on change
     for _kv in $_expect
         set -l _parts (string split -m1 ':' -- "$_kv"); set -l _name $_parts[1]; set -l _want $_parts[2]; set -l _got (count $$_name)
-        if test "$_got" -ne "$_want"; _err_loud "$_name count drift: got=$_got expected=$_want — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if test "$_got" -ne "$_want"; _err_loud "$_name count drift: got=$_got expected=$_want — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
 end
 function _ir_validate_keys --description "Refuse to run on out-of-domain embedded keys and tokens; warn on dual-stack"
     for _k in BT_AUTO_ENABLE BT_FAST_CONNECTABLE BLACKLIST_AMDXDNA
-        if not contains -- "$$_k" true false; _err_loud "$_k must be true|false (got: '$$_k') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not contains -- "$$_k" true false; _err_loud "$_k must be true|false (got: '$$_k') — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _k in SDBOOT_OVERWRITE SDBOOT_REMOVE_EXISTING SDBOOT_REMOVE_OBSOLETE RESOLVED_MDNS RESOLVED_LLMNR
-        if not contains -- "$$_k" yes no; _err_loud "$_k must be yes|no (got: '$$_k') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not contains -- "$$_k" yes no; _err_loud "$_k must be yes|no (got: '$$_k') — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _k in LOADER_TIMEOUT BT_RECONNECT_ATTEMPTS
-        if not string match -qr '^\d+\z' -- "$$_k"; _err_loud "$_k must be a non-negative integer (got: '$$_k') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not string match -qr '^\d+\z' -- "$$_k"; _err_loud "$_k must be a non-negative integer (got: '$$_k') — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
-    if not string match -qr '^[0-3]\z' -- "$NM_WIFI_POWERSAVE"; _err_loud "NM_WIFI_POWERSAVE must be 0|1|2|3 (got: '$NM_WIFI_POWERSAVE') — refuse to run (NetworkManager wifi.powersave accepts no other value)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
-    if not string match -qr '^[A-Z][A-Z]\z' -- "$COUNTRY"; _err_loud "COUNTRY must be an ISO-3166-1 alpha-2 code (got: '$COUNTRY') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
-    if string match -qr '^(AA|Q[M-Z]|X[A-Z]|ZZ)\z' -- "$COUNTRY"; _err_loud "COUNTRY '$COUNTRY' is in the ISO-3166-1 user-assigned/reserved range (AA, QM-QZ, XA-XZ, ZZ) — not a real country code; would silently fall back to world regdomain; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
-    if not contains -- "$GPU_DPM_LEVEL" $_RY_DPM_LEVELS; _err_loud "GPU_DPM_LEVEL must be one of "(string join '|' -- $_RY_DPM_LEVELS)" (got: '$GPU_DPM_LEVEL') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
-    if not contains -- "$EPP_PREFERENCE" $_RY_EPP_LEVELS; _err_loud "EPP_PREFERENCE must be one of "(string join '|' -- $_RY_EPP_LEVELS)" (got: '$EPP_PREFERENCE') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
+    if not string match -qr '^[0-3]\z' -- "$NM_WIFI_POWERSAVE"; _err_loud "NM_WIFI_POWERSAVE must be 0|1|2|3 (got: '$NM_WIFI_POWERSAVE') — refusing to run (NetworkManager wifi.powersave accepts no other value)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if not string match -qr '^[A-Z][A-Z]\z' -- "$COUNTRY"; _err_loud "COUNTRY must be an ISO-3166-1 alpha-2 code (got: '$COUNTRY') — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if string match -qr '^(AA|Q[M-Z]|X[A-Z]|ZZ)\z' -- "$COUNTRY"; _err_loud "COUNTRY '$COUNTRY' is in the ISO-3166-1 user-assigned/reserved range (AA, QM-QZ, XA-XZ, ZZ) — not a real country code; would silently fall back to world regdomain; refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if not contains -- "$GPU_DPM_LEVEL" $_RY_DPM_LEVELS; _err_loud "GPU_DPM_LEVEL must be one of "(string join '|' -- $_RY_DPM_LEVELS)" (got: '$GPU_DPM_LEVEL') — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
+    if not contains -- "$EPP_PREFERENCE" $_RY_EPP_LEVELS; _err_loud "EPP_PREFERENCE must be one of "(string join '|' -- $_RY_EPP_LEVELS)" (got: '$EPP_PREFERENCE') — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end # value is interpolated unquoted into udev ATTR
     for _r in $WP_BLUEZ_ROLES # spliced unquoted into SPA-JSON
-        if not contains -- "$_r" $_RY_BLUEZ_ROLES; _err_loud "WP_BLUEZ_ROLES entries must be among "(string join '|' -- $_RY_BLUEZ_ROLES)" (got: '$_r') — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not contains -- "$_r" $_RY_BLUEZ_ROLES; _err_loud "WP_BLUEZ_ROLES entries must be among "(string join '|' -- $_RY_BLUEZ_ROLES)" (got: '$_r') — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
-    if not string match -qr '^[a-z][a-z0-9_-]*\z' -- "$CPUPOWER_GOVERNOR"; _err_loud "CPUPOWER_GOVERNOR must match ^[a-z][a-z0-9_-]*\\z (got: '$CPUPOWER_GOVERNOR') — refuse to run (the domain ry-install's _grep_cpupower_entry accepts)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+    if not string match -qr '^[a-z][a-z0-9_-]*\z' -- "$CPUPOWER_GOVERNOR"; _err_loud "CPUPOWER_GOVERNOR must match ^[a-z][a-z0-9_-]*\\z (got: '$CPUPOWER_GOVERNOR') — refusing to run (the domain ry-install's _grep_cpupower_entry accepts)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     if contains -- /etc/nftables.conf $SYSTEM_DESTINATIONS; and not contains -- ipv6.disable=1 $KERNEL_PARAMS # base ICMPv6 is accepted; service rules are not
         _warn "Dual-stack: the ruleset accepts only the ICMPv6 base set — add service-specific IPv6 rules to _content__etc_nftables.conf in both scripts and re-run ry-install (a hand edit to /etc/nftables.conf reads as MISMATCH)"
     end
     if test "$BLACKLIST_AMDXDNA" = false; and begin; contains -- amd_iommu=off $KERNEL_PARAMS; or contains -- iommu=off $KERNEL_PARAMS; end # amdxdna probes -ENODEV without the IOMMU; iommu=off disables AMD-Vi
-        _err_loud "BLACKLIST_AMDXDNA=false requires the IOMMU (drop amd_iommu=off / iommu=off; set iommu=pt) — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT
+        _err_loud "BLACKLIST_AMDXDNA=false requires the IOMMU (drop amd_iommu=off / iommu=off; set iommu=pt) — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT
     end
     for _k in LOADER_DEFAULT LOADER_CONSOLE_MODE LOADER_EDITOR SDBOOT_DEFAULT_ENTRY NM_WIFI_BACKEND NM_LOG_LEVEL NM_DISPATCHER_LOGLEVELMAX MKINITCPIO_COMPRESSION EXPECTED_SCALING_DRIVER
-        if test -z "$$_k"; _err_loud "$_k must be non-empty — refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if test -z "$$_k"; _err_loud "$_k must be non-empty — refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     set -l _scalar_metachar_re '[\s"`$;\\\\&|<>(){}*?\x27~!#]' # shell metachar class for scalars written to boot configs
     for _k in MKINITCPIO_COMPRESSION SDBOOT_DEFAULT_ENTRY LOADER_DEFAULT LOADER_CONSOLE_MODE LOADER_EDITOR
-        if string match -qr -- "$_scalar_metachar_re" "$$_k"; _err_loud "$_k contains whitespace, quote, or shell metacharacter: '$$_k' — refuse to run (would corrupt a shell-sourced or parser-read boot config)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if string match -qr -- "$_scalar_metachar_re" "$$_k"; _err_loud "$_k contains whitespace, quote, or shell metacharacter: '$$_k' — refusing to run (would corrupt a shell-sourced or parser-read boot config)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _co in $MKINITCPIO_COMPRESSION_OPTIONS # spliced into a shell array literal; flag charset only
-        if not string match -qr -- '^-?[A-Za-z0-9]+\z' "$_co"; _err_loud "MKINITCPIO_COMPRESSION_OPTIONS token invalid: '$_co' — refuse to run (spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not string match -qr -- '^-?[A-Za-z0-9]+\z' "$_co"; _err_loud "MKINITCPIO_COMPRESSION_OPTIONS token invalid: '$_co' — refusing to run (spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _kp in $KERNEL_PARAMS # spliced into boot configs; charset excludes shell metachars
-        if not string match -qr -- '^[A-Za-z0-9._,=-]+\z' "$_kp"; _err_loud "KERNEL_PARAMS token invalid: '$_kp' — refuse to run (spliced into a shell-sourced boot config and the kernel cmdline)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not string match -qr -- '^[A-Za-z0-9._,=-]+\z' "$_kp"; _err_loud "KERNEL_PARAMS token invalid: '$_kp' — refusing to run (spliced into a shell-sourced boot config and the kernel cmdline)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _mt in $MKINITCPIO_MODULES $MKINITCPIO_HOOKS # plain names (no ? marker): presence checks take them literally
-        if not string match -qr -- '^[A-Za-z0-9_-]+\z' "$_mt"; _err_loud "MKINITCPIO_MODULES/HOOKS token invalid: '$_mt' — refuse to run (plain names only; spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if not string match -qr -- '^[A-Za-z0-9_-]+\z' "$_mt"; _err_loud "MKINITCPIO_MODULES/HOOKS token invalid: '$_mt' — refusing to run (plain names only; spliced into a shell-sourced array literal)"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
 end
 function _ir_validate_sets --description "Refuse to run when add and remove sets contradict each other"
     for _p in $PKGS_ADD # phase 2 installs, phase 4 -Rns removes: verify would assert both
-        if contains -- "$_p" $PKGS_DEL; _err_loud "'$_p' is in both PKGS_ADD and PKGS_DEL — phase 4 would remove what phase 2 installed; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if contains -- "$_p" $PKGS_DEL; _err_loud "'$_p' is in both PKGS_ADD and PKGS_DEL — phase 4 would remove what phase 2 installed; refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _p in $EXPECTED_VULKAN_PKGS # phase 2 installs a missing one, as it does PKGS_ADD
-        if contains -- "$_p" $PKGS_DEL; _err_loud "'$_p' is in both EXPECTED_VULKAN_PKGS and PKGS_DEL — phase 4 would remove what phase 2 installed; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if contains -- "$_p" $PKGS_DEL; _err_loud "'$_p' is in both EXPECTED_VULKAN_PKGS and PKGS_DEL — phase 4 would remove what phase 2 installed; refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
     for _u in $EXPECTED_SERVICES # phase 4 masks before it enables: enable would fail
-        if contains -- "$_u" $MASK; _err_loud "'$_u' is in both MASK and EXPECTED_SERVICES — phase 4 masks before it enables; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if contains -- "$_u" $MASK; _err_loud "'$_u' is in both MASK and EXPECTED_SERVICES — phase 4 masks before it enables; refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
 end
 
@@ -606,11 +606,11 @@ function _init_runtime --description "Cache root UUID + CPU-model gate + validat
     _ir_validate_counts; _ir_validate_keys; _ir_validate_sets
     for _bt in $_RY_BACKUP_TARGETS
         string match -qr -- '/(sysctl|environment)\.d/' "$_bt"; or continue
-        _err_loud "_RY_BACKUP_TARGETS member '$_bt' uses a side-effecting content generator — the install-side post-write restore would mutate run state; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT
+        _err_loud "_RY_BACKUP_TARGETS member '$_bt' uses a side-effecting content generator — the install-side post-write restore would mutate run state; refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT
     end
     _ir_precompute_caches
     for _pn in $PKGS_ADD $PKGS_DEL $EXPECTED_VULKAN_PKGS
-        if string match -q -- '-*' "$_pn"; _err_loud "Package name starts with dash: '$_pn' — pacman would parse as flag; refuse to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
+        if string match -q -- '-*' "$_pn"; _err_loud "Package name starts with dash: '$_pn' — pacman would parse as flag; refusing to run"; _pre_dispatch_exit $EXIT_PREFLIGHT; end
     end
 end
 
@@ -691,7 +691,7 @@ function _content__etc_sysctl.d_95-ry-overrides.conf --description "Generate con
     set -l _printed 0; set -g _RY_SYSCTL_BAD_ENTRIES
     for entry in $SYSCTL_VALUES
         if not string match -qr '^\s*[A-Za-z0-9._-]+\s*=\s*\S' -- "$entry"; set -ga _RY_SYSCTL_BAD_ENTRIES "$entry"; _log "SYSCTL_SKIP_MALFORMED: '$entry' (require key=value, key charset [A-Za-z0-9._-])"; continue; end
-        if string match -qr '[\x00-\x1f\x7f]' -- "$entry"; set -ga _RY_SYSCTL_BAD_ENTRIES "$entry"; _log "SYSCTL_SKIP_CTRLCHAR: entry contains control character (newline/CR/etc) — refuse to emit"; continue; end
+        if string match -qr '[\x00-\x1f\x7f]' -- "$entry"; set -ga _RY_SYSCTL_BAD_ENTRIES "$entry"; _log "SYSCTL_SKIP_CTRLCHAR: entry contains control character (newline/CR/etc) — refusing to emit"; continue; end
         set -l parts (string split -m1 '=' -- "$entry"); set -l key (string trim -- "$parts[1]"); set -l val (string trim -- "$parts[2]")
         printf '%s = %s\n' "$key" "$val"; set _printed (math $_printed + 1)
     end
@@ -728,7 +728,7 @@ function _content_HOME_.config_environment.d_10-environment.conf --description "
     set -l _printed 0; set -g _RY_ENVD_BAD_ENTRIES
     for var in $ENV_VARS
         if not string match -qr '^[A-Za-z_][A-Za-z0-9_]*=' -- "$var"; set -ga _RY_ENVD_BAD_ENTRIES "$var"; _log "ENVD_SKIP_MALFORMED: '$var' (require KEY=value, KEY charset [A-Za-z_][A-Za-z0-9_]*)"; continue; end
-        if string match -qr '[\x00-\x1f\x7f]' -- "$var"; set -ga _RY_ENVD_BAD_ENTRIES "$var"; _log "ENVD_SKIP_CTRLCHAR: entry contains control character (newline/CR/etc) — refuse to emit"; continue; end
+        if string match -qr '[\x00-\x1f\x7f]' -- "$var"; set -ga _RY_ENVD_BAD_ENTRIES "$var"; _log "ENVD_SKIP_CTRLCHAR: entry contains control character (newline/CR/etc) — refusing to emit"; continue; end
         printf '%s\n' "$var"; set _printed (math $_printed + 1)
     end
     if test "$_printed" -ne (count $ENV_VARS); _log "ENVD_COUNT_MISMATCH: printed=$_printed expected="(count $ENV_VARS); return $EXIT_GEN_ENVD; end
@@ -1176,7 +1176,7 @@ END{if (!c && !p && last != "") printf "%d\n%s\n", n, last}' # 2nd rule drops a 
         test -e "$file"; or sudo -n test -e "$file" 2>/dev/null; and return 1; return 0
     end
     test (count $_out) -ge 2; or return 0 # no assignment, or a block still open at EOF
-    test "$_out[1]" -gt 1 2>/dev/null; and not contains -- "$file:$key" $_RY_MKI_DUP_WARNED; and set -ga _RY_MKI_DUP_WARNED "$file:$key"; and _warn "  $file: multiple $key= assignments ($_out[1]) — using the last (conf is shell-sourced)" # once per key per run: boot + syntax both read HOOKS
+    test "$_out[1]" -gt 1 2>/dev/null; and not contains -- "$file:$key" $_RY_MKI_DUP_WARNED; and set -ga _RY_MKI_DUP_WARNED "$file:$key"; and _warn "  $file: multiple $key= assignments ($_out[1]) — using the last (the file is shell-sourced)" # once per key per run: boot + syntax both read HOOKS
     printf '%s\n' (string join ' ' -- $_out[2..-1] | string replace -ra -- '\s+' ' ' | string trim --)
 end
 function _ry_content_bytes --argument-names dst --description "Raw bytes of embedded content" # pipestatus[1]=gen rc
@@ -1232,7 +1232,7 @@ function _vsb_sdboot --description "_verify_static_boot sub: Check sdboot-manage
     if test "$_grep_rc" -ne 0; or test -z "$_opts_raw"
         _fail "  /etc/sdboot-manage.conf: LINUX_OPTIONS= line missing"; set _opts_ok false
     else
-        test (count $_opts_raw) -gt 1; and _warn "  /etc/sdboot-manage.conf: "(count $_opts_raw)" LINUX_OPTIONS= lines — using the last (conf is shell-sourced)"; and set _opts_raw $_opts_raw[-1]
+        test (count $_opts_raw) -gt 1; and _warn "  /etc/sdboot-manage.conf: "(count $_opts_raw)" LINUX_OPTIONS= lines — using the last (the file is shell-sourced)"; and set _opts_raw $_opts_raw[-1]
         string match -qr -- '^\s*LINUX_OPTIONS=(["\'])[^"\']*\1(\s+#.*)?\s*$' "$_opts_raw"; or begin; _fail "  /etc/sdboot-manage.conf: LINUX_OPTIONS= is not one quoted string — skipping parameter extraction"; set _opts_ok false; end
     end
     if test "$_opts_ok" = true
@@ -2637,7 +2637,7 @@ function _vrs_installed_file_perms --description "_verify_runtime_session sub: I
     end
     test "$perm_bad" -eq 0; and test "$perm_checked" -gt 0; and test "$_lapsed" = false; and _ok "  All $perm_checked installed files: correct permissions and ownership"
     test "$perm_checked" -eq 0; and test "$_lapsed" = false; and _warn "  No installed files found to check"
-    test "$perm_vfat_skipped" -gt 0; and _vrs_note INSTALLED_FILE_VFAT_SKIPPED "  $perm_vfat_skipped file(s) skipped on boot partition (vfat or undetermined fstype — Unix permissions not verifiable)"
+    test "$perm_vfat_skipped" -gt 0; and _vrs_note INSTALLED_FILE_VFAT_SKIPPED "  $perm_vfat_skipped "(test "$perm_vfat_skipped" -eq 1; and echo file; or echo files)" skipped on boot partition (vfat or undetermined fstype — Unix permissions not verifiable)"
 end
 function _vpd_dir_perm_check --argument-names dir expected_owner use_sudo --description "_vrs_parent_dirs sub: Run stat -L + owner + group/world-write check (rc 1 = bad, 2 = sudo lapse)"
     set -l _po; set -l _lnk ""
@@ -2688,7 +2688,7 @@ function _vrs_parent_dirs --description "_verify_runtime_session sub: Parent dir
     end
     test "$dir_bad" -eq 0; and test "$dir_checked" -gt 0; and test "$_lapsed" = false; and _ok "  All $dir_checked parent directories: correct ownership, not world/group-writable"
     test "$dir_checked" -eq 0; and test "$_lapsed" = false; and _warn "  No parent directories found to check"
-    test "$dir_vfat_skipped" -gt 0; and _vrs_note PARENT_DIR_VFAT_SKIPPED "  $dir_vfat_skipped dir(s) skipped on boot partition (vfat or undetermined fstype — Unix permissions not verifiable)"
+    test "$dir_vfat_skipped" -gt 0; and _vrs_note PARENT_DIR_VFAT_SKIPPED "  $dir_vfat_skipped "(test "$dir_vfat_skipped" -eq 1; and echo directory; or echo directories)" skipped on boot partition (vfat or undetermined fstype — Unix permissions not verifiable)"
 end
 
 # ── VERIFY-RUNTIME: SESSION ORCHESTRATOR (_verify_runtime_session) ──
