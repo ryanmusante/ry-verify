@@ -1,8 +1,8 @@
 # ry-verify
 
-**Version 7.273.0** · [Changelog](CHANGELOG.md)
+**Version 7.274.0** · [Changelog](CHANGELOG.md)
 
-Standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state — `--verify` reports every check, `--check` probes silently for drift.
+ry-verify is the standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares them with the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state; `--verify` reports every check, and `--check` probes silently for drift.
 
 ## Quick Start
 
@@ -76,7 +76,7 @@ The 18 files are enumerated in [ry-install](https://github.com/ryanmusante/ry-in
 | Runtime › Service state | `conf.d`-implied and `EXPECTED_SERVICES` units, live nftables input policy drop and IPv4 ping accept, `MASK` units inactive, user-scope units, firewall posture |
 | Runtime › Wi-Fi state | Wi-Fi interface and connection, NetworkManager effective backend (`NetworkManager --print-config`), unmanaged Wi-Fi P2P device |
 | Runtime › Environment state | session `ENV_VARS`, live sysctl via `/proc/sys`, fstab ext4 entries, live ext4 mount options, `/dev/ntsync`, wireless regulatory domain, no HFP/HSP profile on a connected Bluetooth card (`pactl`) unless `WP_BLUEZ_ROLES` adds one |
-| Runtime › File permissions | NetworkManager system-connections perms, installed file modes, parent directories of managed files (a symlinked directory is checked at its target) |
+| Runtime › File permissions | NetworkManager system-connections permissions, installed file modes, parent directories of managed files (a symlinked directory is checked at its target) |
 
 With no user bus, `--verify` warns once for each check it skips — session `ENV_VARS`, user units, and Bluetooth roles; a failed `systemctl --user show-environment` warns once.
 

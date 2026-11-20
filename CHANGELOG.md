@@ -3,25 +3,35 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.273.0
+7.274.0
 -------
 
-  - consistency: --help, the root refusal and the ESP fallback warning drop
-    sentence periods, as other messages do
-  - consistency: message lists of three take a serial comma; the masked-unit
-    FAIL reads stop it or reboot, as the removed-unit FAIL does
-  - consistency: the REJECTED token FAIL reads 'inert; drop or correct them';
-    the repeated-key WARN reads 'using the last', as LINUX_OPTIONS= does
+  - verify: a GKeyFile key with a tab before its [locale] suffix parses, as
+    GLib loads it
+  - verify: an escaped trailing `\\` no longer joins the next line in systemd,
+    env and bash files, so the key after it is read
+  - verify: the iw-regdomain FAIL names the two characters iw reads, not a
+    whole COUNTRY= line
+  - verify: a MASK unit still running while masked or without a unit file
+    offers re-running ry-install first
+  - verify: a sudo lapse in the file, directory and connection permission
+    loops names the entries it leaves unchecked
+  - consistency: a sysfs FAIL names the expected value, not its regex; the
+    boot-entry hints join the fix with a dash, not '!'
+  - consistency: --help groups options, exit codes, environment and files;
+    no '?' guesses
+  - consistency: output spells out NM, regdom, dirs, perms, db, perf,
+    params and metachar
 
 
-7.246.0 - 7.272.0
+7.246.0 - 7.273.0
 -----------------
 
   - env: 7.248.0 SDL_GAMECONTROLLER_IGNORE_DEVICES gains 0x3434/0x0b00 (Q0 HE)
   - configuration: 7.248.0 expect the Xbox Wireless Controller libinput
     ignore; 7.251.0 the 60-ry-modules.conf header claims no module options
-  - configuration: 7.257.0 with an hfp_*/hsp_* role in WP_BLUEZ_ROLES, the
-    expected drop-in comment no longer says there is none
+  - configuration: 7.257.0 the expected drop-in comment no longer denies an
+    `hfp_*/hsp_*` role
   - guard: 7.250.0 inherited internal state (env, config.fish) is erased
   - guard: 7.250.0 a fish universal named like internal state (the error names
     its set -eU) or regex-easyesc turned off exits 3; --check stays silent
@@ -31,13 +41,11 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     _do_cleanup; 7.251.0 nor one named _dc_settle or _write_footer
   - guard: 7.250.0 a config.fish job-control or IFS setting no longer steers a
     run; fish_read_limit is pinned, 7.258.0 to 100 MiB, 7.260.0 to 1 GiB
-  - guard: 7.250.0 a fish universal named like the tmpfile list or the
-    boot-path, kernel-config or package cache is never read
-  - guard: 7.250.0 a fish universal named _early_ch is no longer erased
+  - guard: 7.250.0 a universal named like the tmpfile list or a boot-path,
+    kernel-config or package cache is never read; _early_ch is not erased
   - guard: 7.251.0 a universal _ROOT_UUID never steers the cmdline checks
-  - guard: 7.264.0 an inherited fish_read_limit of a few bytes no longer
-    prints a fish error at startup or lets a piped run past its refusal
-  - guard: 7.264.0 a fish universal named _RPT_* no longer exits 3
+  - guard: 7.264.0 a few-byte inherited fish_read_limit no longer breaks
+    startup or a piped run's refusal; a universal `_RPT_*` no longer exits 3
   - signals: 7.250.0 a second signal while a startup signal is handled no
     longer exits 0 or 1, skipping the dir cleanup
   - signals: 7.250.0 a signal in an early exit's final step, 7.251.0 or before
@@ -67,8 +75,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     one activating, reloading or refreshing; an expected unit reloading is not
   - check: 7.250.0 CHECK_UNIT_DRIFT for an inactive or not-enabled unit names
     the expected state; 7.251.0 a not-found one load=not-found expected=loaded
-  - check: 7.250.0 a managed symlink in a root-only directory no longer
-    records its link mode as drift
+  - check: 7.250.0 a root-only managed symlink no longer records its mode as
+    drift
   - check: 7.251.0 nftables.service is probed for a live ruleset even when a
     RemainAfterExit drop-in keeps the unit active
   - check: 7.252.0 a disabled systemd-resolved logs CONFD_UNIT_NOT_ENABLED,
@@ -79,10 +87,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     7.258.0 a difference only after a NUL logs reason=size, not content
   - check: 7.258.0 a sudo lapse at a managed file's mode or owner probe exits
     3; a MASK unit whose file is gone but still runs is drift
-  - check: 7.260.0 an empty /proc/cmdline that reads cleanly is drift in every
-    token (exit 10), not a probe failure (exit 3)
+  - check: 7.260.0 an empty but readable /proc/cmdline is drift in every token
   - check: 7.267.0 a sudo lapse at the nftables ruleset read exits 3, not 10
-    with a ruleset-not-live drift record
   - verify: 7.247.0 a running MASK unit that is not masked is named as such;
     the nftables policy-drop FAIL names the restart
   - verify: 7.247.0 efi and chainload loader entries are skipped; a stale
@@ -129,8 +135,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     level WARNs; bool module params take any kstrtobool spelling
   - verify: 7.254.0 - 7.255.0 LINUX_OPTIONS reads as bash reads it: indented
     or single-quoted counts, and a repeated line WARNs and uses the last
-  - verify: 7.254.0 - 7.255.0 an unreadable cpufreq attribute or amdgpu
-    parameter WARNs
+  - verify: 7.254.0 - 7.255.0 an unreadable cpufreq or amdgpu parameter WARNs
   - verify: 7.254.0 - 7.255.0 a masked unit activating, reloading or
     refreshing FAILs as active; 7.255.0 a running one FAILs once, at runtime
   - verify: 7.254.0 - 7.255.0 fstab mount points decode and resolve as mount
@@ -173,7 +178,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     later override of a managed key (sysctl, env, loader, sdboot, MangoHud)
   - verify: 7.257.0 a sudo lapse at the ParallelDownloads read is named as
     such; a failed fstab scan WARNs in both fstab checks
-  - verify: 7.257.0 an hfp_*/hsp_* role in WP_BLUEZ_ROLES skips the
+  - verify: 7.257.0 an `hfp_*/hsp_*` role in WP_BLUEZ_ROLES skips the
     headset-profile check; no OK or drop-in row then misstates bluez5.roles
   - verify: 7.257.0 a sudo lapse no longer adds a 'No installed files' or 'No
     parent directories' WARN; a blank ufw state reads unknown
@@ -190,7 +195,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.258.0 a quoted loader.conf value is unquoted as systemd-boot
     reads it: double quotes, and single quotes from systemd 260 on
   - verify: 7.258.0 a comment ending in \ no longer swallows the next line: a
-    ; line in systemd and env files, a # comment in sdboot-manage.conf
+    ';' line in systemd and env files, a # comment in sdboot-manage.conf
   - verify: 7.258.0 new nftables.conf rows: flush ruleset, the inet filter
     table, invalid drop, established/related and loopback accept, all policies
   - verify: 7.258.0 a sudo lapse at a system file's readability or access
@@ -215,8 +220,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     a tunable that drops amdgpu no longer FAILs a matching file
   - verify: 7.260.0 mkinitcpio.conf reads tell a sudo lapse (one WARN) and a
     failed read (one FAIL) from a missing assignment; empty HOOKS=() FAILs
-  - verify: 7.260.0 a managed file reduced to its [section] header FAILs each
-    key as missing
+  - verify: 7.260.0 a header-only managed file FAILs each key as missing
   - verify: 7.260.0 a user or group name holding a space no longer FAILs the
     owner checks; the parent-directory chown hint quotes the owner
   - verify: 7.260.0 split_lock_detect=, read raw at boot, is INFO when an
@@ -225,14 +229,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     amd_pstate= value; a token REJECTED or read raw gets no second WARN
   - verify: 7.266.0 processor.max_cstate is read back, as root: its sysfs node
     is 0400; a sudo lapse at that read WARNs as a lapse
-  - verify: 7.267.0 a sudo lapse at the dmesg read is named in the ring buffer
-    and boot-line WARNs, not read as an empty buffer
-  - verify: 7.267.0 a sudo lapse at the nftables ruleset read WARNs in the
-    unit and ping rows, not a FAIL for no live policy drop
-  - report: 7.247.0 - 7.260.0 HTML report fixes: action list, counts ring,
-    state grades, keys table, tmpfile and sudo use
-  - report: 7.264.0 drop --report and the HTML report; the flag is an unknown
-    option (exit 2) and exit 1 no longer means a report that was not written
+  - verify: 7.267.0 a sudo lapse at the dmesg or nftables ruleset read WARNs
+    as a lapse, not an empty buffer or a missing policy drop
+  - report: 7.247.0 - 7.260.0 HTML report fixes; 7.264.0 --report is gone
+    (exit 2) and exit 1 no longer means an unwritten report
   - logging: 7.247.0 a failed date leaves the header ts empty
   - logging: 7.250.0 closing log-file lines are skipped once stderr is gone;
     the preflight log is created as soon as its dir exists
@@ -252,11 +252,17 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     VERIFY_STATIC_READ_FAIL and a lapsed one VERIFY_STATIC_SUDO_LAPSE
   - logging: 7.260.0 a log dir reset to 0700 logs STATE_DIR_PERM_FIX; 7.264.0
     CHECK_UNIT_NOT_INSTALLED says --verify WARNs, not the ledger
-  - logging: 7.265.0 every run logs the running kernel release as
-    KERNEL_RELEASE
+  - logging: 7.265.0 every run logs the running kernel release
+    (KERNEL_RELEASE)
   - consistency: 7.260.0 the GKeyFile rows read parsable
   - consistency: 7.264.0 skip messages read user bus, not user-bus
   - consistency: 7.264.0 the static udev rows read NVMe scheduler and GPU DPM
+  - consistency: 7.273.0 --help, the root refusal and the ESP fallback warning
+    drop sentence periods
+  - consistency: 7.273.0 message lists of three take a serial comma; the
+    masked-unit FAIL reads stop it or reboot, as the removed-unit FAIL does
+  - consistency: 7.273.0 the REJECTED token FAIL reads 'inert; drop or correct
+    them'; the repeated-key WARN reads 'using the last'
 
 
 7.235.0 - 7.245.0
@@ -306,8 +312,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     matched by its resolved path, not listed as stray
   - verify: 7.245.0 a mismatch under the root-UUID fallback logs both
     SHA-256s; the orphan-mask readlink test stays silent
-  - report: 7.243.0 - 7.245.0 HTML report fixes: hint rows, symlink order,
-    HTML escaping, unreadable ENV_VARS rows, a 0600 cmdline
+  - report: 7.243.0 - 7.245.0 HTML report fixes
   - logging: 7.241.0 a signal between the log create and its header no longer
     leaves a footer-only JSONL; a child SIGKILL at cleanup is logged
   - logging: 7.243.0 a JSONL string ending in a newline keeps it; a run whose
@@ -383,8 +388,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     checksum rows say missing or unreadable; pacman -Qq failures log their rc
   - verify: 7.234.0 a digits-only fstab ext4 row warns once; stray files
     exclude exactly the backup names already reported
-  - report: 7.233.0 a MASK unit that is not installed is neutral; 7.234.0 no
-    sudo grades WARN; a failed generator shows no size or hash
+  - report: 7.233.0 - 7.234.0 HTML report grading fixes
 
 
 7.190.0 - 7.216.0
@@ -414,9 +418,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     sudo bail closes its section; 7.211.0 unset ENV_VARS name daemon-reload
   - verify: 7.211.0 the powerdevil crash hint matches coredumps by executable
     path; active but not-enabled units warn
-  - report: 7.214.0 --report runs --verify, then writes a self-contained HTML
-    report (0600) beside the JSONL log; a failed write turns exit 0 into 1
-  - report: 7.215.0 states grade as the ledger; logs go to report-*.jsonl
+  - report: 7.214.0 --report runs --verify and writes an HTML report (0600)
+    beside the JSONL log; 7.215.0 states grade as the ledger
   - logging: 7.211.0 a caught signal logs before its stderr line
   - split: 7.190.0 move ry-verify.fish here
 
@@ -424,21 +427,28 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 7.139.0 - 7.189.0
 -----------------
 
-  - kernel: land on iommu=pt; drop amd_iommu, clearcpuid=umip, amdxdna
-  - network: autoconnect-retries-default=0
-  - dns: drop pinned upstreams, DNSOverTLS= and DNSSEC=; link DNS wins
-  - env: PROTON_FSR4_UPGRADE -> FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1;
-    expect GSK_RENDERER=ngl
-  - sysctl: drop both net.core.netdev_budget keys and vm.swappiness=150
-  - configuration: assert the nftables ICMPv6 base accept
+  - kernel: 7.160.0 drop clearcpuid=umip; 7.162.0 land on iommu=pt, drop the
+    amdxdna blacklist; 7.164.0 drop amd_iommu
+  - network: 7.163.0 autoconnect-retries-default=0
+  - dns: 7.148.0 drop pinned upstreams, DNSOverTLS= and DNSSEC=; link DNS wins
+  - env: 7.154.0 PROTON_FSR4_UPGRADE -> FSR4_WATERMARK; 7.163.0 expect
+    GSK_RENDERER=ngl; 7.181.0 FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1
+  - sysctl: 7.157.0 drop both net.core.netdev_budget keys; 7.171.0 drop
+    vm.swappiness=150
+  - configuration: 7.159.0 assert the nftables ICMPv6 base accept
   - packages: 7.173.0 add cachyos-benchmarker
-  - preflight: rc 3 on a reserved COUNTRY, NM_WIFI_POWERSAVE outside 0-3
-  - backup: .ry.bak moves to ~/ry-install/backups; .ry.orig strays are INFO
-  - boot: COMPRESSION_OPTIONS -1 -> -3, drop -T0; fsck.mode=force -> auto
-  - check: mode drift sets drift; 7.186.1 - 7.187.0 take every --check
+  - preflight: 7.185.1 an NM_WIFI_POWERSAVE outside 0-3 exits 3, as a reserved
+    COUNTRY does
+  - backup: 7.174.0 .ry.bak moves to ~/ry-install/backups; 7.176.0 .ry.orig
+    strays are INFO
+  - boot: 7.140.0 drop -T0; 7.158.0 COMPRESSION_OPTIONS -1 -> -3,
+    fsck.mode=force -> auto
+  - check: 7.171.0 mode drift sets drift; 7.186.1 - 7.187.0 take every --check
     abbreviation, silent rc 3
-  - verify: every cpufreq policy and non-fallback loader entries; resolved
-    unit state, live ext4 opts, MangoHud, .ry.bak and parser complaints
+  - verify: 7.139.0 every cpufreq policy, non-fallback loader entries and
+    resolved unit state
+  - verify: 7.165.0 live ext4 opts, .ry.bak and parser complaints; 7.180.0
+    MangoHud
   - split: 7.177.0 move verify and check to ry-verify.fish
 
 
