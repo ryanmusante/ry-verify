@@ -3,6 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
+7.276.0
+-------
+
+  - consistency: the preset-directory probe quotes its test operands, as every
+    other test does
+
+
 7.275.0
 -------
 

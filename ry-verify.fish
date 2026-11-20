@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.275.0 (2026-11-19) — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.276.0 (2026-11-20) — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; status filename | string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$'; or status stack-trace | string match -q -- '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.275.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.276.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t; set -g fish_read_limit 1073741824 # config.fish job control, IFS or read limit would steer this run
@@ -1328,7 +1328,7 @@ function _vsb_mkinitcpio --description "_verify_static_boot sub: /etc/mkinitcpio
 end
 function _vsb_preset_configs --description "_vsb_mkinitcpio_dropins sub: Preset _config values, as root where needed (rc 2 = sudo lapse)"
     set -l _d /etc/mkinitcpio.d; set -l _pf /etc/mkinitcpio.d/*.preset
-    if test -d $_d; and begin; not test -r $_d; or not test -x $_d; end # a 0700 or x-only dir hides its presets: list as root
+    if test -d "$_d"; and begin; not test -r "$_d"; or not test -x "$_d"; end # a 0700 or x-only dir hides its presets: list as root
         set _pf (sudo -n find -H $_d -maxdepth 1 -name '*.preset' -not -name '.*' -print0 2>/dev/null | string split0); test "$pipestatus[1]" -eq 0; or begin; sudo -n true 2>/dev/null; or return 2; return 1; end; test (count $_pf) -gt 1; and set _pf (path sort -- $_pf)
     end
     set -q _pf[1]; or return 0
