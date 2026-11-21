@@ -3,13 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.301.0
+7.302.0
 -------
 
-  - changelog: trim bullets
+  - changelog: fold the prior block into the 7.260.0 range
 
 
-7.260.0 - 7.300.0
+7.260.0 - 7.301.0
 -----------------
 
   - guard: 7.260.0 fish_read_limit is pinned to 1 GiB; 7.264.0 a few-byte
