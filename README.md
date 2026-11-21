@@ -41,7 +41,7 @@ Each run that passes argument parsing writes one JSONL log (`0600`) to `~/ry-ins
 | Code | Meaning |
 |---|---|
 | `0` | OK — success, `WARN`-only runs, and a clean `--check` |
-| `1` | a `--verify` mismatch, or `-h`/`-v` output that could not be written (stdout full, a pipe closed by its reader, or stdout closed under fish 3) |
+| `1` | a `--verify` mismatch, or `-h`/`-v` output that could not be written |
 | `2` | bad arguments or root misuse — except a valid `--check` run as root, which exits `3` silently |
 | `3` | missing dependency; uncached sudo that no TTY prompt resolved; a failed gate; a fish universal variable named like internal state; fish's `regex-easyesc` feature turned off; failed config validation; an unusable HOME or log tree; under `--check`, a CPU not matching `EXPECTED_CPU_MATCH` unless overridden via [Environment Overrides](#environment-overrides), or a probe that reaches no verdict before any drift (a sudo lapse, an unreadable `/proc/cmdline`, a `systemctl` error); `--check` stays silent |
 | `10` | drift — `--check` found drift from the managed baseline |

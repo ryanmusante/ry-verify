@@ -24,14 +24,13 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     HOOKS=() FAILs; amd_pstate status is checked against KERNEL_PARAMS
   - verify: 7.266.0 processor.max_cstate is read back as root (0400 node);
     7.267.0 a lapse at the dmesg or ruleset read WARNs as a lapse
-  - verify: 7.274.0 a GKeyFile key with a tab before its [locale] parses, as
-    GLib loads it; a lapse in a permission loop says the rest went unchecked
+  - verify: 7.274.0 a GKeyFile key with a tab before its [locale] parses; a
+    lapse in a permission loop says the rest went unchecked
   - report: 7.264.0 --report is gone (exit 2) and exit 1 no longer means an
     unwritten report
   - logging: 7.260.0 new VERIFY_ESP_LAYOUT_FAIL and VERIFY_STATIC_READ_FAIL
     keys; 7.265.0 every run logs KERNEL_RELEASE
-  - consistency: 7.264.0 messages read user bus; udev rows read NVMe scheduler
-    and GPU DPM
+  - consistency: 7.264.0 messages read user bus
   - consistency: 7.273.0 - 7.275.0 messages drop sentence periods and
     abbreviations; refusals read refusing to; --help groups its sections
   - consistency: 7.276.0 the preset-directory probe quotes its test operands;
@@ -132,7 +131,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 -----------------
 
   - guard: 7.243.0 TMPDIR is pinned to /tmp; 7.245.0 a missing findmnt exits 3
-  - signals: 7.245.0 drop the PIPE handler, which silenced a live terminal
+  - signals: 7.245.0 drop the PIPE handler
   - preflight: 7.240.0 iommu=off counts as no IOMMU for amdxdna; 7.243.0 the
     dual-stack WARN names both nftables generators
   - preflight: 7.243.0 a sudo -v that caches nothing (timestamp_timeout=0),
@@ -195,7 +194,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 -----------------
 
   - kernel: 7.195.0 fsck.mode=force; 7.199.0 add ttm.pages_limit=20971520;
-    7.204.0 expect nowatchdog, read back through kernel.watchdog
+    7.204.0 expect nowatchdog
   - perf: 7.204.0 expect governor powersave with EPP performance; 7.211.0
     expect governor performance again
   - env: 7.195.0 GSK_RENDERER ngl -> gl, drop PROTON_FSR4_INDICATOR=1; 7.212.1
@@ -213,8 +212,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     its perms row INFO; 7.206.0 bluetooth keys in emission order
   - verify: 7.203.0 - 7.208.0 labels read Wi-Fi and kernel.watchdog; 7.207.0 a
     sudo bail closes its section; 7.211.0 unset ENV_VARS name daemon-reload
-  - report: 7.214.0 --report runs --verify and writes an HTML report (0600)
-    beside the JSONL log; 7.215.0 states grade as the ledger
+  - report: 7.214.0 --report runs --verify and writes an HTML report; 7.215.0
+    states grade as the ledger
   - split: 7.190.0 move ry-verify.fish here
 
 
@@ -231,8 +230,7 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     vm.swappiness=150
   - configuration: 7.159.0 assert the nftables ICMPv6 base accept
   - packages: 7.173.0 add cachyos-benchmarker
-  - preflight: 7.185.1 an NM_WIFI_POWERSAVE outside 0-3 exits 3, as a reserved
-    COUNTRY does
+  - preflight: 7.185.1 an NM_WIFI_POWERSAVE outside 0-3 exits 3
   - backup: 7.174.0 .ry.bak moves to ~/ry-install/backups; 7.176.0 .ry.orig
     strays are INFO
   - boot: 7.140.0 drop -T0; 7.158.0 COMPRESSION_OPTIONS -1 -> -3,
