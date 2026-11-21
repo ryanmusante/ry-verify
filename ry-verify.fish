@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.276.0 (2026-11-20) — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.300.0 (2026-11-20) — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; status filename | string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$'; or status stack-trace | string match -q -- '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.276.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.300.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t; set -g fish_read_limit 1073741824 # config.fish job control, IFS or read limit would steer this run
@@ -843,7 +843,7 @@ function _is_symlink --argument-names path use_sudo --description "Sudo-aware te
         test -L "$path"
     end
 end
-function _is_system_dst --argument-names dst --description "True if dst is a system path (requires sudo to read)"
+function _is_system_dst --argument-names dst --description "True when dst is a system path (requires sudo to read)"
     set -l _p (string trim -r -c / -- "$dst"); for _u in $USER_DESTINATIONS; test "$_p" = "$_u"; or test "$_p" = (path dirname -- "$_u"); and return 1; end # HOME may sit under /etc or /boot
     string match -q '/etc/*' -- "$dst"; or string match -q '/boot/*' -- "$dst"
 end
@@ -1004,7 +1004,7 @@ function _chk_sysfs_eq --argument-names path expected label --description "Read 
     set -l _val (_chk_sysfs_read "$path" "$label"); or return 0 # no value: logged or warned there
     _chk_eq "$label" "$_val" "$expected"
 end
-function _chk_perms --argument-names path expected_perms expected_owner use_sudo --description "Compare file mode+owner; refuses 4-digit modes (setuid/sgid/sticky); rc 2 = sudo lapse"
+function _chk_perms --argument-names path expected_perms expected_owner use_sudo --description "Compare file mode+owner; refuse 4-digit modes (setuid/sgid/sticky); rc 2 = sudo lapse"
     set -l _po
     if test "$use_sudo" = true
         set _po (sudo -n stat -c '%a %U:%G' -- "$path" 2>/dev/null)
@@ -1375,7 +1375,7 @@ function _vsb_entry_options --description "_vsb_entries sub: Assert each non-fal
             _fail "  $_n: missing "(count $_missing)": $_missing"
         end
     end
-    test "$_chk" -eq 0; and begin; _fail "  No non-fallback linux entry: none carries KERNEL_PARAMS"; _info "  ↳ The next boot gets no profile kernel parameters — Run: sudo sdboot-manage gen"; end
+    test "$_chk" -eq 0; and begin; _fail "  No non-fallback linux entry: none carries KERNEL_PARAMS"; _info "  ↳ The next boot gets no profile kernel parameters — sudo sdboot-manage gen"; end
 end
 function _vsb_entry_images --argument-names boot --description "_vsb_entries sub: Each linux entry's kernel and initrd files exist, non-empty, in \$BOOT"
     for _e in $argv[2..]
@@ -1384,10 +1384,10 @@ function _vsb_entry_images --argument-names boot --description "_vsb_entries sub
         set -l _kl (string match -rg -- '^\s*linux\s+(.*\S)' $_ls)[-1] # systemd-boot keeps the last linux line
         if test -z "$_kl" # no linux key: an efi or chainload entry, or unreadable
             sudo -n true 2>/dev/null; or begin; _warn "  $_n and later entries: boot images unverified (sudo cache lapsed)"; break; end # one lapse, one WARN
-            test "$_grc" -le 1; or begin; _fail "  $_n: unreadable (read error) — boot images unverified"; _info "  ↳ System may not boot — Run: sudo sdboot-manage gen"; end; continue
+            test "$_grc" -le 1; or begin; _fail "  $_n: unreadable (read error) — boot images unverified"; _info "  ↳ System may not boot — sudo sdboot-manage gen"; end; continue
         end
         set -l _ir (string match -rg -- '^\s*initrd\s+(.*\S)' $_ls); set -l _gone; set -l _out # BLS: one path per initrd line, as ry-install's sanity check
-        if not set -q _ir[1]; _fail "  $_n: no initrd line (the kernel would boot without an initramfs)"; _info "  ↳ System may not boot — Run: sudo sdboot-manage gen"; continue; end # gen writes one per entry
+        if not set -q _ir[1]; _fail "  $_n: no initrd line (the kernel would boot without an initramfs)"; _info "  ↳ System may not boot — sudo sdboot-manage gen"; continue; end # gen writes one per entry
         for _p in $_kl $_ir
             set -l _r (string replace -r -- '^/+' '' "$_p"); set -l _f "$boot/$_r"; command -q realpath; and set _f (sudo -n realpath -m -- "$_f" 2>/dev/null) # as root: a 0700 $BOOT hides its links
             if string match -q -- '*/../*' "/$_r/"; or not string match -qr -- '^'(string escape --style=regex -- "$boot")'(/|$)' "$_f"; set -a _out "$_p"; continue; end # .. or a link out of $BOOT, as ry-install refuses
@@ -1395,11 +1395,11 @@ function _vsb_entry_images --argument-names boot --description "_vsb_entries sub
         end
         if not set -q _gone[1]; and not set -q _out[1]; _ok "  $_n: kernel and "(count $_ir)" initrd image(s) present"; continue; end
         sudo -n true 2>/dev/null; or begin; _warn "  $_n and later entries: boot images unverified (sudo cache lapsed)"; break; end # a lapsed realpath reads as out of $BOOT
-        if set -q _out[1]; _fail "  $_n: path leaves \$BOOT (.. or a symlink out of it): $_out"; _info "  ↳ System may not boot — Run: sudo sdboot-manage gen"; continue; end
-        _fail "  $_n: missing, empty, or not a file: $_gone"; set -l _fx "Run: sudo mkinitcpio -P"; set -l _pb (string replace -r -- '^(.*/)?vmlinuz-' '' "$_kl")
+        if set -q _out[1]; _fail "  $_n: path leaves \$BOOT (.. or a symlink out of it): $_out"; _info "  ↳ System may not boot — sudo sdboot-manage gen"; continue; end
+        _fail "  $_n: missing, empty, or not a file: $_gone"; set -l _fx "sudo mkinitcpio -P"; set -l _pb (string replace -r -- '^(.*/)?vmlinuz-' '' "$_kl")
         if contains -- "$_kl" $_gone # its package restores the kernel, and its hooks the initramfs
             set _fx "reinstall the package that provides $_kl"
-            test "$_pb" != "$_kl"; and command -q pacman; and command pacman -Qq -- "$_pb" >/dev/null 2>&1; and set _fx "Run: sudo pacman -S "(string escape -- "$_pb")
+            test "$_pb" != "$_kl"; and command -q pacman; and command pacman -Qq -- "$_pb" >/dev/null 2>&1; and set _fx "sudo pacman -S "(string escape -- "$_pb")
         end
         _info "  ↳ System may not boot — $_fx"
     end
@@ -1422,13 +1422,13 @@ function _vsb_entries --description "_verify_static_boot sub: \$BOOT entries enu
     else if test "$_entries_pipe_ok" = false
         _fail "  Boot entries: cannot enumerate $_boot/loader/entries (read error)"
     else if test "$_entries_dir_probed" = false
-        _fail "  Boot entries: $_boot/loader/entries/ does not exist"; _info "  ↳ System may not boot — Run: sudo sdboot-manage gen"
+        _fail "  Boot entries: $_boot/loader/entries/ does not exist"; _info "  ↳ System may not boot — sudo sdboot-manage gen"
     else if test "$entry_count" -gt 0; and test "$_lx" -eq 0 # efi or chainload only, as ry-install's sanity check fails
-        _fail "  Boot entries: $entry_count found, none with a linux line"; _info "  ↳ System may not boot — Run: sudo sdboot-manage gen"
+        _fail "  Boot entries: $entry_count found, none with a linux line"; _info "  ↳ System may not boot — sudo sdboot-manage gen"
     else if test "$entry_count" -gt 0
         _ok "  Boot entries: $entry_count found"; _vsb_entry_options $_entries; _vsb_entry_images "$_boot" $_entries
     else
-        _fail "  Boot entries: NONE in $_boot/loader/entries/"; _info "  ↳ System may not boot — Run: sudo sdboot-manage gen"
+        _fail "  Boot entries: NONE in $_boot/loader/entries/"; _info "  ↳ System may not boot — sudo sdboot-manage gen"
     end
 end
 function _verify_static_boot --description "Verify loader.conf, sdboot-manage + mkinitcpio (+ drop-ins), kernel cmdline, boot entries"; _echo "BOOT CONFIGURATION"; _vsb_loader; _vsb_sdboot; _vsb_sdboot_dropins; _vsb_cmdline; _vsb_mkinitcpio; _vsb_mkinitcpio_dropins; _vsb_entries; end
@@ -2737,7 +2737,7 @@ function _dir_group_or_world_writable --argument-names mode --description "True 
     test "$other_has_w" -eq 1; and return 0
     return 1
 end
-function _has_user_bus_active --description "True iff user systemd manager is reachable"
+function _has_user_bus_active --description "True when the user systemd manager is reachable"
     set -q XDG_RUNTIME_DIR; and test -S "$XDG_RUNTIME_DIR/bus"; and return 0
     set -l _user_state (command systemctl --user is-system-running 2>/dev/null | string trim --); test -n "$_user_state"; and test "$_user_state" != offline; and return 0
     return 1

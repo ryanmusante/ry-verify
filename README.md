@@ -1,6 +1,6 @@
 # ry-verify
 
-**Version 7.276.0** · [Changelog](CHANGELOG.md)
+**Version 7.300.0** · [Changelog](CHANGELOG.md)
 
 ry-verify is the standalone audit of the GTR9 Pro CachyOS profile that [ry-install](https://github.com/ryanmusante/ry-install) deploys. `ry-verify.fish` regenerates all 18 [Managed Files](#managed-files) in memory, compares them with the installed bytes, then reads live kernel-cmdline, module, sysctl, unit, fstab, and session state; `--verify` reports every check, and `--check` probes silently for drift.
 
@@ -50,7 +50,7 @@ Each run that passes argument parsing writes one JSONL log (`0600`) to `~/ry-ins
 
 Skipping the hardware check is the risky override — a wrong-CPU run compares against an incorrect kernel cmdline and initramfs `MODULES`.
 
-- `RY_INSTALL_SKIP_HARDWARE_CHECK=1` — let `--check` probe a CPU that does not match `EXPECTED_CPU_MATCH`, or whose model is unreadable, instead of exiting `3`
+- `RY_INSTALL_SKIP_HARDWARE_CHECK=1` — let `--check` probe a CPU that does not match `EXPECTED_CPU_MATCH`, or whose model cannot be read, instead of exiting `3`
 - `NO_COLOR` — disable colored output when set to a non-empty value ([no-color.org](https://no-color.org))
 
 ## Managed Files
