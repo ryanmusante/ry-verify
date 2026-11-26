@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
-# ry-verify v7.303.0 (2026-11-25) — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
+# ry-verify v7.304.0 (2026-11-26) — CachyOS config verifier for the Beelink GTR9 Pro (gfx1151)
 if begin; set -lx LC_ALL C; status filename | string match -qr -- '^(-|Standard input|/dev/(stdin|fd/0)|/proc/self/fd/0)$'; or status stack-trace | string match -q -- '*from sourcing*'; end; echo "[ERR] ry-verify: must be run as a file, not sourced or piped (use ./ry-verify.fish)" >&2; return 1; end
 
 # ── HEADER: VERSION + EXIT CODES + PROFILE CONSTANTS ──
-set -g VERSION "7.303.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
+set -g VERSION "7.304.0"; set -g EXIT_OK 0; set -g EXIT_FAIL 1; set -g EXIT_USAGE 2; set -g EXIT_PREFLIGHT 3; set -g EXIT_DRIFT 10
 set -g EXIT_GEN_NOFN 11; set -g EXIT_GEN_NOUUID 12; set -g EXIT_GEN_SYSCTL 13; set -g EXIT_GEN_ENVD 14 # internal gen-fail sentinels (fn return only)
 set -g EXIT_AS_MISUSE 250 # internal sentinel (fn return only)
 status job-control none; set -g IFS \n\ \t; set -g fish_read_limit 1073741824 # config.fish job control, IFS or read limit would steer this run
@@ -2540,10 +2540,11 @@ end
 function _vre_regdom --description "_verify_runtime_env sub: Wireless regulatory domain via iw reg get"
     _echo "── Wireless regulatory domain ──"
     if not command -q iw
-        _info "  Regulatory domain: iw(8) absent — cannot query (expected $COUNTRY)"; return 0
+        _warn "  Regulatory domain: iw(8) absent — $COUNTRY not applied until iw is installed (cachyos-iw-set-regdomain needs it)"
+        _info "  ↳ Install missing: sudo pacman -Syu --needed iw"; return 0
     end
     set -l _rg (command env LC_ALL=C iw reg get 2>/dev/null); set -l _rg_rc $status
-    if test "$_rg_rc" -ne 0; _info "  Regulatory domain: iw reg get failed (rc=$_rg_rc; no nl80211 support, or the Wi-Fi driver is not loaded) — cannot query (expected $COUNTRY)"; return 0; end # as the iw-absent row
+    if test "$_rg_rc" -ne 0; _info "  Regulatory domain: iw reg get failed (rc=$_rg_rc; no nl80211 support, or the Wi-Fi driver is not loaded) — cannot query (expected $COUNTRY)"; return 0; end # a failed query is no verdict
     if string match -qr -- "^country $COUNTRY" $_rg
         _ok "  Regulatory domain: country $COUNTRY active"
     else

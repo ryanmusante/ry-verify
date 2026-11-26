@@ -3,13 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.303.0
+7.304.0
 -------
 
-  - changelog: fold the prior block into the 7.260.0 range
+  - verify: without iw(8) the regulatory domain WARNs as not applied
 
 
-7.260.0 - 7.302.0
+7.260.0 - 7.303.0
 -----------------
 
   - guard: 7.260.0 fish_read_limit is pinned to 1 GiB; 7.264.0 a few-byte
