@@ -3,13 +3,13 @@ Changes for ry-verify
 
 Newest first. Versioning is MAJOR.MINOR.PATCH.
 
-7.302.0
+7.303.0
 -------
 
   - changelog: fold the prior block into the 7.260.0 range
 
 
-7.260.0 - 7.301.0
+7.260.0 - 7.302.0
 -----------------
 
   - guard: 7.260.0 fish_read_limit is pinned to 1 GiB; 7.264.0 a few-byte
@@ -26,8 +26,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     7.267.0 a lapse at the dmesg or ruleset read WARNs as a lapse
   - verify: 7.274.0 a GKeyFile key with a tab before its [locale] parses; a
     lapse in a permission loop says the rest went unchecked
-  - report: 7.264.0 --report is gone (exit 2) and exit 1 no longer means an
-    unwritten report
+  - report: 7.264.0 --report is gone (exit 2) and exit 1 no longer means
+    an unwritten report
   - logging: 7.260.0 new VERIFY_ESP_LAYOUT_FAIL and VERIFY_STATIC_READ_FAIL
     keys; 7.265.0 every run logs KERNEL_RELEASE
   - consistency: 7.264.0 messages read user bus
@@ -61,8 +61,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     nftables.conf gains flush, table, drop, accept and policy rows
   - verify: 7.258.0 a dangling /etc/fstab .ry.bak or .ry.orig link is a stray;
     a lapsed probe WARNs, once per check
-  - logging: 7.257.0 BLUEZ_ROLES_RUNTIME headset= counts cards; 7.258.0
-    VERIFY_RESULT names its scope
+  - logging: 7.257.0 BLUEZ_ROLES_RUNTIME headset= counts cards;
+    7.258.0 VERIFY_RESULT names its scope
 
 
 7.254.0 - 7.255.0
@@ -108,10 +108,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     7.251.0 a universal _ROOT_UUID never steers the cmdline checks
   - signals: 7.250.0 a second startup signal no longer exits 0 or 1; one in an
     early exit's last step, 7.251.0 or before the main handler, keeps its code
-  - preflight: 7.247.0 MODULES and HOOKS tokens are charset-checked; 7.252.0
-    an empty or non-directory HOME names the value
-  - check: 7.247.0 a masked MASK unit still running is drift; 7.251.0 a
-    RemainAfterExit nftables.service is probed for a live ruleset
+  - preflight: 7.247.0 MODULES and HOOKS tokens are charset-checked;
+    7.252.0 an empty or non-directory HOME names the value
+  - check: 7.247.0 a masked MASK unit still running is drift;
+    7.251.0 a RemainAfterExit nftables.service is probed for a live ruleset
   - verify: 7.247.0 a running MASK unit not masked is named; efi and chainload
     entries are skipped
   - verify: 7.247.0 a file in a root-only directory is checked with sudo;
@@ -121,10 +121,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     directory at a .ry.bak name WARNs, 7.252.0 as does an empty .ry.bak
   - verify: 7.250.0 - 7.252.0 modprobe.d, initcpio/install, conf.d,
     mkinitcpio.d and NM dirs behind 0700 are read as root
-  - verify: 7.252.0 a linux entry with no options line FAILs as missing every
-    KERNEL_PARAMS token
-  - logging: 7.247.0 a failed date leaves the header ts empty; 7.250.0 the
-    preflight log starts early
+  - verify: 7.252.0 a linux entry with no options line FAILs as missing
+    every KERNEL_PARAMS token
+  - logging: 7.247.0 a failed date leaves the header ts empty;
+    7.250.0 the preflight log starts early
 
 
 7.235.0 - 7.245.0
@@ -132,8 +132,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 
   - guard: 7.243.0 TMPDIR is pinned to /tmp; 7.245.0 a missing findmnt exits 3
   - signals: 7.245.0 drop the PIPE handler
-  - preflight: 7.240.0 iommu=off counts as no IOMMU for amdxdna; 7.243.0 the
-    dual-stack WARN names both nftables generators
+  - preflight: 7.240.0 iommu=off counts as no IOMMU for amdxdna;
+    7.243.0 the dual-stack WARN names both nftables generators
   - preflight: 7.243.0 a sudo -v that caches nothing (timestamp_timeout=0),
     7.245.0 or a passing sudo -n -v with sudo -n unusable, exits 3
   - check: 7.243.0 --check stays silent when id(1) is missing or the disk is
@@ -142,8 +142,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     pacman -Syu --needed; 7.245.0 each missing package gets its own hint
   - verify: 7.240.0 an ext4 row with nolazytime, 7.243.0 or several commit=,
     FAILs as a pending rewrite
-  - verify: 7.241.0 the policy-drop FAIL, 7.245.0 and the IPv4 ping WARN, name
-    systemctl restart
+  - verify: 7.241.0 the policy-drop FAIL, 7.245.0 and the IPv4 ping WARN,
+    name systemctl restart
   - verify: 7.243.0 mkinitcpio.conf.d drop-ins and dotfiles warn as overrides;
     $'...'-quoted ENV_VARS are decoded
   - verify: 7.243.0 a killed run's temp file is a stray; stray and NM
@@ -151,8 +151,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.245.0 sysctl keys and values trim as the generator writes them;
     a symlinked loader/entries dir is listed
   - logging: 7.241.0 a signal before the header leaves no footer-only JSONL
-  - logging: 7.243.0 a failed stderr write stops terminal output; 7.245.0
-    STDERR_WRITE_FAIL logs once
+  - logging: 7.243.0 a failed stderr write stops terminal output;
+    7.245.0 STDERR_WRITE_FAIL logs once
   - consistency: 7.242.0 error text reads 'unparsable', not 'unparseable'
 
 
@@ -161,8 +161,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 
   - kernel: 7.217.0 drop ttm.pages_limit=20971520
   - perf: 7.217.0 governor performance -> powersave, EPP performance kept
-  - env: 7.217.0 RADV_PERFTEST=nggc -> nggc,nircache; 7.220.0 expect
-    SDL_GAMECONTROLLER_IGNORE_DEVICES
+  - env: 7.217.0 RADV_PERFTEST=nggc -> nggc,nircache;
+    7.220.0 expect SDL_GAMECONTROLLER_IGNORE_DEVICES
   - configuration: 7.229.0 MangoHud expects no_small_font and alpha=0.8, not
     text_outline; 7.232.0 text_outline=0
   - packages: 7.220.0 expect pipewire-jack installed
@@ -179,8 +179,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - verify: 7.220.0 the WirePlumber rule is checked in file and via pactl;
     7.224.0 more parser rejections, live fstab
   - verify: 7.229.0 drop soft-mixer checks; list strays beside managed files
-  - verify: 7.230.0 stray-sibling match drops the ? wildcard; 7.231.0 an
-    unreadable sdboot conf.d warns
+  - verify: 7.230.0 stray-sibling match drops the ? wildcard;
+    7.231.0 an unreadable sdboot conf.d warns
   - verify: 7.233.0 startup WARNs count in the Combined line and footer; bytes
     after a NUL read MISMATCH
   - verify: 7.233.0 a duplicate HOOKS= line warns once; ESP autodetect reads
@@ -195,13 +195,13 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
 
   - kernel: 7.195.0 fsck.mode=force; 7.199.0 add ttm.pages_limit=20971520;
     7.204.0 expect nowatchdog
-  - perf: 7.204.0 expect governor powersave with EPP performance; 7.211.0
-    expect governor performance again
-  - env: 7.195.0 GSK_RENDERER ngl -> gl, drop PROTON_FSR4_INDICATOR=1; 7.212.1
-    expect RADV_PERFTEST=nggc and MANGOHUD_DLSYM=1
+  - perf: 7.204.0 expect governor powersave with EPP performance;
+    7.211.0 expect governor performance again
+  - env: 7.195.0 GSK_RENDERER ngl -> gl, drop PROTON_FSR4_INDICATOR=1;
+    7.212.1 expect RADV_PERFTEST=nggc and MANGOHUD_DLSYM=1
   - sysctl: 7.195.0 expect vm.watermark_scale_factor=125
-  - configuration: 7.195.0 expect MangoHud cpu_stats enabled; 7.203.0 the
-    managed-file header on every file but /etc/kernel/cmdline
+  - configuration: 7.195.0 expect MangoHud cpu_stats enabled;
+    7.203.0 the managed-file header on every file but /etc/kernel/cmdline
   - configuration: 7.205.0 the cpupower header names EnvironmentFile=
   - cli: 7.211.0 glued short flags take only h and v; -Vh and -hV fail like -V
   - check: 7.195.1 - 7.195.2 silence every bootstrap gate; 7.200.1 log
@@ -212,8 +212,8 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     its perms row INFO; 7.206.0 bluetooth keys in emission order
   - verify: 7.203.0 - 7.208.0 labels read Wi-Fi and kernel.watchdog; 7.207.0 a
     sudo bail closes its section; 7.211.0 unset ENV_VARS name daemon-reload
-  - report: 7.214.0 --report runs --verify and writes an HTML report; 7.215.0
-    states grade as the ledger
+  - report: 7.214.0 --report runs --verify and writes an HTML report;
+    7.215.0 states grade as the ledger
   - split: 7.190.0 move ry-verify.fish here
 
 
@@ -226,21 +226,21 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
   - dns: 7.148.0 drop pinned upstreams, DNSOverTLS= and DNSSEC=; link DNS wins
   - env: 7.154.0 PROTON_FSR4_UPGRADE -> FSR4_WATERMARK; 7.163.0 expect
     GSK_RENDERER=ngl; 7.181.0 FSR4_WATERMARK -> PROTON_FSR4_INDICATOR=1
-  - sysctl: 7.157.0 drop both net.core.netdev_budget keys; 7.171.0 drop
-    vm.swappiness=150
+  - sysctl: 7.157.0 drop both net.core.netdev_budget keys;
+    7.171.0 drop vm.swappiness=150
   - configuration: 7.159.0 assert the nftables ICMPv6 base accept
   - packages: 7.173.0 add cachyos-benchmarker
   - preflight: 7.185.1 an NM_WIFI_POWERSAVE outside 0-3 exits 3
-  - backup: 7.174.0 .ry.bak moves to ~/ry-install/backups; 7.176.0 .ry.orig
-    strays are INFO
+  - backup: 7.174.0 .ry.bak moves to ~/ry-install/backups;
+    7.176.0 .ry.orig strays are INFO
   - boot: 7.140.0 drop -T0; 7.158.0 COMPRESSION_OPTIONS -1 -> -3,
     fsck.mode=force -> auto
   - check: 7.171.0 mode drift sets drift; 7.186.1 - 7.187.0 take every --check
     abbreviation, silent rc 3
   - verify: 7.139.0 every cpufreq policy, non-fallback loader entries and
     resolved unit state
-  - verify: 7.165.0 live ext4 opts, .ry.bak and parser complaints; 7.180.0
-    MangoHud
+  - verify: 7.165.0 live ext4 opts, .ry.bak and parser complaints;
+    7.180.0 MangoHud
   - split: 7.177.0 move verify and check to ry-verify.fish
 
 
@@ -251,10 +251,10 @@ Newest first. Versioning is MAJOR.MINOR.PATCH.
     kernel.nmi_watchdog=0
   - perf: 7.130.0 - 7.131.1 governor and EPP performance, GPU DPM level high
   - dns: 7.123.0 - 7.129.0 pin upstreams in resolved and NM global-dns
-  - env: 7.123.0 - 7.129.0 FSR4_UPGRADE -> PROTON_FSR4_UPGRADE; drop
-    VKD3D_CONFIG
-  - configuration: 7.137.0 - 7.138.0 drop the dormant RY_REMOTE_PLAY_PORTS
-    nftables gate
+  - env: 7.123.0 - 7.129.0 FSR4_UPGRADE -> PROTON_FSR4_UPGRADE;
+    drop VKD3D_CONFIG
+  - configuration: 7.137.0 - 7.138.0 drop the dormant
+    RY_REMOTE_PLAY_PORTS nftables gate
   - services: 7.118.0 - 7.122.0 mask ufw instead of removing
   - check: 7.135.0 - 7.136.1 record 60-ry-* drop-ins, masks not in MASK
   - verify: 7.100.0 - 7.107.3 SHA-256 checksum, installed vs generated bytes
